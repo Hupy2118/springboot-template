@@ -1,6 +1,5 @@
 package com.cmbchina.backend.infrastructure.common.page;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -36,18 +35,19 @@ public class PageResult<T> {
      */
     private long totalPage;
 
-    public static <T, F> PageResult<T> convert(Page<F> originPage, Function<F, T> converter) {
-        List<F> originList = Optional.ofNullable(originPage.getRecords()).orElse(new ArrayList<>());
-        List<T> targetList = originList.stream().map(converter).collect(Collectors.toList());
-        return new PageResult<>(originPage.getTotal(), targetList,
-                originPage.getCurrent(), originPage.getSize(), originPage.getPages());
+    public static <T, F> PageResult<T> of(long total, int current, int pageSize,
+                                          List<F> origin, Function<F, T> converter) {
+        long totalPage = (pageSize <= 0) ? 0 : (total + pageSize - 1) / pageSize;
+        List<F> safeList = Optional.ofNullable(origin).orElse(new ArrayList<>());
+        List<T> targetList = safeList.stream().map(converter).collect(Collectors.toList());
+        return new PageResult<>(total, targetList, current, pageSize, totalPage);
     }
 
-    public static <T, F> PageResult<T> convert(PageResult<F> originPage, Function<F, T> converter) {
-        List<F> originList = Optional.ofNullable(originPage.getList()).orElse(new ArrayList<>());
-        List<T> targetList = originList.stream().map(converter).collect(Collectors.toList());
-        return new PageResult<>(originPage.getTotal(), targetList,
-                originPage.getCurrent(), originPage.getPageSize(), originPage.getTotalPage());
+    public static <T, F> PageResult<T> convert(PageResult<F> origin, Function<F, T> converter) {
+        List<F> safeList = Optional.ofNullable(origin.getList()).orElse(new ArrayList<>());
+        List<T> targetList = safeList.stream().map(converter).collect(Collectors.toList());
+        return new PageResult<>(
+                origin.getTotal(), targetList, origin.getCurrent(), origin.getPageSize(), origin.getTotalPage());
     }
 
 }
