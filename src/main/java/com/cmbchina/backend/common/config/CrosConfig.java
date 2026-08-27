@@ -1,4 +1,4 @@
-package com.cmbchina.backend.infrastructure.config;
+package com.cmbchina.backend.common.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
