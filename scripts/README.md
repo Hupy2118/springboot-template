@@ -31,6 +31,14 @@
 ./backend/scripts/bootstrap-authorization.sh
 ```
 
+Windows 使用等价入口：
+
+```powershell
+& .\backend\scripts\bootstrap-authorization.ps1
+```
+
+两个入口均从后端目录运行 Maven，成功返回 `0`；输入或业务校验失败返回 `2`，未预期错误返回 `3`，找不到 Maven 返回 `127`。
+
 脚本优先加载 `backend/.env`，未提供的变量再使用
 `backend/src/main/resources/application.yml` 中的 `spring.datasource.*` 默认值。
 `application.yml` 的 `${DB_URL:default}`、`${DB_USERNAME:default}`、
