@@ -6,8 +6,6 @@ import java.util.List;
 
 public interface RoleMemberRepository {
 
-    List<RoleMember> findByMemberId(String memberId);
-
     List<RoleMember> findByRoleId(String roleId);
 
     void deleteByRoleId(String roleId);

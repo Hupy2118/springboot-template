@@ -31,11 +31,6 @@ public class RoleRepositoryImpl implements RoleRepository {
     }
 
     @Override
-    public long countActive() {
-        return roleMapper.selectCount(new LambdaQueryWrapper<>());
-    }
-
-    @Override
     public Role findByRoleId(String roleId) {
         RolePO role = roleMapper.selectOne(new LambdaQueryWrapper<RolePO>()
                 .eq(RolePO::getRoleId, roleId));

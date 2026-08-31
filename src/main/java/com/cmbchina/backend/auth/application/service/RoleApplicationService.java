@@ -14,7 +14,6 @@ import com.cmbchina.backend.auth.domain.repository.RoleMemberRepository;
 import com.cmbchina.backend.auth.domain.repository.RoleRepository;
 import com.cmbchina.backend.auth.domain.repository.RoleResourceRepository;
 import com.cmbchina.backend.common.exception.BizException;
-import com.cmbchina.backend.common.lock.NamedLockRepository;
 import com.cmbchina.backend.common.page.PageParam;
 import com.cmbchina.backend.common.page.PageResult;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +36,6 @@ public class RoleApplicationService {
     private final ResourceRepository resourceRepository;
     private final RoleMemberRepository roleMemberRepository;
     private final RoleResourceRepository roleResourceRepository;
-    private final NamedLockRepository namedLockRepository;
 
     public PageResult<RoleDTO> listRoles(PageParam query) {
         int safeCurrent = query.getCurrent();
@@ -53,7 +51,6 @@ public class RoleApplicationService {
     @Transactional(rollbackFor = Exception.class)
     public RoleDTO createRole(RoleUpsertDTO request) {
         String actor = currentActor();
-        namedLockRepository.acquire(AuthConstants.ROLE_ID_LOCK);
         Integer current = roleRepository.findMaxGeneratedRoleNumber();
         int next = current == null ? 1 : current + 1;
         if (next > 999) {

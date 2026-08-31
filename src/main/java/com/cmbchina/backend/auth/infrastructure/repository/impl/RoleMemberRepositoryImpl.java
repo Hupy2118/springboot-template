@@ -19,11 +19,6 @@ public class RoleMemberRepositoryImpl implements RoleMemberRepository {
     private final RoleMemberConverter converter;
 
     @Override
-    public List<RoleMember> findByMemberId(String memberId) {
-        return converter.toEntities(roleMemberMapper.findByMemberId(memberId));
-    }
-
-    @Override
     public List<RoleMember> findByRoleId(String roleId) {
         return converter.toEntities(roleMemberMapper.findByRoleId(roleId));
     }

@@ -8,6 +8,7 @@
         <result column="created_at" property="createdAt"/>
         <result column="created_by" property="createdBy"/>
     </resultMap>
+
     <select id="listMembers" resultMap="RoleMemberMap">
         SELECT MIN(rm.`role_id`) AS role_id, rm.`member_id`, MIN(rm.`member_name`) AS member_name,
                MIN(rm.`created_at`) AS created_at, MIN(rm.`created_by`) AS created_by
@@ -15,29 +16,27 @@
         JOIN `role` r ON r.`role_id` = rm.`role_id` AND r.`is_deleted` = 0
         GROUP BY rm.`member_id` ORDER BY rm.`member_id` LIMIT #{offset}, #{pageSize}
     </select>
+
     <select id="countMembers" resultType="long">
         SELECT COUNT(DISTINCT rm.`member_id`)
         FROM `role_member` rm
         JOIN `role` r ON r.`role_id` = rm.`role_id` AND r.`is_deleted` = 0
     </select>
-    <select id="findByMemberId" resultMap="RoleMemberMap">
-        SELECT rm.`role_id`, rm.`member_id`, rm.`member_name`, rm.`created_at`, rm.`created_by`
-        FROM `role_member` rm
-        JOIN `role` r ON r.`role_id` = rm.`role_id` AND r.`is_deleted` = 0
-        WHERE rm.`member_id` = #{memberId} ORDER BY rm.`role_id`
-    </select>
+
     <select id="findByRoleId" resultMap="RoleMemberMap">
         SELECT rm.`role_id`, rm.`member_id`, rm.`member_name`, rm.`created_at`, rm.`created_by`
         FROM `role_member` rm
         JOIN `role` r ON r.`role_id` = rm.`role_id` AND r.`is_deleted` = 0
         WHERE rm.`role_id` = #{roleId} ORDER BY rm.`member_id`
     </select>
+
     <insert id="insertBatch">
         INSERT INTO `role_member` (`role_id`, `member_id`, `member_name`, `created_at`, `created_by`) VALUES
         <foreach collection="items" item="item" separator=",">
             (#{item.roleId}, #{item.memberId}, #{item.memberName}, COALESCE(#{item.createdAt}, CURRENT_TIMESTAMP), #{item.createdBy})
         </foreach>
     </insert>
+
     <delete id="deleteBatch">
         DELETE FROM `role_member`
         WHERE `role_id` = #{roleId}

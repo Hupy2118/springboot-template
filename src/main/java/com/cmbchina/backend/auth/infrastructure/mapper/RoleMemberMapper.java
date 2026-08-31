@@ -13,8 +13,6 @@ public interface RoleMemberMapper extends BaseMapper<RoleMemberPO> {
 
     long countMembers();
 
-    List<RoleMemberPO> findByMemberId(@Param("memberId") String memberId);
-
     List<RoleMemberPO> findByRoleId(@Param("roleId") String roleId);
 
     int insertBatch(@Param("items") List<RoleMemberPO> items);

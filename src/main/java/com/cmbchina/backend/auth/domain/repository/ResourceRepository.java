@@ -11,6 +11,4 @@ public interface ResourceRepository {
     Resource findByKey(String resourceKey);
 
     List<String> findExistingKeys(List<String> resourceKeys);
-
-    void save(Resource resource);
 }

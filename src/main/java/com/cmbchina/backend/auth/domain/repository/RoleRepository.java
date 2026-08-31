@@ -6,8 +6,6 @@ import com.cmbchina.backend.common.page.PageResult;
 public interface RoleRepository {
     PageResult<Role> page(int current, int pageSize);
 
-    long countActive();
-
     Role findByRoleId(String roleId);
 
     Integer findMaxGeneratedRoleNumber();

@@ -50,11 +50,4 @@ public class ResourceRepositoryImpl implements ResourceRepository {
                 .map(ResourcePO::getKey)
                 .collect(Collectors.toList());
     }
-
-    @Override
-    public void save(Resource resource) {
-        ResourcePO po = converter.toPO(resource);
-        mapper.insert(po);
-        resource.setId(po.getId());
-    }
 }

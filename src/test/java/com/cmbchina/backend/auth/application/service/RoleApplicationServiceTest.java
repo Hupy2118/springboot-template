@@ -14,7 +14,6 @@ import com.cmbchina.backend.auth.domain.repository.ResourceRepository;
 import com.cmbchina.backend.auth.domain.repository.RoleMemberRepository;
 import com.cmbchina.backend.auth.domain.repository.RoleRepository;
 import com.cmbchina.backend.auth.domain.repository.RoleResourceRepository;
-import com.cmbchina.backend.common.lock.NamedLockRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -43,15 +42,13 @@ class RoleApplicationServiceTest {
     @Mock
     private RoleMemberRepository roleMemberRepository;
     @Mock
-    private NamedLockRepository namedLockRepository;
-    @Mock
     private RoleAssembler roleAssembler;
     private RoleApplicationService service;
 
     @BeforeEach
     void setUp() {
         service = new RoleApplicationService(roleAssembler, roleRepository, resourceRepository,
-                roleMemberRepository, roleResourceRepository, namedLockRepository);
+                roleMemberRepository, roleResourceRepository);
         BaseUserDataThreadHodler.set(new BaseUserData("admin", "管理员"));
     }
 
