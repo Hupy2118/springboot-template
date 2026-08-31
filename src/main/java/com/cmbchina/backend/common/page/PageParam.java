@@ -1,4 +1,4 @@
-package com.cmbchina.backend.infrastructure.common.page;
+package com.cmbchina.backend.common.page;
 
 import lombok.NoArgsConstructor;
 import lombok.Setter;
