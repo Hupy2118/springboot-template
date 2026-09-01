@@ -4,6 +4,9 @@ import com.cmbchina.backend.common.exception.IErrorCode;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * 统一接口响应对象，封装响应码、错误信息和业务数据，并提供成功或失败响应的构造方法。
+ */
 @Getter
 @Setter
 public class ResponseEntity<T> {

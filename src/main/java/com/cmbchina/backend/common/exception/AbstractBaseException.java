@@ -2,6 +2,9 @@ package com.cmbchina.backend.common.exception;
 
 import lombok.Getter;
 
+/**
+ * 异常体系的基础运行时异常，统一封装错误码、格式化参数及原始异常原因。
+ */
 public class AbstractBaseException extends RuntimeException {
 
     private static final long serialVersionUID = 8742197704733072618L;

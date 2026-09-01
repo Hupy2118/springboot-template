@@ -11,6 +11,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 
 import javax.validation.ConstraintViolationException;
 
+/**
+ * 全局异常处理器，将业务异常、请求参数校验异常等统一转换为标准响应结构。
+ */
 @Slf4j
 @RestControllerAdvice
 public class BaseExceptionHandler {
@@ -26,7 +29,7 @@ public class BaseExceptionHandler {
             ConstraintViolationException.class, HttpMessageNotReadableException.class})
     @ResponseStatus(value = HttpStatus.OK)
     public ResponseEntity<Object> validationExceptionHandle(Exception e) {
-        log.warn("请求参数校验失败", e);
+        log.error("请求参数校验失败:", e);
         return ResponseEntity.failed("validation_failed", "请求参数校验失败");
     }
 }

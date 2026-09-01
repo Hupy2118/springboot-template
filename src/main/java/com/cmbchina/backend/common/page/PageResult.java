@@ -10,6 +10,9 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * 分页查询结果，统一封装总条数、分页信息和当前页数据，并支持结果类型转换。
+ */
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor

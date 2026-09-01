@@ -4,6 +4,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+/**
+ * 全局跨域配置，为所有接口统一设置允许的来源、请求方法、请求头及预检请求缓存策略。
+ */
 @Configuration
 public class CrosConfig implements WebMvcConfigurer {
 

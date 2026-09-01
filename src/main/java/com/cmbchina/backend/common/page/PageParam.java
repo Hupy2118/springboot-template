@@ -3,6 +3,9 @@ package com.cmbchina.backend.common.page;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * 分页查询参数，提供当前页码和页面大小，并对非法或超限参数使用默认值。
+ */
 @Setter
 @NoArgsConstructor
 public class PageParam {
