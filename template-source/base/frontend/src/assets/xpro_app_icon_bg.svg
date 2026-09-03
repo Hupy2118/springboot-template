@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1em" height="1em" viewBox="0 0 60 60" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>编组 4备份 2</title>
+    <defs>
+        <rect id="path-1" x="0" y="0" width="60" height="60"></rect>
+    </defs>
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="特别说明" transform="translate(-24.000000, -498.000000)">
+            <g id="椭圆形-+-编组-3-蒙版" transform="translate(24.000000, 498.000000)">
+                <mask id="mask-2" fill="white">
+                    <use xlink:href="#path-1"></use>
+                </mask>
+                <g id="蒙版"></g>
+                <ellipse id="椭圆形" fill="currentColor" opacity="0.200000003" mask="url(#mask-2)" cx="19.6875" cy="61.875" rx="32.8125"
+                         ry="11.25"></ellipse>
+                <ellipse id="椭圆形备份" fill="currentColor" opacity="0.200000003" mask="url(#mask-2)" cx="40.3125" cy="61.40625" rx="32.8125" ry="10.78125"></ellipse>
+                <ellipse id="椭圆形备份-2" fill="currentColor" opacity="0.200000003" mask="url(#mask-2)" cx="30" cy="65.625" rx="32.8125" ry="11.25"></ellipse>
+            </g>
+        </g>
+    </g>
+</svg>
