@@ -1,0 +1,14 @@
+schemaVersion: 1
+source:
+  id: xcodeagent-springboot-template
+  version: 1.0.0
+base:
+  path: base
+  version: 1.0.0
+capabilities:
+  - id: login
+    path: capabilities/login
+    version: 1.0.0
+  - id: authorization
+    path: capabilities/authorization
+    version: 1.0.0

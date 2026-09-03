@@ -1,0 +1,26 @@
+id: login
+version: 1.0.0
+requires: []
+provides: [current-user-context, mock-login]
+configSchema:
+  type: object
+  additionalProperties: false
+  properties:
+    enabled: { type: boolean, default: true }
+    mockLogin: { type: boolean, default: true }
+files:
+  - { source: backend/src/main/java/com/cmbchina/backend/auth, target: backend/src/main/java/com/cmbchina/backend/auth, owner: login }
+  - { source: frontend/src/apis/login.ts, target: frontend/src/apis/login.ts, owner: login }
+  - { source: frontend/src/constants/yst.ts, target: frontend/src/constants/yst.ts, owner: login }
+  - { source: frontend/src/login, target: frontend/src/login, owner: login }
+  - { source: frontend/src/hooks/useGuard.ts, target: frontend/src/hooks/useGuard.ts, owner: login }
+  - { source: frontend/src/pages/Login, target: frontend/src/pages/Login, owner: login }
+  - { source: frontend/src/pages/Logout, target: frontend/src/pages/Logout, owner: login }
+  - { source: frontend/src/providers/index.tsx, target: frontend/src/providers/index.tsx, owner: login }
+  - { source: frontend/src/typings/yst.ts, target: frontend/src/typings/yst.ts, owner: login }
+dependencies: []
+extensions:
+  - { point: frontend.app-provider, id: login-provider, order: 100 }
+  - { point: frontend.routes, id: login-routes, order: 100 }
+  - { point: backend.webmvc-interceptors, id: login-current-user, order: 100 }
+migrations: []

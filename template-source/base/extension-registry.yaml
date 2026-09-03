@@ -1,0 +1,27 @@
+version: 1
+extensionPoints:
+  - id: frontend.app-provider
+    target: frontend/src/generated/capabilityProviders.tsx
+    contributionType: react-provider
+    order: ascending
+    conflict: fail
+  - id: frontend.routes
+    target: frontend/src/generated/capabilityRoutes.tsx
+    contributionType: react-route
+    order: ascending
+    conflict: fail
+  - id: frontend.page-routes
+    target: frontend/src/generated/capabilityRoutes.tsx
+    contributionType: page-route
+    order: ascending
+    conflict: fail
+  - id: frontend.layout-menu
+    target: frontend/src/generated/capabilityMenus.ts
+    contributionType: layout-menu
+    order: ascending
+    conflict: fail
+  - id: backend.webmvc-interceptors
+    target: backend/src/main/java/com/cmbchina/backend/common/config
+    contributionType: spring-webmvc-interceptor
+    order: ascending
+    conflict: fail

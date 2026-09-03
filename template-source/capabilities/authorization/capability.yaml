@@ -1,0 +1,35 @@
+id: authorization
+version: 1.0.0
+requires:
+  - { id: login, mode: required }
+provides: [role-management, resource-permission, member-management]
+configSchema:
+  type: object
+  additionalProperties: false
+  properties:
+    enabled: { type: boolean, default: true }
+files:
+  - { source: backend/src/main/java/com/cmbchina/backend/auth, target: backend/src/main/java/com/cmbchina/backend/auth, owner: authorization }
+  - { source: backend/src/main/resources/mapper/auth, target: backend/src/main/resources/mapper/auth, owner: authorization }
+  - { source: frontend/src/apis/authorization.ts, target: frontend/src/apis/authorization.ts, owner: authorization }
+  - { source: frontend/src/components/authorization, target: frontend/src/components/authorization, owner: authorization }
+  - { source: frontend/src/constants/resources.ts, target: frontend/src/constants/resources.ts, owner: authorization }
+  - { source: frontend/src/hooks/usePageMenus.ts, target: frontend/src/hooks/usePageMenus.ts, owner: authorization }
+  - { source: frontend/src/hooks/usePermission.ts, target: frontend/src/hooks/usePermission.ts, owner: authorization }
+  - { source: frontend/src/pages/System/AuthorizationManagementPage, target: frontend/src/pages/System/AuthorizationManagementPage, owner: authorization }
+  - { source: frontend/src/providers/AuthProvider.tsx, target: frontend/src/providers/AuthProvider.tsx, owner: authorization }
+  - { source: frontend/src/typings/authorization.ts, target: frontend/src/typings/authorization.ts, owner: authorization }
+  - { source: frontend/src/typings/generated/authorizationApiTypes.ts, target: frontend/src/typings/generated/authorizationApiTypes.ts, owner: authorization }
+  - { source: frontend/src/utils/protectedRoutes.tsx, target: frontend/src/utils/protectedRoutes.tsx, owner: authorization }
+dependencies:
+  npm:
+    - { name: ahooks, version: ^3.8.1, section: dependencies }
+extensions:
+  - { point: frontend.app-provider, id: authorization-provider, order: 200 }
+  - { point: frontend.routes, id: authorization-protected-routes, order: 200 }
+  - { point: frontend.page-routes, id: authorization-management-page, order: 200 }
+  - { point: frontend.layout-menu, id: authorization-filtered-menu, order: 200 }
+  - { point: backend.webmvc-interceptors, id: authorization-resource-permission, order: 200 }
+migrations:
+  - { id: schema, source: migrations/001-schema.sql, target: backend/src/main/resources/xcodeagent/migrations/authorization/001-schema.sql, order: 100, mode: COPY }
+  - { id: initialization, source: migrations/002-initialization.sql, target: backend/src/main/resources/xcodeagent/migrations/authorization/002-initialization.sql, order: 200, mode: COPY }

@@ -7,3 +7,13 @@
   --color-primary-1: #2c68ff0A;
   --color-primary-2: #2c68ff14;
 }
+ .authorization-page { min-height: 100%; padding: 24px; background: var(--ant-color-bg-layout, #f5f7fb); color: var(--ant-color-text, #1f1f1f); }
+ .authorization-hero { margin-bottom: 16px; border: 1px solid var(--ant-color-border-secondary, #f0f0f0); background: var(--ant-color-bg-container, #fff); }
+ .authorization-hero .ant-card-body { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+ .authorization-hero h2 { margin: 0 !important; }
+ .authorization-alert { margin-bottom: 16px; }
+.authorization-state { min-height: 50vh; display: flex; align-items: center; justify-content: center; }
+.authorization-login-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--ant-color-bg-layout, #f5f7fb); }
+.authorization-login-card { width: min(400px, 100%); border: 1px solid var(--ant-color-border-secondary, #f0f0f0); }
+.authorization-login-card .ant-alert { margin-bottom: 16px; }
+ @media (max-width: 640px) { .authorization-page { padding: 12px; } .authorization-hero .ant-card-body { align-items: flex-start; flex-direction: column; } }
