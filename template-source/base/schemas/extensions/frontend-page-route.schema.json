@@ -1,0 +1,1 @@
+{"type":"object","required":["path","name","module","export","exportType"],"properties":{"path":{"type":"string"},"name":{"type":"string"},"module":{"type":"string"},"export":{"type":"string"},"exportType":{"enum":["default","named"]},"resourceKey":{"type":"string"}},"additionalProperties":false}

@@ -45,13 +45,19 @@ export function createPageRoutes(
     }
 
     const route: RouteObject = { path: item.pageId ? pageRouteSegmentFromId(item.pageId) : item.path };
-    if (item.pageId || item.modulePath) {
-      const pageModule = resolvePageModule(item);
-      if (!pageModule?.loader) {
-        throw new Error(`未找到页面模块：${item.pageId || item.modulePath}（期望 ${pageModule?.importPath || '有效页面标识'}）`);
+    if (item.pageId || item.modulePath || item.component) {
+      let element: ReactNode;
+      if (item.component) {
+        const Page = item.component;
+        element = <Page />;
+      } else {
+        const pageModule = resolvePageModule(item);
+        if (!pageModule?.loader) {
+          throw new Error(`未找到页面模块：${item.pageId || item.modulePath}（期望 ${pageModule?.importPath || '有效页面标识'}）`);
+        }
+        const Page = lazy(pageModule.loader);
+        element = <Suspense><Page /></Suspense>;
       }
-      const Page = lazy(pageModule.loader);
-      const element = <Suspense><Page /></Suspense>;
       route.element = wrapElement ? wrapElement(element, item) : element;
     }
     if (item.children?.length) route.children = createPageRoutes(item.children, wrapElement);

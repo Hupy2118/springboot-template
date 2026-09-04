@@ -1,209 +1,599 @@
 # XcodeAgent 可插拔模板工程重构方案
 
-本文是模板工程的设计与实施基线。后续任何接口、状态模型、Capability、验收条件或实施范围的调整，必须同步更新本文件。
+本文是模板工程 V1 的唯一设计与实施基线。接口、状态模型、Capability、Extension Point、ChangeSet、错误码和验收条件的调整，必须先更新本文，再修改实现与测试。
 
-# 第一章：方案设计
+## 1. 目标、范围与工程基线
 
-## 1. 目标与边界
+当前工程基线为 Java 8、Spring Boot 2.7.2、Maven、React 18、Vite 和 pnpm。仓库根没有 Maven Reactor 或 Maven Wrapper，template-engine 尚未形成工程；V1 不创建根 mvnw，不实现 CLI，也不建立第二套本地组合逻辑。
 
-目标是将当前模板拆分为稳定的 `Base` 与可组合的 `Capability`，由 Engine 根据配置生成或收敛目标工程；上层系统只负责请求编排，XcodeAgent 只负责在本地工作区落地变更。
+唯一 Core Engine 使用固定 Template Source、当前 TemplateState 和完整 RequestedConfig 计算 Target State，并输出 ChangeSet。Engine Service 只治理 Project State、Revision、ChangeSet 生命周期、认证和幂等。
 
-V1 必须满足：
+本项目交付范围：
 
-- Base 可独立构建、测试、运行；
-- `login`、`authorization` 可独立启用、组合启用和升级；
-- 同一输入、同一源码版本和同一锁定版本产生相同的期望状态；
-- 变更先被计划、校验和存档，再由执行端应用；
-- 本地 CLI 可以完整调试组合结果，不依赖第三阶段服务接口。
+    Template Source
+    TemplateSourceLoader
+    Engine Core
+    Stage2 Apply Fixture
+    Engine Service
+    OpenAPI
 
-V1 不包含多仓库事务、自动合并人工改动、未声明的能力组合，以及把 XcodeAgent 纳入本模板工程的交付物。
+XcodeAgent 只保留外部参考设计。本项目不实现 XcodeAgent Client、FakeXcodeAgent、Pending Apply 文件、Agent Apply 或恢复测试；它们不属于本项目 V1 退出条件。
 
-## 2. 分层职责与不可跨越的边界
-
-| 层 | 职责 | 不负责 |
+| 层 | 负责 | 不负责 |
 |---|---|---|
-| Template Source | Base、Capability、迁移、结构化贡献声明 | 读取用户工程、写入工作区 |
-| Core Engine | 校验配置、解析能力、计算期望状态与 ChangeSet | HTTP、Git 拉取、文件落地 |
-| CLI | 以本地方式调用 Core、输出可调试产物 | 复制第二套组合逻辑 |
-| Engine Service | 源码快照、持久化、幂等、鉴权、HTTP | 文件落地、重新实现 Core |
-| XcodeAgent | 获取 ChangeSet、工作区锁定、应用、构建验证、提交 | 能力解析、依赖选择、二次编排 |
+| Template Source | Base、Capability、Schema、Extension、Migration、模板文件 | Project State、HTTP、Workspace |
+| TemplateSourceLoader | 加载和校验固定 Source | Capability Resolve、持久化 |
+| Core Engine | Resolve、Renderer、Target、Diff、ChangeSet | HTTP、Revision、Workspace 写入 |
+| Stage2 Fixture | 临时 Workspace Apply、验证、State 写入 | Service 生命周期、Agent 恢复 |
+| Engine Service | Project State、ChangeSet 生命周期、认证、幂等、审计 | 重写 Core、写 Workspace |
+| XcodeAgent 参考设计 | 说明外部执行方协议 | 本项目代码、测试、验收 |
 
-唯一的组合入口是 Core。CLI、Service 和 XcodeAgent 均不得实现另一套 Capability 解析、依赖合并或模板渲染规则。
+V1 不支持历史 Template Source Snapshot、调用方选择 Source 或版本、内容 Hash/CAS、自动合并人工修改、目录/Glob/二进制 File Operation、任意 XML Patch、Capability 自定义 Config Binding、真实业务数据库 Migration 执行或本项目内的 XcodeAgent 实现。
 
-## 3. 仓库结构与发布单元
+login 必须可独立启用。authorization 必须以 required 单向依赖 login。Login 不得 import Authorization API、AuthProvider、权限资源、权限页面或权限刷新逻辑。
 
-```text
-template-source/
-  base/
-  capabilities/
-    login/
-    authorization/
-  migrations/
-  catalog.yaml
-template-engine/
-  engine-core/
-  engine-cli/
-  engine-service/
-docs/
-  REFACTOR.md
-```
+## 2. Template Source 协议
 
-- `template-source` 是能力和迁移的发布单元；Base 与全部 Capability 必须来自同一不可变 `sourceRef`。
-- `engine-core` 是无副作用的组合内核；`engine-cli` 和 `engine-service` 只是适配层。
-- 当前工程仅交付前三层；XcodeAgent 的协议在本章保留，但其实现不属于本仓库。
+固定目录：
 
-## 4. Base、Capability 与文件归属
+    template-source/
+      template-revision.txt
+      catalog.yaml
+      base/
+        base.yaml
+        extension-registry.yaml
+        schemas/extensions/
+        frontend/
+        backend/
+      capabilities/<id>/
+        capability.yaml
+        config.schema.json
+        frontend/
+        backend/
+        migrations/
+        docs/
 
-Base 提供应用骨架、最小配置、公共异常与响应结构、数据库和构建基线；不得引用任一可选能力的类、Bean、路由、表、权限或前端入口。
+    template-engine/
+      pom.xml
+      engine-core/
+      engine-service/
 
-Capability 是可独立识别、可声明依赖、可升级、可校验的增量包。每个 Capability 包含：
+    validation/
+      verify-stage2.sh
 
-```text
-capabilities/<id>/
-  capability.yaml
-  backend/
-  frontend/
-  docs/
-  migrations/
-```
+### 2.1 Source 注入
 
-`capability.yaml` 至少声明 `id`、`version`、`requires`、`provides`、`configSchema`、`files`、`dependencies`、`extensions` 和 `migrations`。文件归属应完整覆盖 Capability 自身新增或接管的文件。
+template-source/template-revision.txt 是唯一发布代次。
 
-文件归属规则：
+- Stage2 固定从仓库根读取 template-source。
+- Stage3 仅从 Service 部署配置读取 Source Root。
+- Core 在构造期接收 TemplateSourceContext。
+- 业务请求、HTTP 请求和测试参数都不得传入或覆盖 Source Path、Source Ref、Snapshot、Template Version 或 Template Revision。
+- Template Source 的任一受管文件、Manifest、Schema、Registry 或 Renderer 协议发生变化时，发布者必须提升 template-revision.txt；同 Revision 的 Source 视为不可变。
 
-- Base 文件仅由 Base 拥有；Capability 文件仅由一个 Capability 拥有；
-- 对既有文件的共同扩展只能通过预定义 Extension Point；
-- 发生文件所有权、路径或扩展点冲突时，规划失败，不能按安装顺序覆盖；
-- 被 Capability 管理的文件，状态中需记录 `owner`、`source`、`contentHash`、`formatVersion` 与用户改动标识。
+### 2.2 Base 与显式文件清单
 
-## 5. 配置、依赖和解析结果
+base.yaml 固定字段：
 
-输入配置分为两层：`requested` 是用户表达的选择；`effective` 是经依赖闭包、版本约束与冲突校验后的实际安装集合。响应、状态和 ChangeSet 均必须返回 `effective`，并标识隐式引入项。
+    schemaVersion: 1
+    id: base
+    files: []
+    reservedRootPaths: ["/", "/page"]
+    reservedPagePaths: []
+    validationPlan: []
 
-`requires` 使用三态语义：
+Generated Target 不在 base.yaml 声明，只在 Extension Registry 声明。
 
-- `required`：必须存在；
-- `optional`：存在时集成，不存在不报错；
-- `forbidden`：存在即冲突。
+files 元素只允许单文件映射：
 
-每个 Capability 的配置用 JSON Schema 描述。Core 在渲染前完成默认值填充、类型校验、必填校验、条件约束和未知字段校验；配置错误不得进入渲染或 ChangeSet 阶段。
+    source: frontend/src/App.tsx
+    target: frontend/src/App.tsx
 
-## 6. 依赖与共享文件的结构化贡献
+规则：
 
-Capability 不得提交原始 `pom.xml`、`package.json` 或任意共享配置片段后再进行文本拼接。依赖和共享文件变更必须转换为结构化 Contribution。
+- source 相对于所属 Base 或 Capability 根目录；target 为 Workspace 相对 POSIX 文件路径。
+- Owner 由所属 Base/Capability 推导，不允许在 File Entry 重复声明。
+- base/frontend、base/backend、Capability 的 frontend、backend 下每个非文档普通文件必须在所属 Manifest 的 files 中恰好声明一次。
+- Capability 的 migrations 下每个普通文件必须在 migrations 中恰好声明一次，不得同时出现在 files 中；Core 将每个 Migration 物化为一个 Engine-owned Managed File 和对应的 TemplateState.migrations 记录。
+- 未声明模板文件报 UNDECLARED_TEMPLATE_FILE；重复 Target 报 FILE_OWNERSHIP_CONFLICT。
+- Manifest、Schema、README 等 Source 元数据不列入 files。
+- 目录、Glob、绝对路径、..、符号链接、非 UTF-8、二进制、.git、node_modules、target、build、dist、coverage、IDE 文件和 pnpm-lock.yaml 即使被声明也必须拒绝。
+- 二进制 favicon 改为 SVG。
 
-| 目标 | 稳定键 | 合并规则 |
-|---|---|---|
-| Maven 依赖 | `groupId:artifactId:type:classifier` | 版本由 Base 或显式裁决策略确定 |
-| npm 依赖 | `packageName` | 相同包的版本范围必须相容 |
-| Spring Bean | 类名或显式 Bean 名 | 重名即冲突，除非扩展点允许 |
-| HTTP 路由 | method + path | 完全相同即冲突 |
-| 数据表/字段 | 逻辑对象名 | 不兼容定义即冲突 |
+### 2.3 Capability Manifest、Config、Dependency 与 Migration
 
-共享扩展点由 Base 的 `extension-registry.yaml` 定义，包含标识、目标文件、锚点、允许的贡献类型、顺序策略和冲突策略。未注册的扩展点不可使用。贡献必须在解析后排序并以稳定格式写入，避免输入遍历顺序导致输出漂移。
+capability.yaml 固定字段：
 
-### 6.1 前端受管组合层
+    schemaVersion
+    id
+    version
+    requires
+    provides
+    configSchema
+    files
+    dependencies
+    extensions
+    migrations
 
-Base 的 `App`、主路由和布局只能依赖 `frontend/src/generated/` 中的稳定入口，不能直接导入 Capability。Core 按有效 Capability 集完整生成 `capabilityProviders.tsx`、`capabilityRoutes.tsx` 和 `capabilityMenus.ts`；空能力集生成恒等 Provider、空路由贡献和原样菜单。Capability 只能贡献 Provider、根路由、页面路由、页面包装器或菜单过滤器，且按 `(order, capabilityId, contributionId)` 稳定排序。
+configSchema 只能引用 Capability 根目录的 config.schema.json，不允许内嵌第二份 Schema。
 
-`login` Provider 的顺序为 100，`authorization` 为 200；因此组合时登录上下文始终位于权限 Provider 外层。授权资源键、守卫和 API 类型是 authorization 私有实现，不进入 Base 的公共路由类型或常量文件。
+enabled 只属于 Requested Config Envelope。Login 和 Authorization 的 V1 Config Schema 固定为空对象，additionalProperties 为 false。删除未映射到目标工程的 mockLogin Config。
 
-## 7. Migration、文档与工程状态
+requires 元素：
 
-迁移以版本目录及 `migration.yaml` 管理，声明来源/目标版本、前置条件、结构化步骤、回滚能力和人工介入要求。Core 只计划迁移；执行端负责实际执行和结果回传。
+    id: login
+    mode: required
 
-文档按对象归属：Base 文档仅说明 Base；Capability 文档仅说明自身功能、配置和迁移；最终工程的 `AGENTS.md` 描述实际工程结构、已启用能力、构建命令及扩展约定，不承载模板设计全文。
+mode 只支持 required、optional、forbidden。V1 不支持 Capability 版本范围。未知 Capability、依赖循环、required 配置缺失、forbidden 组合都在 Resolve 阶段失败。
 
-工作区状态至少包含：
+RequestedConfig 是完整目标配置：
 
-- `.template-engine/state.json`：来源、请求与生效配置、能力版本、文件归属和哈希；
-- `.template-engine/lock.json`：解析后的精确能力版本与源码提交；
-- `.template-engine/changesets/<id>.json`：可审计的变更计划和执行结果。
+    {
+      "capabilities": {
+        "login": { "enabled": true, "config": {} },
+        "authorization": { "enabled": true, "config": {} }
+      }
+    }
 
-## 8. 确定性、ChangeSet 与并发控制
+未声明 Capability 视为未启用；enabled:false 从规范化 Requested Config 删除。Authorization 启用时 Login 自动进入 Effective Config；requiredBy 按 Capability ID 排序。
 
-期望状态由以下输入唯一决定：Base 版本、`effective` 配置、Capability 精确版本、迁移集合、渲染器版本、格式化器版本和 `sourceRef`。所有配置、状态和 ChangeSet 在哈希前采用确定性序列化。
+Dependency 结构：
 
-ChangeSet 是执行端唯一的写入依据，至少包含：
+    dependencies:
+      npm:
+        - name: ahooks
+          version: "^3.8.1"
+          section: dependencies
+      maven:
+        - groupId: example
+          artifactId: example
+          version: "1.0.0"
+          scope: compile
+          type: jar
+          classifier: ""
+          optional: false
+          exclusions: []
 
-- 元数据：`changeSetId`、输入/输出状态哈希、锁定版本、创建时间；
-- 文件操作：新增、更新、删除、移动、每项前置哈希和目标内容或受控内容引用；
-- 结构化操作：依赖、扩展点、迁移和配置操作；
-- 验证计划、风险和人工介入项。
+npm 稳定键为 section,name；Maven 稳定键为 groupId,artifactId,type,classifier。相同键完整值一致时合并 contributors；否则报 DEPENDENCY_CONFLICT。Login 声明 ahooks，Authorization 通过 required Login 获得该依赖。
 
-写入采用 compare-and-set：当前内容或状态与 ChangeSet 前置哈希不一致时必须停止并报告冲突；不得无条件覆盖。人工改动默认保留并进入冲突或人工介入流程。
+Migration 仅在 capability.yaml 声明：
 
-## 9. 对外接口与 XcodeAgent 协议
+    migrations:
+      - id: authorization-schema
+        source: migrations/001-schema.sql
+        target: backend/src/main/resources/xcodeagent/migrations/authorization/001-schema.sql
+        order: 100
+        mode: COPY
 
-Engine Service 的最小接口为：
+Migration ID 在 Capability 内唯一，Target 全局唯一。Core 只物化 File Operation；删除独立 migration.yaml，不执行数据库 SQL。
 
-- `POST /v1/projects/plan`：解析并返回 ChangeSet；
-- `POST /v1/projects/simulate`：不产生可应用写入，返回预览和风险；
-- `POST /v1/projects/apply`：记录执行请求并返回执行任务或 ChangeSet；
-- `GET /v1/projects/{projectId}/state`：读取状态；
-- `GET /v1/changesets/{changeSetId}`：读取可审计计划。
+## 3. Extension 与 Generated Layer 协议
 
-所有写接口使用 `Idempotency-Key`；同一调用方和相同请求体返回同一结果，不同请求体使用同一键必须拒绝。服务持久化源快照、锁定版本、状态、幂等记录、ChangeSet 与审计事件。
+Registry 唯一位置为 base/extension-registry.yaml。每个 Point 固定字段：
 
-XcodeAgent 的保留设计是：获取 ChangeSet → 获取工作区锁 → 检查前置哈希 → 应用文件与结构化变更 → 执行验证 → 回传结果 → 可选提交。它不属于本模板工程实施范围，且不得绕过 ChangeSet 直接解释配置或改写模板逻辑。
+    point
+    payloadSchema
+    renderer
+    target
+    cardinality
+    orderBy: CONTRIBUTION_ORDER
 
-## 10. 验证与错误契约
+payloadSchema 引用 base/schemas/extensions/<point>.schema.json。
 
-Core 必须覆盖配置校验、依赖闭包、冲突检测、确定性、迁移路径、Contribution 合并和 ChangeSet 生成。CLI/Service 必须覆盖适配层与 Core 输出一致性；模板组合至少覆盖 Base、login、authorization、组合安装、升级、冲突和用户改动冲突。
+Contribution Envelope：
 
-错误统一返回机器可读的 `code`、`message`、`details`、`traceId`。最低错误集合包括：`CONFIG_INVALID`、`CAPABILITY_NOT_FOUND`、`CAPABILITY_CONFLICT`、`VERSION_UNSATISFIABLE`、`EXTENSION_POINT_INVALID`、`MIGRATION_PATH_MISSING`、`STATE_CONFLICT`、`IDEMPOTENCY_CONFLICT` 和 `SOURCE_REF_INVALID`。
+    point: frontend.providers
+    id: login-provider
+    order: 100
+    payload: {}
 
-# 第二章：实施计划
+稳定键为 point, capabilityId, id；排序为 order, capabilityId, id。Renderer 不允许按 Capability ID 分支。
 
-实施顺序固定为“能力定义与拆分 → 本地组合与调试 → 对外接口”。每一步的验收针对本阶段边界；后续阶段不得替前一阶段补齐其验收缺口。
+| Point | Renderer | Target | Cardinality |
+|---|---|---|---|
+| frontend.providers | frontend-providers-v1 | frontend/src/generated/capabilityProviders.tsx | MANY |
+| frontend.root-routes | frontend-routes-v1 | frontend/src/generated/capabilityRoutes.tsx | MANY |
+| frontend.page-routes | frontend-routes-v1 | frontend/src/generated/capabilityRoutes.tsx | MANY |
+| frontend.page-wrappers | frontend-routes-v1 | frontend/src/generated/capabilityRoutes.tsx | MANY |
+| frontend.menu-hooks | frontend-menus-v1 | frontend/src/generated/capabilityMenus.ts | MANY |
+| backend.spring-interceptors | spring-webmvc-v1 | backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java | MANY |
 
-## 阶段一：模板能力定义与代码拆分
+Core 每个唯一 renderer,target 只调用 Renderer 一次。frontend-routes-v1 聚合三个路由 Point 后一次性写 capabilityRoutes.tsx；多个 Renderer 不得覆写同一 Generated File。
 
-本阶段只建立 `template-source` 与可独立启停的模板能力，不实现配置组合器、HTTP 服务或 XcodeAgent。
+冲突规则：
 
-| 步骤 | 实施内容 | 可验收结果 |
-|---|---|---|
-| 1.1 | 建立 `template-source/base`、`capabilities`、`migrations`、`catalog.yaml` 的目录和版本规范 | 新目录可被独立定位；catalog 能列出 Base、`login`、`authorization` 和精确版本 |
-| 1.2 | 将现有工程收敛为纯 Base，移除对登录、授权、角色成员等可选功能的编译期和运行期依赖 | Base 后端测试通过，前端构建通过；启动后不暴露登录/授权专属路由或菜单 |
-| 1.3 | 将登录的后端、前端、配置、文档和迁移移入 `capabilities/login`，编写完整 manifest | login 文件均由 manifest 覆盖；Base 不再引用 login；单独将 login 叠加到 Base 后可构建运行 |
-| 1.4 | 将授权及角色成员能力移入 `capabilities/authorization`，并显式声明与 login 的关系 | authorization manifest 可表达 required/optional/forbidden；独立与组合样例均按声明工作 |
-| 1.5 | 修复搬迁前已有的基础测试缺口，例如 `RoleMemberMapper.findByMemberId` 与其 XML 查询保持一致 | `mvn -f template-source/base/backend/pom.xml test` 通过；失败不再由缺失 Mapper 方法导致 |
-| 1.6 | 补齐 Base、两个 Capability 的职责、配置、文件归属、迁移和扩展点文档；建立前端受管组合入口与默认欢迎页 | Base 的 App/路由/布局不导入 Capability；空能力集可构建并展示欢迎页；Provider、路由和菜单均只经生成入口接入 |
+- Provider、Page Wrapper、Menu Hook 可多项贡献，按稳定顺序组合。
+- Root Route 的 routeId 或绝对 path 重复时报 EXTENSION_CONFLICT。
+- Page Route 的 routeId、相对 path 或与 Base reservedPagePaths 冲突时报 EXTENSION_CONFLICT。
+- Interceptor 的 className 重复时报 EXTENSION_CONFLICT。
 
-阶段一退出条件：Base 和两个 Capability 都有明确边界、可独立构建验证，且源码目录中没有以运行开关伪装模块化的残留耦合。
+### 3.1 Payload
 
-## 阶段二：本地组合引擎与可调试 CLI
+Provider：
 
-本阶段实现 `engine-core` 与 `engine-cli`。目标是用本地命令生成、预览和验证最终工程，不依赖 Service 或 XcodeAgent。
+    module: "@/providers"
+    export: GlobalContextProvider
+    exportType: named
+    props: {}
 
-| 步骤 | 实施内容 | 可验收结果 |
-|---|---|---|
-| 2.1 | 建立无副作用的 `engine-core` 模块，读取 catalog 和 manifests，输出 `requested`、`effective`、诊断信息 | 单元测试验证 required、optional、forbidden、版本冲突和未知 Capability；解析结果稳定 |
-| 2.2 | 实现配置 Schema 校验、默认值填充、结构化依赖合并、Extension Point 注册与冲突检测 | 无效配置、未注册扩展点、Maven/npm/路由冲突均在渲染前失败并返回指定错误码 |
-| 2.3 | 实现模板渲染、迁移规划、确定性状态、lock 和 ChangeSet 生成 | 相同输入重复执行产生字节级一致的状态和 ChangeSet；输出记录精确 `sourceRef` 和能力版本 |
-| 2.4 | 实现 CLI：`validate`、`plan`、`simulate`、`generate`、`verify` | 每个命令可在本地以目录和配置文件运行；`simulate` 不写目标工程，`plan` 可读，`generate` 按 ChangeSet 写入 |
-| 2.5 | 实现本地冲突与回归验证：前置哈希检查、人工改动识别、构建测试执行 | 改动受管文件后再次 generate 会停止并报告 `STATE_CONFLICT`；未改动样例可生成并通过后端测试、前端构建 |
-| 2.6 | 建立可重复的能力组合矩阵和黄金产物 | 覆盖 Base、login、authorization、组合、升级和冲突；CLI 结果与黄金产物一致且不依赖网络服务 |
+Root Route：
 
-阶段二退出条件：开发者只通过 CLI 即可验证“配置 → 有效能力集 → ChangeSet → 生成工程 → 构建测试”的完整链路；Service 尚未存在时也不影响组合正确性验证。
+    routeId: login
+    path: /login
+    index: false
+    component:
+      module: "@/pages/Login"
+      export: default
+      exportType: default
 
-## 阶段三：对外 Engine Service
+Page Route：
 
-本阶段仅将已验证的 Core 能力封装为服务，并实现协议规定的持久化、审计和幂等；不得把组合规则复制进 Controller 或任务执行器。
+    routeId: authorization-management
+    name: 权限管理
+    path: authorization
+    resourceKey: AUTHORIZATION_MANAGEMENT
+    component:
+      module: "@/pages/System/AuthorizationManagementPage"
+      export: default
+      exportType: default
 
-| 步骤 | 实施内容 | 可验收结果 |
-|---|---|---|
-| 3.1 | 建立 `engine-service`，实现源码快照/Ref 校验、状态、ChangeSet、幂等和审计的持久化模型 | 计划请求可追溯到不可变 sourceRef；重启后可读取既有状态与 ChangeSet |
-| 3.2 | 实现 `plan`、`simulate`、`apply`、`state`、`changeset` 五个接口及统一错误模型 | OpenAPI 或等价接口契约可执行；错误码、traceId、鉴权和幂等行为可由集成测试验证 |
-| 3.3 | 让 Service 通过 Core 生成结果，并与 CLI 进行一致性回归 | 对同一 sourceRef 和配置，Service 的 effective、stateHash、ChangeSet 与 CLI 相同 |
-| 3.4 | 实现服务级并发、失败恢复和审计测试 | 相同幂等键同载荷重试返回同一结果；不同载荷拒绝；过期 stateHash 和并发请求不覆盖既有状态 |
-| 3.5 | 形成 XcodeAgent 接入契约和端到端模拟，不在本仓库实现 Agent | 模拟客户端仅消费 ChangeSet；验证 Agent 无法通过接口触发未计划的工作区写入 |
+Page Wrapper：
 
-阶段三退出条件：服务只是 Core 的受控入口；CLI 与 Service 对同一输入等价；XcodeAgent 可按稳定 ChangeSet 协议接入而不需要知晓模板内部实现。
+    module: "@/components/authorization/wrapAuthorizationPage"
+    export: wrapAuthorizationPage
+    exportType: named
 
-## 跨阶段验收原则
+固定导出签名：
 
-- 阶段一验证“能力能被定义和拆分”，不以手工复制项目成功替代验收；
-- 阶段二验证“引擎本地组合正确”，不以 HTTP 返回成功替代构建和冲突验证；
-- 阶段三验证“协议与运行治理正确”，不以重新实现 Core 逻辑替代一致性验证；
-- 任何新增 Capability、扩展点、状态字段、错误码或实施范围变更，都先更新第一章，再在第二章增加相应验收步骤。
+    (element: ReactNode, route: PageRouteDefinition) => ReactNode
+
+Menu Hook：
+
+    module: "@/hooks/useAuthorizationMenuTransform"
+    export: useAuthorizationMenuTransform
+    exportType: named
+
+固定导出签名：
+
+    (menus: Route[]) => Route[]
+
+Interceptor：
+
+    className: com.cmbchina.backend.auth.common.interceptor.UserWebMvcInterceptor
+    order: 100
+    pathPatterns: ["/**"]
+    excludePathPatterns: []
+
+Payload 校验规则：
+
+- 前端 module 必须以 @/ 开头；exportType=default 时 export 必须为 default，exportType=named 时 export 必须是合法 TypeScript 标识符。
+- props 只允许 JSON 对象和值，不允许函数、表达式或原始代码片段。
+- Root Route path 必须以 / 开头；Page Route path 必须非空且不以 / 开头。
+- 同一 Route 不得同时设置 index=true 和 path。
+
+### 3.2 Generated API 与现有前端衔接
+
+Generated 文件固定导出：
+
+    capabilityProviders.tsx: CapabilityProviders
+    capabilityRoutes.tsx: capabilityRootRoutes, capabilityPageRoutes, wrapCapabilityPage
+    capabilityMenus.ts: useCapabilityMenus
+    CapabilityWebMvcConfiguration.java: CapabilityWebMvcConfiguration
+
+空 Capability 集生成恒等 Provider、空路由、恒等 Wrapper、原样 Menu Hook 和无注册 Interceptor 的配置类。
+
+沿用现有 PageRouteDefinition、createPageRoutes、findFirstPagePath 和 React Router 结构，不重写路由体系。PageRouteDefinition 新增：
+
+    routeId?: string
+    component?: React.ComponentType<any>
+      | React.LazyExoticComponent<React.ComponentType<any>>
+    resourceKey?: string
+
+- exportType=default 生成默认导出 lazy 包装。
+- exportType=named 将 m[export] 适配为默认导出后 lazy load。
+- createPageRoutes 优先使用 component；Base 原有 pageId/modulePath 继续用于业务页面。
+- findFirstPagePath 将带 component 的 Page Route 视为可访问页面。
+- wrapCapabilityPage 对 Base 与 Capability 页面按稳定顺序组合，低 order Wrapper 位于外层。
+- Layout 对 PAGE_ROUTES + capabilityPageRoutes 生成菜单，并在组件顶层调用 useCapabilityMenus。
+- useCapabilityMenus 必须按稳定顺序无条件调用所有 Menu Hook，禁止在循环、条件或回调内调用 Hook。
+- Authorization 将 usePageMenus 改为 useAuthorizationMenuTransform(menus)，将 createProtectedRoutes 改为 wrapAuthorizationPage。
+
+### 3.3 Spring Interceptor
+
+生成类固定为 com.cmbchina.backend.common.config.CapabilityWebMvcConfiguration：
+
+- 使用 Configuration 并实现 WebMvcConfigurer。
+- Interceptor 类保留 Component，生成类按具体类型构造器注入。
+- 贡献渲染为 addInterceptor(...).order(...).addPathPatterns(...).excludePathPatterns(...)。
+- 删除 Login 和 Authorization 的既有 WebMvcConfigurer，防止重复注册。
+- Login 保留 Capability 私有配置类，只负责 EnableConfigurationProperties(MockLoginProperties.class)；配置前缀改为 xcodeagent.login.mock-login。
+
+## 4. Core、State、Refresh 与 ChangeSet
+
+### 4.1 Core API
+
+    TemplateEngine(TemplateSourceContext sourceContext)
+
+    CorePlanResult plan(
+        @Nullable TemplateState currentTemplateState,
+        RequestedConfig requestedConfig
+    )
+
+确定性输入为 TemplateSourceContext、currentTemplateState、requestedConfig。相同输入必须产生相同 nextTemplateState 和 ChangeSetBody。
+
+    CorePlanResult
+      kind: CHANGE | NO_CHANGE
+      nextTemplateState
+      body: ChangeSetBody | null
+      diagnostics
+
+- 首次 Plan 使用 currentTemplateState=null，必返回 CHANGE。
+- NO_CHANGE 仅在 Current 非空、规范化 Target State 等于 Current State、Operation 为空时返回，body 为 null。
+- V1 删除 STATE_ONLY。
+
+### 4.2 State 与 Target Diff
+
+TemplateState 固定保存：
+
+    templateRevision
+    requested
+    effective
+    capabilities
+    managed.files
+    managed.nodes
+    migrations
+
+不保存 Project Revision、Project ID、ChangeSet ID 或 Service 生命周期。
+
+Managed File 稳定键为 path，Owner 为 BASE、CAPABILITY 或 GENERATED。Managed Node：
+
+    {
+      "path": "frontend/package.json",
+      "nodeType": "JSON_NODE",
+      "key": "/dependencies/ahooks",
+      "value": "^3.8.1",
+      "contributors": [{ "type": "CAPABILITY", "id": "login" }]
+    }
+
+Node 类型只支持 JSON_NODE 与 MAVEN_DEPENDENCY。
+
+同 Source Revision 的 Diff：
+
+- Target 有、Current 无：ADD。
+- Target 无、Current 有：DELETE。
+- Capability 私有 Full File：Capability 新增时 ADD，移除时 DELETE，持续启用时无 Operation。
+- Generated File：贡献集合变化时 UPDATE；Current 不存在时 ADD。
+- Node：path、nodeType、key、value、contributors 任一不同即 UPSERT；Target 不存在即 DELETE。
+
+Template Refresh 条件：
+
+    current.templateRevision != source.templateRevision
+
+Refresh 不读取旧 Source Snapshot，固定执行：
+
+- Current 存在、Target 不存在的 Managed File、Node、Migration：DELETE。
+- Target 中全部 Capability/Base Full File：Current 存在则 UPDATE，不存在则 ADD。
+- Target 中全部 Generated File：Current 存在则 UPDATE，不存在则 ADD。
+- Target 中全部 Node：UPSERT。
+- Target State 的 templateRevision 更新为 Source Revision。
+
+package.json、pom.xml 可同时是 Base Full File 和 Capability Structured Node 宿主。首次先创建 File 再写 Node；Refresh 先更新 Base File 再写 Target Node。人工修改 Managed File 不受 V1 保护。
+
+### 4.3 ChangeSet Wire Schema
+
+    ChangeSetBody
+      requested
+      effective
+      operations
+      validationPlan
+      risks
+
+risks 元素固定为 code、severity:LOW|MEDIUM|HIGH、message；diagnostics 元素固定为 code、message、details。二者均按 code、message 稳定排序。
+
+Operation 仅支持：
+
+    ADD_FILE(path, content)
+    UPDATE_FILE(path, content)
+    DELETE_FILE(path)
+
+    UPSERT_JSON_NODE(path, pointer, value)
+    DELETE_JSON_NODE(path, pointer)
+
+    UPSERT_MAVEN_DEPENDENCY(path, key, value)
+    DELETE_MAVEN_DEPENDENCY(path, key)
+
+Apply 前置条件：
+
+- ADD 要求路径不存在。
+- UPDATE/DELETE 要求路径存在、为普通文件且属于 Current Managed State。
+- Node DELETE 仅删除 Current Managed Node。
+- JSON Locator 使用 RFC 6901 Pointer。
+- Maven Key 为 groupId,artifactId,type,classifier。
+
+排序为删除 Node、删除 File、ADD/UPDATE File、UPSERT Node；同组按规范化路径和稳定键排序。Fixture 不得重排。
+
+JSON 使用 UTF-8、LF、两空格缩进，保留原有键顺序，新键按字典序插入。Maven 使用固定 Maven Model Reader/Writer，Dependency 按稳定键排序。
+
+### 4.4 Preflight 与 Validation
+
+NO_CHANGE 不代表 Workspace 健康。Stage2 Fixture 在 Plan/Apply 前检查 Current State 中所有 Managed File 与结构化宿主仍存在且为普通文件；缺失时报 MANAGED_FILE_MISSING。
+
+validationPlan 元素：
+
+    {
+      "id": "backend-test",
+      "type": "COMMAND",
+      "workingDirectory": "backend",
+      "command": ["mvn", "test"],
+      "environment": {},
+      "timeoutSeconds": 600,
+      "blocking": true
+    }
+
+命令按参数数组直接执行，不经过 Shell；Working Directory 必须在 Workspace 内；超时、启动失败、非零退出码都阻断 Apply；单命令输出上限为 1 MiB。
+
+pnpm-lock.yaml 由 Workspace 的 pnpm 管理，不进入 Source、Core State 或黄金结果。Base package.json 固定加入：
+
+    {
+      "packageManager": "pnpm@11.9.0",
+      "engines": { "node": ">=20 <23" }
+    }
+
+## 5. 实施与验收
+
+### 阶段一：Source 重构与 Loader
+
+1. 创建 template-engine/pom.xml 与 engine-core 骨架，Java 编译 Target 保持 8。
+2. 拆分 Base、Login、Authorization。Login 页面仅通过 frontend/src/apis/login.ts 调用已有 POST /api/login/mock；登录成功仅更新 Login 会话上下文。
+3. 外置 Config Schema，迁移 Manifest 到显式 File、Extension、Dependency 和 Migration 协议。
+4. 清理构建产物、Source Lockfile、二进制 favicon、旧 Extension、独立 migration.yaml。
+5. 实现 TemplateSourceLoader 与 TemplateSourceContractTest。
+
+Contract Test 必测：Revision 缺失、Manifest/Schema 解析、未知字段、非法路径、未声明模板文件、重复 Target、symlink/二进制、未知 Point、Payload、Route/Interceptor 冲突、Dependency 冲突、Migration 引用与 Target。
+
+阶段一只实现 Source 加载与契约校验。
+
+### 阶段二：Core 与真实临时 Workspace
+
+唯一验收入口：
+
+    ./validation/verify-stage2.sh
+
+固定命令：
+
+    mvn -f template-engine/pom.xml \
+      -pl engine-core \
+      -am \
+      -Pstage2-verification \
+      verify
+
+工具链为 Maven >= 3.9、Java Runtime >= 11（编译 target=8）、Node >= 20 且 < 23、pnpm 11.9.0。Surefire 执行单测；Failsafe 在该 Profile 执行 Stage2AcceptanceIT。
+
+实现顺序：
+
+    Requested/Effective Config
+    → Capability Resolve
+    → Target Managed Model
+    → Generated Renderer
+    → Diff/Refresh
+    → ChangeSet
+    → Apply Fixture
+    → Validation
+    → Workspace State 写入与二次 Plan
+
+每场景使用独立临时 Workspace，全部 Blocking Validation 成功后原子写：
+
+    { "revision": null, "templateState": {} }
+
+验证顺序为后端 mvn test、前端 pnpm install --no-frozen-lockfile、pnpm test、pnpm build。
+
+验收覆盖：null 首次 Plan、Base/Login/Authorization 组合、二次 NO_CHANGE、Capability 增删、Refresh 全量 UPDATE/ADD/DELETE、六类 Extension 编译、依赖与 Source 冲突、Operation 前置条件、Migration 物化、Validation 失败不写 State、黄金 Core 输出。
+
+阶段二不实现 HTTP、Project Revision、认证、幂等、ChangeSetRecord、XcodeAgent 或真实数据库 Migration。
+
+### 阶段三：极薄 Engine Service
+
+Service 使用 Spring JDBC、MySQL 8、Flyway；集成测试使用 H2 MySQL Mode。
+
+持久化模型：
+
+    ProjectState
+      projectId, revision, templateState, lastAppliedChangeSetId
+
+    ChangeSetRecord
+      changeSetId, projectId, fromRevision, toRevision,
+      nextTemplateState, body, status, principalId, requestHash,
+      createdAt, approvedAt?, appliedAt?, failedAt?, resultDiagnostics?
+
+    IdempotencyRecord
+      principalId, projectId, operation, key, requestHash, responseBody, createdAt
+
+ChangeSet 状态：
+
+    PLANNED
+    APPROVED
+    APPLIED
+    FAILED
+    SUPERSEDED
+
+允许迁移：
+
+    PLANNED  -> APPROVED | SUPERSEDED
+    APPROVED -> APPLIED | FAILED
+    APPLIED | FAILED | SUPERSEDED -> terminal
+
+HTTP 契约：
+
+    POST /v1/projects/{projectId}/plan
+    POST /v1/projects/{projectId}/simulate
+    POST /v1/projects/{projectId}/change-sets/{changeSetId}/approve
+    GET  /v1/projects/{projectId}/change-sets/{changeSetId}
+    POST /v1/projects/{projectId}/change-sets/{changeSetId}/results
+
+Plan/Simulate 请求为 expectedRevision、requestedConfig；Approve 请求为 expectedRevision；Result 请求为 status:SUCCEEDED|FAILED、diagnostics。OpenAPI 是所有 HTTP 请求、响应和错误 Envelope 的唯一权威。
+
+统一错误 Envelope：
+
+    {
+      "code": "STATE_REVISION_CONFLICT",
+      "message": "...",
+      "details": {},
+      "traceId": "..."
+    }
+
+Loader/Core 错误包括 TEMPLATE_SOURCE_INVALID、UNDECLARED_TEMPLATE_FILE、FILE_OWNERSHIP_CONFLICT、CONFIG_INVALID、CAPABILITY_NOT_FOUND、CAPABILITY_DEPENDENCY_CYCLE、DEPENDENCY_CONFLICT、EXTENSION_CONFLICT、MANAGED_FILE_MISSING。Service 错误包括 PROJECT_NOT_FOUND、STATE_REVISION_CONFLICT、CHANGESET_NOT_FOUND、CHANGESET_STATUS_INVALID、CHANGESET_ALREADY_APPROVED、CHANGESET_RESULT_CONFLICT、IDEMPOTENCY_CONFLICT、FORBIDDEN。OpenAPI 固定这些 code 与 HTTP 状态映射。
+
+Plan 规则：
+
+- Project 不存在且 expectedRevision=null：同一事务内插入 Revision 0 Project、以 current=null 调用 Core、创建首个 PLANNED ChangeSet；任一步失败整体回滚。
+- 并发首次 Plan 由 Project 主键约束保护；竞争失败方重读后返回 STATE_REVISION_CONFLICT。
+- Project 存在时 expectedRevision 必须等于当前 Revision。
+- 存在 APPROVED ChangeSet 时拒绝新 Plan。
+- 新 CHANGE Plan：同 Revision 全部 PLANNED 标记 SUPERSEDED，再创建新 PLANNED。
+- 新 NO_CHANGE Plan：同 Revision 全部 PLANNED 标记 SUPERSEDED，不创建 ChangeSet，不推进 Revision。
+- Simulate 使用已应用 TemplateState；Project 不存在且 expectedRevision=null 时用 null State 计算且不持久化。
+
+Approve 仅允许 PLANNED 到 APPROVED，并验证 expected Revision。一个 Project/Revision 最多一个 APPROVED ChangeSet。
+
+Result 仅允许 APPROVED+SUCCEEDED 到 APPLIED 或 APPROVED+FAILED 到 FAILED。SUCCEEDED 在一个事务内推进 Project Revision、TemplateState 与 lastAppliedChangeSetId。相同终态和相同 Diagnostics 的重复 Result 幂等成功；其他重复 Result 报 CHANGESET_RESULT_CONFLICT。
+
+Plan、Approve、Result 要求 Idempotency-Key，键为 principalId、projectId、operation、key。Service 必须先查询幂等记录，再执行 Revision、状态和权限状态迁移判断：相同键和规范化请求返回原响应；相同键不同请求报 IDEMPOTENCY_CONFLICT。Simulate 不保存幂等记录。
+
+认证使用服务端配置 Token 的 SHA-256 摘要映射 principalId、principalType、scopes，不保存明文 Token。Scope 固定为 template.plan、template.simulate、template.approve、template.read、template.apply-result；只有 XCODE_AGENT 加 template.apply-result 能提交 Result。
+
+Stage3 仅通过 MockMvc/Service 集成测试模拟 Result，不实现 Agent Apply 或恢复。
+
+必须覆盖：首次/并发 Plan、首次 Simulate、Revision 冲突、PLANNED Supersede、NO_CHANGE 清理旧 PLANNED、APPROVED 阻塞、非法 Approve/Result、重复 Result、认证、Scope、幂等、事务回滚、Service/Core 结果一致。
+
+## 6. XcodeAgent 外部参考设计
+
+本章为非交付设计，不实现、不测试、不计入本项目完成标准。
+
+建议外部执行方：
+
+    获取 APPROVED ChangeSet
+    → Workspace Lock
+    → 读取本地 State
+    → 校验 fromRevision
+    → 写 pending-apply.json
+    → Workspace Preflight
+    → 顺序 Apply
+    → Blocking Validation
+    → 提交 Result
+    → Service 确认 APPLIED
+    → 原子推进本地 State
+    → 删除 Pending
+
+Pending 建议字段为 schemaVersion、projectId、changeSetId、fromRevision、toRevision、phase。Service 为 APPLIED 时本地 finalize；为 APPROVED 时可从首个 Operation 对账重放；为 FAILED、SUPERSEDED、NOT_FOUND 时进入 LOCAL_STATE_DIVERGED。Validation 失败后 Workspace 必须显式恢复或丢弃，不自动回滚。
+
+XcodeAgent 不得 Resolve Capability、修改 Operation 顺序或自行选择 Template Source。
+
+## 7. V1 完成标准
+
+1. Loader 拒绝旧 Manifest、非法 Source、未声明模板文件和 Extension/Route/Interceptor 冲突，不提供兼容层。
+2. Login 可独立生成和构建，不再反向依赖 Authorization。
+3. 阶段一通过 TemplateSourceContractTest。
+4. 阶段二仅通过 ./validation/verify-stage2.sh 完成真实临时 Workspace 闭环。
+5. 阶段三完成 Service HTTP、状态机、Revision、事务、认证、幂等和 OpenAPI 验收。
+6. XcodeAgent 只保留参考设计，不计入本项目 V1 完成范围。
+7. 新增 Capability、Point、State 字段、Operation 或错误码前，必须先扩展本文、Schema、Fixture 与验收测试。

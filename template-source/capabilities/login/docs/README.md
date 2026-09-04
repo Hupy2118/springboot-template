@@ -12,4 +12,4 @@ Login 提供当前用户上下文、JWT Cookie 解析、本地 `/api/login/mock`
 
 ## 接入方式
 
-通过 `frontend.app-provider` 贡献登录 Provider，通过 `frontend.routes` 贡献登录/登出根路由，通过 `backend.webmvc-interceptors` 注册当前用户上下文拦截器。贡献顺序固定为 100；生成器负责写入 Base 的受管 `generated/` 组合入口，禁止人工复制共享文件。
+通过 `frontend.providers` 贡献登录 Provider，通过 `frontend.root-routes` 贡献登录/登出根路由，通过 `backend.spring-interceptors` 注册当前用户上下文拦截器。贡献顺序固定为 100；生成器负责写入 Base 的受管 `generated/` 组合入口，禁止人工复制共享文件。

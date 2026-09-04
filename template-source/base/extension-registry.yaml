@@ -1,27 +1,38 @@
 version: 1
 extensionPoints:
-  - id: frontend.app-provider
+  - point: frontend.providers
+    payloadSchema: schemas/extensions/frontend-provider.schema.json
+    renderer: frontend-provider-renderer
     target: frontend/src/generated/capabilityProviders.tsx
-    contributionType: react-provider
-    order: ascending
-    conflict: fail
-  - id: frontend.routes
+    cardinality: MANY
+    orderBy: CONTRIBUTION_ORDER
+  - point: frontend.root-routes
+    payloadSchema: schemas/extensions/frontend-root-route.schema.json
+    renderer: frontend-root-route-renderer
     target: frontend/src/generated/capabilityRoutes.tsx
-    contributionType: react-route
-    order: ascending
-    conflict: fail
-  - id: frontend.page-routes
+    cardinality: MANY
+    orderBy: CONTRIBUTION_ORDER
+  - point: frontend.page-routes
+    payloadSchema: schemas/extensions/frontend-page-route.schema.json
+    renderer: frontend-page-route-renderer
     target: frontend/src/generated/capabilityRoutes.tsx
-    contributionType: page-route
-    order: ascending
-    conflict: fail
-  - id: frontend.layout-menu
+    cardinality: MANY
+    orderBy: CONTRIBUTION_ORDER
+  - point: frontend.page-wrappers
+    payloadSchema: schemas/extensions/frontend-page-wrapper.schema.json
+    renderer: frontend-page-wrapper-renderer
+    target: frontend/src/generated/capabilityRoutes.tsx
+    cardinality: MANY
+    orderBy: CONTRIBUTION_ORDER
+  - point: frontend.menu-hooks
+    payloadSchema: schemas/extensions/frontend-menu-transform.schema.json
+    renderer: frontend-menu-transform-renderer
     target: frontend/src/generated/capabilityMenus.ts
-    contributionType: layout-menu
-    order: ascending
-    conflict: fail
-  - id: backend.webmvc-interceptors
-    target: backend/src/main/java/com/cmbchina/backend/common/config
-    contributionType: spring-webmvc-interceptor
-    order: ascending
-    conflict: fail
+    cardinality: MANY
+    orderBy: CONTRIBUTION_ORDER
+  - point: backend.spring-interceptors
+    payloadSchema: schemas/extensions/backend-webmvc-interceptor.schema.json
+    renderer: backend-webmvc-interceptor-renderer
+    target: backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java
+    cardinality: MANY
+    orderBy: CONTRIBUTION_ORDER

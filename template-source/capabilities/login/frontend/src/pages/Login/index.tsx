@@ -2,17 +2,15 @@ import { useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRequest } from 'ahooks';
 import { Alert, Button, Card, Form, Input, Typography } from 'antd';
-import { mockAuthorizationLogin } from '@/apis/authorization';
+import { mockLogin } from '@/apis/login';
 import { USER_INFO_KEY } from '@/login/constants';
 import { GlobalContext } from '@/providers';
-import { useAuth } from '@/providers/AuthProvider';
 
 export default function Login() {
   const navigate = useNavigate();
   const { setUserInfo } = useContext(GlobalContext);
-  const { refreshPermissions } = useAuth();
-  const [form] = Form.useForm<{ memberId: string }>();
-  const { loading, error, runAsync } = useRequest(mockAuthorizationLogin, {
+  const [form] = Form.useForm<{ memberId: string; memberName: string }>();
+  const { loading, error, runAsync } = useRequest(mockLogin, {
     manual: true,
   });
 
@@ -22,13 +20,12 @@ export default function Login() {
   }, [navigate]);
 
   const submit = async () => {
-    const { memberId } = await form.validateFields();
+    const { memberId, memberName } = await form.validateFields();
     try {
-      const member = await runAsync({ memberId: memberId.trim() });
+      const member = await runAsync({ memberId: memberId.trim(), memberName: memberName.trim() });
       const userInfo = { userId: member.memberId, userNo: member.memberId, userName: member.memberName };
       sessionStorage.setItem(USER_INFO_KEY, JSON.stringify(userInfo));
       setUserInfo(userInfo);
-      await refreshPermissions();
       navigate('/page', { replace: true });
     } catch {
       // useRequest exposes the error for the form to render.
@@ -68,6 +65,15 @@ export default function Login() {
               autoComplete='username'
               placeholder='例如：10000001'
             />
+          </Form.Item>
+          <Form.Item
+            name='memberName'
+            label='用户名称'
+            rules={[
+              { required: true, whitespace: true, message: '请输入用户名称' },
+            ]}
+          >
+            <Input autoComplete='name' placeholder='例如：测试用户' />
           </Form.Item>
           <Button type='primary' htmlType='submit' block loading={loading}>
             {loading ? '登录中…' : '登录'}

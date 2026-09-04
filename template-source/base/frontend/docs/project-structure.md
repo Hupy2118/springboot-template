@@ -32,7 +32,8 @@ src/
 
 - 页面、目录和外链只在 `src/constants/routes.tsx` 的 `XCODEAGENT_BUSINESS_ROUTES_START/END` 标记之间注册。
 - 业务页面必须使用小写 snake_case `pageId`。例如 `asset_list` 对应 `src/pages/AssetList/index.tsx` 和 `/page/asset-list`。
-- 页面由既有页面发现机制自动懒加载；不得新增业务页面静态 import、手写业务路由或自行维护第二份菜单配置。
+- 基础业务页面由既有页面发现机制自动懒加载；能力页面由引擎生成的 `src/generated/capabilityRoutes.tsx` 以显式组件引用接入。不得绕开该生成入口手写第二份能力路由或菜单配置。
+- 菜单始终先由 `createLayoutMenus` 从基础路由与 `capabilityPageRoutes` 汇总，再交给引擎生成的 `useCapabilityMenus` 变换链；页面守卫同样只通过 `capabilityRoutes.tsx` 的生成包装链接入。
 
 ## 依赖方向
 

@@ -1,26 +1,41 @@
 id: login
+schemaVersion: 1
 version: 1.0.0
 requires: []
 provides: [current-user-context, mock-login]
-configSchema:
-  type: object
-  additionalProperties: false
-  properties:
-    enabled: { type: boolean, default: true }
-    mockLogin: { type: boolean, default: true }
+configSchema: config.schema.json
 files:
-  - { source: backend/src/main/java/com/cmbchina/backend/auth, target: backend/src/main/java/com/cmbchina/backend/auth, owner: login }
-  - { source: frontend/src/apis/login.ts, target: frontend/src/apis/login.ts, owner: login }
-  - { source: frontend/src/constants/yst.ts, target: frontend/src/constants/yst.ts, owner: login }
-  - { source: frontend/src/login, target: frontend/src/login, owner: login }
-  - { source: frontend/src/hooks/useGuard.ts, target: frontend/src/hooks/useGuard.ts, owner: login }
-  - { source: frontend/src/pages/Login, target: frontend/src/pages/Login, owner: login }
-  - { source: frontend/src/pages/Logout, target: frontend/src/pages/Logout, owner: login }
-  - { source: frontend/src/providers/index.tsx, target: frontend/src/providers/index.tsx, owner: login }
-  - { source: frontend/src/typings/yst.ts, target: frontend/src/typings/yst.ts, owner: login }
-dependencies: []
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/adapter/web/MockLoginController.java, target: backend/src/main/java/com/cmbchina/backend/auth/adapter/web/MockLoginController.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/application/service/MockJwtService.java, target: backend/src/main/java/com/cmbchina/backend/auth/application/service/MockJwtService.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/common/context/BaseUserData.java, target: backend/src/main/java/com/cmbchina/backend/auth/common/context/BaseUserData.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/common/context/BaseUserDataThreadHodler.java, target: backend/src/main/java/com/cmbchina/backend/auth/common/context/BaseUserDataThreadHodler.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/common/interceptor/UserWebMvcInterceptor.java, target: backend/src/main/java/com/cmbchina/backend/auth/common/interceptor/UserWebMvcInterceptor.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/config/LoginPropertiesConfiguration.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/config/LoginPropertiesConfiguration.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/config/MockLoginProperties.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/config/MockLoginProperties.java }
+  - { source: frontend/src/apis/login.ts, target: frontend/src/apis/login.ts }
+  - { source: frontend/src/login/constants.ts, target: frontend/src/login/constants.ts }
+  - { source: frontend/src/login/types.ts, target: frontend/src/login/types.ts }
+  - { source: frontend/src/pages/Login/index.tsx, target: frontend/src/pages/Login/index.tsx }
+  - { source: frontend/src/pages/Logout/index.tsx, target: frontend/src/pages/Logout/index.tsx }
+  - { source: frontend/src/providers/index.tsx, target: frontend/src/providers/index.tsx }
+dependencies:
+  npm:
+    - { name: ahooks, version: ^3.8.1 }
 extensions:
-  - { point: frontend.app-provider, id: login-provider, order: 100 }
-  - { point: frontend.routes, id: login-routes, order: 100 }
-  - { point: backend.webmvc-interceptors, id: login-current-user, order: 100 }
+  - point: frontend.providers
+    id: login-provider
+    order: 100
+    payload: { module: '@/providers', export: GlobalContextProvider, exportType: named, props: {} }
+  - point: frontend.root-routes
+    id: login-route
+    order: 100
+    payload: { path: /login, module: '@/pages/Login', export: default, exportType: default }
+  - point: frontend.root-routes
+    id: logout-route
+    order: 110
+    payload: { path: /logout, module: '@/pages/Logout', export: default, exportType: default }
+  - point: backend.spring-interceptors
+    id: login-current-user
+    order: 100
+    payload: { className: com.cmbchina.backend.auth.common.interceptor.UserWebMvcInterceptor, order: 100, pathPatterns: ['/**'], excludePathPatterns: ['/api/login/mock'] }
 migrations: []

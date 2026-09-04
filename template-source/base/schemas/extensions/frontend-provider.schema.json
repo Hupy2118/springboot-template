@@ -1,0 +1,1 @@
+{"type":"object","required":["module","export","exportType"],"properties":{"module":{"type":"string"},"export":{"type":"string"},"exportType":{"enum":["default","named"]},"props":{"type":"object"}},"additionalProperties":false}

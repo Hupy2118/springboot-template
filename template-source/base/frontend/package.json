@@ -2,6 +2,8 @@
   "name": "@za38.03/xcode-agent-lowcode-template",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "pnpm@11.9.0",
+  "engines": { "node": ">=20.19 <23" },
   "description": "低代码应用模板骨架",
   "type": "module",
   "scripts": {

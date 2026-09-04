@@ -7,7 +7,7 @@ import java.time.Duration;
 
 /** 本地模拟登录签发的 JWT Cookie 配置。 */
 @Data
-@ConfigurationProperties(prefix = "xcodeagent.authorization.mock-login")
+@ConfigurationProperties(prefix = "xcodeagent.login.mock-login")
 public class MockLoginProperties {
 
     private String cookieName = "token";

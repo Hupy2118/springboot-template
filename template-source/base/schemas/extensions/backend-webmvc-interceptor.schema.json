@@ -1,0 +1,1 @@
+{"type":"object","required":["className","order","pathPatterns","excludePathPatterns"],"properties":{"className":{"type":"string"},"order":{"type":"integer"},"pathPatterns":{"type":"array","items":{"type":"string"}},"excludePathPatterns":{"type":"array","items":{"type":"string"}}},"additionalProperties":false}

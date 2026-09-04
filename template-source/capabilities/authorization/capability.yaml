@@ -1,35 +1,101 @@
 id: authorization
+schemaVersion: 1
 version: 1.0.0
-requires:
-  - { id: login, mode: required }
-provides: [role-management, resource-permission, member-management]
-configSchema:
-  type: object
-  additionalProperties: false
-  properties:
-    enabled: { type: boolean, default: true }
+requires: [login]
+provides: [resource-permission]
+configSchema: config.schema.json
 files:
-  - { source: backend/src/main/java/com/cmbchina/backend/auth, target: backend/src/main/java/com/cmbchina/backend/auth, owner: authorization }
-  - { source: backend/src/main/resources/mapper/auth, target: backend/src/main/resources/mapper/auth, owner: authorization }
-  - { source: frontend/src/apis/authorization.ts, target: frontend/src/apis/authorization.ts, owner: authorization }
-  - { source: frontend/src/components/authorization, target: frontend/src/components/authorization, owner: authorization }
-  - { source: frontend/src/constants/resources.ts, target: frontend/src/constants/resources.ts, owner: authorization }
-  - { source: frontend/src/hooks/usePageMenus.ts, target: frontend/src/hooks/usePageMenus.ts, owner: authorization }
-  - { source: frontend/src/hooks/usePermission.ts, target: frontend/src/hooks/usePermission.ts, owner: authorization }
-  - { source: frontend/src/pages/System/AuthorizationManagementPage, target: frontend/src/pages/System/AuthorizationManagementPage, owner: authorization }
-  - { source: frontend/src/providers/AuthProvider.tsx, target: frontend/src/providers/AuthProvider.tsx, owner: authorization }
-  - { source: frontend/src/typings/authorization.ts, target: frontend/src/typings/authorization.ts, owner: authorization }
-  - { source: frontend/src/typings/generated/authorizationApiTypes.ts, target: frontend/src/typings/generated/authorizationApiTypes.ts, owner: authorization }
-  - { source: frontend/src/utils/protectedRoutes.tsx, target: frontend/src/utils/protectedRoutes.tsx, owner: authorization }
-dependencies:
-  npm:
-    - { name: ahooks, version: ^3.8.1, section: dependencies }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/adapter/web/MemberController.java, target: backend/src/main/java/com/cmbchina/backend/auth/adapter/web/MemberController.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/adapter/web/ResourceController.java, target: backend/src/main/java/com/cmbchina/backend/auth/adapter/web/ResourceController.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/adapter/web/RoleController.java, target: backend/src/main/java/com/cmbchina/backend/auth/adapter/web/RoleController.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/application/assembler/ResourceAssembler.java, target: backend/src/main/java/com/cmbchina/backend/auth/application/assembler/ResourceAssembler.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/application/assembler/RoleAssembler.java, target: backend/src/main/java/com/cmbchina/backend/auth/application/assembler/RoleAssembler.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/application/dto/MemberDTO.java, target: backend/src/main/java/com/cmbchina/backend/auth/application/dto/MemberDTO.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/application/dto/MemberResourcesDTO.java, target: backend/src/main/java/com/cmbchina/backend/auth/application/dto/MemberResourcesDTO.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/application/dto/ResourceDTO.java, target: backend/src/main/java/com/cmbchina/backend/auth/application/dto/ResourceDTO.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleDTO.java, target: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleDTO.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleMembersDTO.java, target: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleMembersDTO.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleResourcesDTO.java, target: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleResourcesDTO.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleStatusDTO.java, target: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleStatusDTO.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleUpsertDTO.java, target: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleUpsertDTO.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/application/service/MemberApplicationService.java, target: backend/src/main/java/com/cmbchina/backend/auth/application/service/MemberApplicationService.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/application/service/ResourceApplicationService.java, target: backend/src/main/java/com/cmbchina/backend/auth/application/service/ResourceApplicationService.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/application/service/RoleApplicationService.java, target: backend/src/main/java/com/cmbchina/backend/auth/application/service/RoleApplicationService.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/bootstrap/AuthorizationBootstrapCommand.java, target: backend/src/main/java/com/cmbchina/backend/auth/bootstrap/AuthorizationBootstrapCommand.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/common/annotation/RequireAnyResource.java, target: backend/src/main/java/com/cmbchina/backend/auth/common/annotation/RequireAnyResource.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/common/interceptor/ResourcePermissionInterceptor.java, target: backend/src/main/java/com/cmbchina/backend/auth/common/interceptor/ResourcePermissionInterceptor.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/domain/constant/AuthConstants.java, target: backend/src/main/java/com/cmbchina/backend/auth/domain/constant/AuthConstants.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/domain/entity/Resource.java, target: backend/src/main/java/com/cmbchina/backend/auth/domain/entity/Resource.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/domain/entity/Role.java, target: backend/src/main/java/com/cmbchina/backend/auth/domain/entity/Role.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/domain/entity/RoleMember.java, target: backend/src/main/java/com/cmbchina/backend/auth/domain/entity/RoleMember.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/domain/entity/RoleResource.java, target: backend/src/main/java/com/cmbchina/backend/auth/domain/entity/RoleResource.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/domain/exception/AuthErrorCode.java, target: backend/src/main/java/com/cmbchina/backend/auth/domain/exception/AuthErrorCode.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/domain/repository/ResourceRepository.java, target: backend/src/main/java/com/cmbchina/backend/auth/domain/repository/ResourceRepository.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/domain/repository/RoleMemberRepository.java, target: backend/src/main/java/com/cmbchina/backend/auth/domain/repository/RoleMemberRepository.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/domain/repository/RoleRepository.java, target: backend/src/main/java/com/cmbchina/backend/auth/domain/repository/RoleRepository.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/domain/repository/RoleResourceRepository.java, target: backend/src/main/java/com/cmbchina/backend/auth/domain/repository/RoleResourceRepository.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/mapper/ResourceMapper.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/mapper/ResourceMapper.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/mapper/RoleMapper.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/mapper/RoleMapper.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/mapper/RoleMemberMapper.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/mapper/RoleMemberMapper.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/mapper/RoleResourceMapper.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/mapper/RoleResourceMapper.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/po/ResourcePO.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/po/ResourcePO.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/po/RoleMemberPO.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/po/RoleMemberPO.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/po/RolePO.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/po/RolePO.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/po/RoleResourcePO.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/po/RoleResourcePO.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/converter/ResourceConverter.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/converter/ResourceConverter.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/converter/RoleConverter.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/converter/RoleConverter.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/converter/RoleMemberConverter.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/converter/RoleMemberConverter.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/converter/RoleResourceConverter.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/converter/RoleResourceConverter.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/impl/ResourceRepositoryImpl.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/impl/ResourceRepositoryImpl.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/impl/RoleMemberRepositoryImpl.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/impl/RoleMemberRepositoryImpl.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/impl/RoleRepositoryImpl.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/impl/RoleRepositoryImpl.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/impl/RoleResourceRepositoryImpl.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/impl/RoleResourceRepositoryImpl.java }
+  - { source: backend/src/main/resources/mapper/auth/RoleMapper.xml, target: backend/src/main/resources/mapper/auth/RoleMapper.xml }
+  - { source: backend/src/main/resources/mapper/auth/RoleMemberMapper.xml, target: backend/src/main/resources/mapper/auth/RoleMemberMapper.xml }
+  - { source: backend/src/main/resources/mapper/auth/RoleResourceMapper.xml, target: backend/src/main/resources/mapper/auth/RoleResourceMapper.xml }
+  - { source: backend/src/test/java/com/cmbchina/backend/auth/AuthContractTest.java, target: backend/src/test/java/com/cmbchina/backend/auth/AuthContractTest.java }
+  - { source: backend/src/test/java/com/cmbchina/backend/auth/adapter/web/ControllerResponseTest.java, target: backend/src/test/java/com/cmbchina/backend/auth/adapter/web/ControllerResponseTest.java }
+  - { source: backend/src/test/java/com/cmbchina/backend/auth/application/service/MemberApplicationServiceTest.java, target: backend/src/test/java/com/cmbchina/backend/auth/application/service/MemberApplicationServiceTest.java }
+  - { source: backend/src/test/java/com/cmbchina/backend/auth/application/service/ResourceApplicationServiceTest.java, target: backend/src/test/java/com/cmbchina/backend/auth/application/service/ResourceApplicationServiceTest.java }
+  - { source: backend/src/test/java/com/cmbchina/backend/auth/application/service/RoleApplicationServiceTest.java, target: backend/src/test/java/com/cmbchina/backend/auth/application/service/RoleApplicationServiceTest.java }
+  - { source: backend/src/test/java/com/cmbchina/backend/auth/common/interceptor/ResourcePermissionInterceptorTest.java, target: backend/src/test/java/com/cmbchina/backend/auth/common/interceptor/ResourcePermissionInterceptorTest.java }
+  - { source: backend/src/test/java/com/cmbchina/backend/auth/domain/exception/AuthErrorCodeTest.java, target: backend/src/test/java/com/cmbchina/backend/auth/domain/exception/AuthErrorCodeTest.java }
+  - { source: backend/src/test/java/com/cmbchina/backend/auth/infrastructure/mapper/MapperIntegrationTest.java, target: backend/src/test/java/com/cmbchina/backend/auth/infrastructure/mapper/MapperIntegrationTest.java }
+  - { source: backend/src/test/java/com/cmbchina/backend/auth/infrastructure/po/ResourcePOMetadataTest.java, target: backend/src/test/java/com/cmbchina/backend/auth/infrastructure/po/ResourcePOMetadataTest.java }
+  - { source: backend/src/test/java/com/cmbchina/backend/auth/infrastructure/po/RolePOMetadataTest.java, target: backend/src/test/java/com/cmbchina/backend/auth/infrastructure/po/RolePOMetadataTest.java }
+  - { source: frontend/src/apis/authorization.ts, target: frontend/src/apis/authorization.ts }
+  - { source: frontend/src/components/authorization/Permission.tsx, target: frontend/src/components/authorization/Permission.tsx }
+  - { source: frontend/src/components/authorization/RouteGuard.tsx, target: frontend/src/components/authorization/RouteGuard.tsx }
+  - { source: frontend/src/components/authorization/wrapAuthorizationPage.tsx, target: frontend/src/components/authorization/wrapAuthorizationPage.tsx }
+  - { source: frontend/src/constants/resources.ts, target: frontend/src/constants/resources.ts }
+  - { source: frontend/src/hooks/useAuthorizationMenuTransform.ts, target: frontend/src/hooks/useAuthorizationMenuTransform.ts }
+  - { source: frontend/src/hooks/usePermission.ts, target: frontend/src/hooks/usePermission.ts }
+  - { source: frontend/src/pages/System/AuthorizationManagementPage/index.tsx, target: frontend/src/pages/System/AuthorizationManagementPage/index.tsx }
+  - { source: frontend/src/providers/AuthProvider.tsx, target: frontend/src/providers/AuthProvider.tsx }
+  - { source: frontend/src/typings/authorization.ts, target: frontend/src/typings/authorization.ts }
+  - { source: frontend/src/typings/generated/authorizationApiTypes.ts, target: frontend/src/typings/generated/authorizationApiTypes.ts }
+dependencies: []
 extensions:
-  - { point: frontend.app-provider, id: authorization-provider, order: 200 }
-  - { point: frontend.routes, id: authorization-protected-routes, order: 200 }
-  - { point: frontend.page-routes, id: authorization-management-page, order: 200 }
-  - { point: frontend.layout-menu, id: authorization-filtered-menu, order: 200 }
-  - { point: backend.webmvc-interceptors, id: authorization-resource-permission, order: 200 }
+  - point: frontend.providers
+    id: authorization-provider
+    order: 200
+    payload: { module: '@/providers/AuthProvider', export: AuthProvider, exportType: named, props: {} }
+  - point: frontend.page-routes
+    id: authorization-management-page
+    order: 200
+    payload: { path: system/authorization, name: 权限管理, module: '@/pages/System/AuthorizationManagementPage', export: default, exportType: default, resourceKey: system_authorization_management }
+  - point: frontend.page-wrappers
+    id: authorization-page-guard
+    order: 200
+    payload: { module: '@/components/authorization/wrapAuthorizationPage', export: wrapAuthorizationPage, exportType: named }
+  - point: frontend.menu-hooks
+    id: authorization-menu-transform
+    order: 200
+    payload: { module: '@/hooks/useAuthorizationMenuTransform', export: useAuthorizationMenuTransform, exportType: named }
+  - point: backend.spring-interceptors
+    id: authorization-resource-permission
+    order: 200
+    payload: { className: com.cmbchina.backend.auth.common.interceptor.ResourcePermissionInterceptor, order: 200, pathPatterns: ['/**'], excludePathPatterns: ['/api/login/mock', '/actuator/**'] }
 migrations:
   - { id: schema, source: migrations/001-schema.sql, target: backend/src/main/resources/xcodeagent/migrations/authorization/001-schema.sql, order: 100, mode: COPY }
   - { id: initialization, source: migrations/002-initialization.sql, target: backend/src/main/resources/xcodeagent/migrations/authorization/002-initialization.sql, order: 200, mode: COPY }
