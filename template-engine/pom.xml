@@ -9,14 +9,17 @@
 
     <modules>
         <module>engine-core</module>
+        <module>engine-service</module>
     </modules>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
-        <jackson.version>2.15.4</jackson.version>
+        <!-- Kept aligned with Spring Boot 2.7's SnakeYAML 1.x runtime. -->
+        <jackson.version>2.13.4</jackson.version>
         <junit.version>5.10.2</junit.version>
+        <spring-boot.version>2.7.2</spring-boot.version>
     </properties>
 
     <profiles>

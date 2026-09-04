@@ -688,7 +688,7 @@ Stage3 集成测试使用 MockMvc 与真实 `engine-core`，不使用 H2/MySQL�
 
 #### 5.3.8 本地手工验收 Runbook
 
-本节是 **Stage3 实现完成后** 的人工验收步骤。它不是当前阶段可执行的启动说明：在 `engine-service` 模块、OpenAPI 生成代码和 Package Builder 尚未交付前，不能宣称 Service 已可启动。实现 Stage3 时必须同时提交本节引用的 `validation/stage3/application.yml` 与请求 Fixture；否则 Stage3 不可验收。
+本节是 Stage3 的可执行人工验收步骤。`engine-service`、OpenAPI、Package Builder，以及本节引用的 `validation/stage3/application.yml` 与请求 Fixture 必须一起交付；缺少其中任一项均不能宣称 Stage3 可验收。
 
 验收机需要 JDK 11+、Maven 3.9+、`curl`、`jq` 和 `unzip`。所有命令从仓库根目录执行。Java 编译 target 仍可为 8；JDK 11 只是验收运行环境的下限。
 
@@ -790,7 +790,7 @@ curl -sS -o /private/tmp/stage3-forbidden.json -w '%{http_code}\n' \
   -X POST http://127.0.0.1:18080/v1/generate \
   -H 'Authorization: Bearer stage3-plan-token' \
   -H 'Content-Type: application/json' \
-  --data '{"capabilities":{"authorization":{"enabled":true,"config":{}}}}'
+  --data '{"requestedConfig":{"capabilities":{"authorization":{"enabled":true,"config":{}}}}}'
 ```
 
 前一个命令必须输出 `401`，后一个必须输出 `403`；两个响应均为统一错误 Envelope，`code` 分别为 `UNAUTHORIZED`、`FORBIDDEN`，且不泄露 Token digest 或明文 Token。
@@ -803,7 +803,7 @@ curl -sS -D /private/tmp/stage3-generate.headers \
   -X POST http://127.0.0.1:18080/v1/generate \
   -H 'Authorization: Bearer stage3-demo-token' \
   -H 'Content-Type: application/json' \
-  --data '{"capabilities":{"authorization":{"enabled":true,"config":{}}}}'
+  --data '{"requestedConfig":{"capabilities":{"authorization":{"enabled":true,"config":{}}}}}'
 unzip -t /private/tmp/stage3-generate.zip
 unzip -Z1 /private/tmp/stage3-generate.zip
 unzip -p /private/tmp/stage3-generate.zip .xcodeagent/template-state.json \

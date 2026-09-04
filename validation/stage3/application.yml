@@ -1,0 +1,14 @@
+server:
+  port: 18080
+xcodeagent:
+  template-engine:
+    source-root: ${STAGE3_SOURCE_ROOT}
+    principals:
+      - principal-id: stage3-full
+        principal-type: XCODE_AGENT
+        token-sha256: f807843a7ee53c652d63a1d2215e104ab2f265ed0d2bea0cf4c64f1486764593
+        scopes: [template.plan, template.generate, template.update]
+      - principal-id: stage3-plan-only
+        principal-type: XCODE_AGENT
+        token-sha256: 3a1af87bdeb7471c0124f17aa27e90ad46bbbee710dc7cad2c3f6dbd2feea646
+        scopes: [template.plan]

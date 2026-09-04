@@ -1,0 +1,56 @@
+openapi: 3.0.3
+info:
+  title: XcodeAgent Template Engine Service
+  version: v1
+paths:
+  /v1/plan:
+    post:
+      operationId: plan
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PlanRequest' } } } }
+      responses:
+        '200': { description: Core plan, content: { application/json: { schema: { $ref: '#/components/schemas/PlanResponse' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /v1/generate:
+    post:
+      operationId: generate
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/GenerateRequest' } } } }
+      responses:
+        '200': { description: Complete project package, content: { application/zip: { schema: { type: string, format: binary } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /v1/update:
+    post:
+      operationId: update
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PlanRequest' } } } }
+      responses:
+        '200': { description: Update package, content: { application/zip: { schema: { type: string, format: binary } } } }
+        '204': { description: No template change }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  responses:
+    Error: { description: Error envelope, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  schemas:
+    PlanRequest:
+      type: object
+      required: [currentTemplateState, requestedConfig]
+      additionalProperties: false
+      properties: { currentTemplateState: { nullable: true, $ref: '#/components/schemas/TemplateState' }, requestedConfig: { $ref: '#/components/schemas/RequestedConfig' } }
+    GenerateRequest:
+      type: object
+      required: [requestedConfig]
+      additionalProperties: false
+      properties: { requestedConfig: { $ref: '#/components/schemas/RequestedConfig' } }
+    RequestedConfig: { type: object, required: [capabilities], additionalProperties: false, properties: { capabilities: { type: object, additionalProperties: { type: object } } } }
+    TemplateState: { type: object, required: [templateRevision, managedFiles, requested, effective], additionalProperties: false, properties: { templateRevision: { type: string }, managedFiles: { type: object, additionalProperties: { type: string } }, requested: { type: object }, effective: { type: object } } }
+    PlanResponse: { type: object, required: [kind, nextTemplateState, body, diagnostics], additionalProperties: false, properties: { kind: { type: string, enum: [CHANGE, NO_CHANGE] }, nextTemplateState: { $ref: '#/components/schemas/TemplateState' }, body: { nullable: true, type: object }, diagnostics: { type: array, items: {} } } }
+    Error: { type: object, required: [code, message, details, traceId], additionalProperties: false, properties: { code: { type: string }, message: { type: string }, details: { type: object }, traceId: { type: string } } }
