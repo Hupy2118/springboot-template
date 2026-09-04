@@ -1,1 +1,1 @@
-{"type":"object","required":["path","module","export","exportType"],"properties":{"path":{"type":"string"},"module":{"type":"string"},"export":{"type":"string"},"exportType":{"enum":["default","named"]}},"additionalProperties":false}
+{"type":"object","required":["path","module","export","exportType"],"properties":{"path":{"type":"string"},"entry":{"type":"boolean"},"module":{"type":"string"},"export":{"type":"string"},"exportType":{"enum":["default","named"]}},"additionalProperties":false}

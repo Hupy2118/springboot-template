@@ -18,4 +18,22 @@
         <jackson.version>2.15.4</jackson.version>
         <junit.version>5.10.2</junit.version>
     </properties>
+
+    <profiles>
+        <profile>
+            <id>stage2-verification</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <version>3.2.5</version>
+                        <executions>
+                            <execution><goals><goal>integration-test</goal><goal>verify</goal></goals></execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

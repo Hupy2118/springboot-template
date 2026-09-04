@@ -130,7 +130,7 @@ public final class TemplateSourceLoader {
             try (Stream<Path> stream = Files.walk(scanned)) {
                 stream.filter(path -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)).forEach(path -> {
                     String relative = ownerRoot.relativize(path).toString().replace('\\', '/');
-                    if (!containsForbiddenSegment(relative) && !declared.contains(relative)) {
+                    if (!containsForbiddenSegment(relative) && !isGeneratedTarget(relative) && !declared.contains(relative)) {
                         throw new TemplateSourceException("UNDECLARED_TEMPLATE_FILE: " + relative);
                     }
                 });
@@ -247,6 +247,9 @@ public final class TemplateSourceLoader {
     private boolean containsForbiddenSegment(String value) {
         for (String segment : value.split("/")) if (FORBIDDEN_SEGMENTS.contains(segment)) return true;
         return false;
+    }
+    private boolean isGeneratedTarget(String value) {
+        return value.startsWith("frontend/src/generated/") || value.equals("backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java");
     }
     private Integer number(Object value) { return value instanceof Number ? ((Number) value).intValue() : null; }
     private String string(Object value, String label) { require(value instanceof String && !((String) value).trim().isEmpty(), "TEMPLATE_SOURCE_INVALID: " + label); return (String) value; }

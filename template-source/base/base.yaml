@@ -61,9 +61,6 @@ files:
   - { source: frontend/src/constants/index.ts, target: frontend/src/constants/index.ts }
   - { source: frontend/src/constants/layout.ts, target: frontend/src/constants/layout.ts }
   - { source: frontend/src/constants/routes.tsx, target: frontend/src/constants/routes.tsx }
-  - { source: frontend/src/generated/capabilityMenus.ts, target: frontend/src/generated/capabilityMenus.ts }
-  - { source: frontend/src/generated/capabilityProviders.tsx, target: frontend/src/generated/capabilityProviders.tsx }
-  - { source: frontend/src/generated/capabilityRoutes.tsx, target: frontend/src/generated/capabilityRoutes.tsx }
   - { source: frontend/src/index.css, target: frontend/src/index.css }
   - { source: frontend/src/index.tsx, target: frontend/src/index.tsx }
   - { source: frontend/src/layout/components/AppIcon/index.tsx, target: frontend/src/layout/components/AppIcon/index.tsx }

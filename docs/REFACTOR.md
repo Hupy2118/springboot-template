@@ -6,7 +6,7 @@
 
 当前工程基线为 Java 8、Spring Boot 2.7.2、Maven、React 18、Vite 和 pnpm。仓库根没有 Maven Reactor 或 Maven Wrapper，template-engine 尚未形成工程；V1 不创建根 mvnw，不实现 CLI，也不建立第二套本地组合逻辑。
 
-唯一 Core Engine 使用固定 Template Source、当前 TemplateState 和完整 RequestedConfig 计算 Target State，并输出 ChangeSet。Engine Service 只治理 Project State、Revision、ChangeSet 生命周期、认证和幂等。
+唯一 Core Engine 使用固定 Template Source、当前 TemplateState 和完整 RequestedConfig 计算 Target State，并输出 ChangeSet。Engine Service 是无状态 HTTP Adapter 与 Package Builder，只负责请求校验、认证、调用 Core 和组装首次工程/更新包；Project、Workspace 与 TemplateState 的持久化均由外部调用方负责。
 
 本项目交付范围：
 
@@ -23,12 +23,12 @@ XcodeAgent 只保留外部参考设计。本项目不实现 XcodeAgent Client、
 |---|---|---|
 | Template Source | Base、Capability、Schema、Extension、Migration、模板文件 | Project State、HTTP、Workspace |
 | TemplateSourceLoader | 加载和校验固定 Source | Capability Resolve、持久化 |
-| Core Engine | Resolve、Renderer、Target、Diff、ChangeSet | HTTP、Revision、Workspace 写入 |
+| Core Engine | Resolve、Renderer、Target、Diff、ChangeSet | HTTP、Project Revision、Workspace 写入 |
 | Stage2 Fixture | 临时 Workspace Apply、验证、State 写入 | Service 生命周期、Agent 恢复 |
-| Engine Service | Project State、ChangeSet 生命周期、认证、幂等、审计 | 重写 Core、写 Workspace |
+| Engine Service | HTTP、认证、调用 Core、首次工程 ZIP、更新包 ZIP | Project State、Revision、ChangeSet 生命周期、持久化、调用方 Workspace 写入 |
 | XcodeAgent 参考设计 | 说明外部执行方协议 | 本项目代码、测试、验收 |
 
-V1 不支持历史 Template Source Snapshot、调用方选择 Source 或版本、内容 Hash/CAS、自动合并人工修改、目录/Glob/二进制 File Operation、任意 XML Patch、Capability 自定义 Config Binding、真实业务数据库 Migration 执行或本项目内的 XcodeAgent 实现。
+V1 不支持历史 Template Source Snapshot、调用方选择 Source 或版本、内容 Hash/CAS、自动合并人工修改、目录/Glob/二进制 File Operation、任意 XML Patch、Capability 自定义 Config Binding、真实业务数据库 Migration 执行、服务端 Project/ChangeSet 持久化、审批/结果回调、服务端数据库或本项目内的 XcodeAgent 实现。
 
 login 必须可独立启用。authorization 必须以 required 单向依赖 login。Login 不得 import Authorization API、AuthProvider、权限资源、权限页面或权限刷新逻辑。
 
@@ -481,119 +481,420 @@ Contract Test 必测：Revision 缺失、Manifest/Schema 解析、未知字段�
     → Validation
     → Workspace State 写入与二次 Plan
 
-每场景使用独立临时 Workspace，全部 Blocking Validation 成功后原子写：
+每场景使用独立临时 Workspace，全部 Blocking Validation 成功后原子写 Workspace 本地状态：
 
-    { "revision": null, "templateState": {} }
+    .xcodeagent/template-state.json
+
+文件内容就是完整 `TemplateState`，不再包裹 Project Revision 或 Service 生命周期字段。
 
 验证顺序为后端 mvn test、前端 pnpm install --no-frozen-lockfile、pnpm test、pnpm build。
 
 验收覆盖：null 首次 Plan、Base/Login/Authorization 组合、二次 NO_CHANGE、Capability 增删、Refresh 全量 UPDATE/ADD/DELETE、六类 Extension 编译、依赖与 Source 冲突、Operation 前置条件、Migration 物化、Validation 失败不写 State、黄金 Core 输出。
 
-阶段二不实现 HTTP、Project Revision、认证、幂等、ChangeSetRecord、XcodeAgent 或真实数据库 Migration。
+阶段二不实现 HTTP、认证、Service Package、XcodeAgent 或真实数据库 Migration。阶段二已经必须完整实现 `CorePlanResult`、`TemplateState` 与全部 ChangeSet Operation；阶段三不得在 Service 层补算或重定义 Core 结果。
 
-### 阶段三：极薄 Engine Service
+### 阶段三：无状态 Engine Service
 
-Service 使用 Spring JDBC、MySQL 8、Flyway；集成测试使用 H2 MySQL Mode。
+阶段三只把阶段二已经验收通过的 Core 暴露为无状态 HTTP 服务，并提供首次工程 ZIP 与更新包 ZIP。Service 不拥有 Project，不保存 TemplateState，不保存 ChangeSet，不管理 Apply 生命周期。
 
-持久化模型：
+固定模块：
 
-    ProjectState
-      projectId, revision, templateState, lastAppliedChangeSetId
+    template-engine/
+      pom.xml
+      engine-core/
+      engine-service/
+        src/main/resources/openapi/engine-service-v1.yaml
 
-    ChangeSetRecord
-      changeSetId, projectId, fromRevision, toRevision,
-      nextTemplateState, body, status, principalId, requestHash,
-      createdAt, approvedAt?, appliedAt?, failedAt?, resultDiagnostics?
+`engine-service` 不引入 Spring JDBC、JPA、MyBatis、Flyway、H2、MySQL、Redis 或其他持久化/缓存组件。V1 不创建数据库 Schema，也没有 Repository/DAO。
 
-    IdempotencyRecord
-      principalId, projectId, operation, key, requestHash, responseBody, createdAt
+#### 5.3.1 Service 边界
 
-ChangeSet 状态：
+Service 只负责：
 
-    PLANNED
-    APPROVED
-    APPLIED
-    FAILED
-    SUPERSEDED
+- 从部署配置加载固定 Source Root，并在启动时构造唯一 `TemplateSourceContext` 与 `TemplateEngine`。
+- 校验 HTTP 请求与认证 Scope。
+- 将 `currentTemplateState + requestedConfig` 原样映射到 Core 输入。
+- 将 `CorePlanResult` 原样映射为 Plan JSON 响应。
+- 首次生成时，将 `currentTemplateState=null` 的 CHANGE 结果在内存或 Service 私有临时目录中物化为完整工程 ZIP。
+- 更新时，将 Core ChangeSet、`nextTemplateState` 与文件 Payload 组装为 Update Package ZIP。
+- 请求结束后删除 Service 私有临时文件；不保留项目级状态、历史或结果。
 
-允许迁移：
+Service 明确不负责：
 
-    PLANNED  -> APPROVED | SUPERSEDED
-    APPROVED -> APPLIED | FAILED
-    APPLIED | FAILED | SUPERSEDED -> terminal
+- 不识别或保存 `projectId`、Project Revision、Workspace Revision。
+- 不保存 `TemplateState`、`ChangeSetBody`、Diagnostics、请求或响应。
+- 不维护 PLANNED/APPROVED/APPLIED/FAILED/SUPERSEDED 等状态机。
+- 不提供 Approve、Result callback、ChangeSet 查询或恢复接口。
+- 不使用服务端幂等记录；相同确定性输入允许直接重新计算。
+- 不写调用方 Workspace，不执行 XcodeAgent 的 Workspace Lock、Apply、恢复或本地 State 推进。
+- 不执行 `validationPlan` 中的构建/测试命令；Validation 由外部 Apply 方在真实 Workspace 上执行。
+- 不执行真实业务数据库 Migration。
 
-HTTP 契约：
+#### 5.3.2 HTTP 契约
 
-    POST /v1/projects/{projectId}/plan
-    POST /v1/projects/{projectId}/simulate
-    POST /v1/projects/{projectId}/change-sets/{changeSetId}/approve
-    GET  /v1/projects/{projectId}/change-sets/{changeSetId}
-    POST /v1/projects/{projectId}/change-sets/{changeSetId}/results
+固定接口：
 
-Plan/Simulate 请求为 expectedRevision、requestedConfig；Approve 请求为 expectedRevision；Result 请求为 status:SUCCEEDED|FAILED、diagnostics。OpenAPI 是所有 HTTP 请求、响应和错误 Envelope 的唯一权威。
+    POST /v1/plan
+    POST /v1/generate
+    POST /v1/update
+
+OpenAPI 文件 `engine-service-v1.yaml` 是 HTTP 请求、响应、Content-Type、错误 Envelope、错误码与状态码映射的唯一权威；Controller DTO 不得脱离 OpenAPI 自行扩展字段。
+
+`POST /v1/plan` 请求：
+
+    {
+      "currentTemplateState": null | TemplateState,
+      "requestedConfig": RequestedConfig
+    }
+
+响应固定映射 `CorePlanResult`：
+
+    {
+      "kind": "CHANGE" | "NO_CHANGE",
+      "nextTemplateState": {},
+      "body": null | ChangeSetBody,
+      "diagnostics": []
+    }
+
+`nextTemplateState.templateRevision` 必须等于本次请求实际使用的 `TemplateSourceContext.templateRevision`。
+
+`POST /v1/generate` 请求只允许：
+
+    {
+      "requestedConfig": RequestedConfig
+    }
+
+Service 必须等价调用：
+
+    core.plan(null, requestedConfig)
+
+首次 Plan 按 Core 契约必须返回 CHANGE。Service 将 ChangeSet 物化为完整工程 ZIP，并在 ZIP 中写入：
+
+    <workspace files...>
+    .xcodeagent/template-state.json
+
+`.xcodeagent/template-state.json` 必须与 `CorePlanResult.nextTemplateState` 语义完全一致。Service 可以使用内存文件映射或请求级临时目录组装 ZIP，但该目录不是 Project Workspace，请求完成后必须删除。
+
+`POST /v1/update` 请求：
+
+    {
+      "currentTemplateState": TemplateState,
+      "requestedConfig": RequestedConfig
+    }
+
+Service 必须等价调用：
+
+    core.plan(currentTemplateState, requestedConfig)
+
+当 Core 返回 CHANGE 时返回 `application/zip` Update Package；当 Core 返回 NO_CHANGE 时返回 `204 No Content`，不得创建空 ChangeSet 或服务端记录。
+
+Update Package 固定结构：
+
+    change-set.json
+    next-template-state.json
+    payload/
+      <ADD_FILE / UPDATE_FILE 对应的 target path>
+
+规则：
+
+- `change-set.json` 必须是 Core `ChangeSetBody` 的规范序列化，不得修改 Operation 顺序。
+- `next-template-state.json` 必须是 Core `nextTemplateState` 的规范序列化。
+- `payload/` 只物化 `ADD_FILE` 与 `UPDATE_FILE` 的 `content`；目录层级保持 Workspace target path。
+- Payload 文件字节必须与对应 Operation 的 UTF-8 `content` 一致。
+- DELETE 与结构化 Node Operation 只由 `change-set.json` 描述，不在 Payload 中制造伪文件。
+- Update Package 不代表已 Apply；只有调用方在真实 Workspace Apply 和 Validation 成功后，才能用 `next-template-state.json` 覆盖本地 State。
+
+#### 5.3.3 无状态与重试语义
+
+Service 不接收 `Idempotency-Key`，也不保存 requestHash 或 responseBody。
+
+确定性保证来自 Core：相同 `TemplateSourceContext + currentTemplateState + requestedConfig` 必须得到相同 `CorePlanResult`。调用方在网络失败后可以提交同一请求重新计算。
+
+V1 不承诺 ZIP 二进制字节完全一致；ZIP entry 顺序、entry path 与文件内容必须确定，entry timestamp 必须固定为同一常量值，确保验收测试可重复。Plan JSON、ChangeSetBody、TemplateState 与 Payload 内容必须确定。
+
+#### 5.3.4 Source Root 与启动契约
+
+Stage3 的 Source Root 只允许来自部署配置：
+
+    xcodeagent:
+      template-engine:
+        source-root: /opt/xcodeagent/template-source
+
+规则：
+
+- `source-root` 缺失、为空、不可读或不是目录时 Service 启动失败。
+- 启动时只加载一次 `TemplateSourceContext`；加载或 Contract 校验失败时 Service 启动失败，不以降级 Source 对外提供请求。
+- 运行中的 HTTP 请求不得指定 Source Path、Source Ref、Template Version 或 Template Revision。
+- Source 发布后必须提升 `template-revision.txt`；部署新 Source 通过 Service 重启生效。
+- 每个 Plan 响应中的 `nextTemplateState`、Generate Package State、Update Package State 都必须携带该次启动加载的 `templateRevision`。
+
+#### 5.3.5 服务认证
+
+认证仍使用部署配置，不使用数据库。固定配置模型：
+
+    xcodeagent:
+      template-engine:
+        principals:
+          - principal-id: xcodeagent
+            principal-type: XCODE_AGENT
+            token-sha256: <64 lowercase hex>
+            scopes:
+              - template.plan
+              - template.generate
+              - template.update
+
+规则：
+
+- Header 固定使用 `Authorization: Bearer <token>`。
+- Service 对 Bearer Token 原始 UTF-8 字节计算 SHA-256，并以 lowercase hex 与配置中的 `token-sha256` 比较；不记录明文 Token。
+- `principal-id` 与 `token-sha256` 在配置中都必须唯一；重复、非法 digest、未知 principalType 或未知 scope 均导致启动失败。
+- 缺失/非法 Authorization、未知 Token 返回 401 `UNAUTHORIZED`。
+- Token 有效但缺少接口所需 Scope 返回 403 `FORBIDDEN`。
+- `/v1/plan` 需要 `template.plan`；`/v1/generate` 需要 `template.generate`；`/v1/update` 需要 `template.update`。
+
+#### 5.3.6 错误契约
 
 统一错误 Envelope：
 
     {
-      "code": "STATE_REVISION_CONFLICT",
+      "code": "CONFIG_INVALID",
       "message": "...",
       "details": {},
       "traceId": "..."
     }
 
-Loader/Core 错误包括 TEMPLATE_SOURCE_INVALID、UNDECLARED_TEMPLATE_FILE、FILE_OWNERSHIP_CONFLICT、CONFIG_INVALID、CAPABILITY_NOT_FOUND、CAPABILITY_DEPENDENCY_CYCLE、DEPENDENCY_CONFLICT、EXTENSION_CONFLICT、MANAGED_FILE_MISSING。Service 错误包括 PROJECT_NOT_FOUND、STATE_REVISION_CONFLICT、CHANGESET_NOT_FOUND、CHANGESET_STATUS_INVALID、CHANGESET_ALREADY_APPROVED、CHANGESET_RESULT_CONFLICT、IDEMPOTENCY_CONFLICT、FORBIDDEN。OpenAPI 固定这些 code 与 HTTP 状态映射。
+Loader/Core 错误至少包括 `TEMPLATE_SOURCE_INVALID`、`UNDECLARED_TEMPLATE_FILE`、`FILE_OWNERSHIP_CONFLICT`、`CONFIG_INVALID`、`CAPABILITY_NOT_FOUND`、`CAPABILITY_DEPENDENCY_CYCLE`、`DEPENDENCY_CONFLICT`、`EXTENSION_CONFLICT`、`MANAGED_FILE_MISSING`。
 
-Plan 规则：
+Service 自有错误只允许协议层错误，例如 `BAD_REQUEST`、`UNAUTHORIZED`、`FORBIDDEN`、`PACKAGE_BUILD_FAILED`、`INTERNAL_ERROR`。不再存在 `PROJECT_NOT_FOUND`、`STATE_REVISION_CONFLICT`、`CHANGESET_NOT_FOUND`、`CHANGESET_STATUS_INVALID`、`CHANGESET_ALREADY_APPROVED`、`CHANGESET_RESULT_CONFLICT`、`IDEMPOTENCY_CONFLICT`。
 
-- Project 不存在且 expectedRevision=null：同一事务内插入 Revision 0 Project、以 current=null 调用 Core、创建首个 PLANNED ChangeSet；任一步失败整体回滚。
-- 并发首次 Plan 由 Project 主键约束保护；竞争失败方重读后返回 STATE_REVISION_CONFLICT。
-- Project 存在时 expectedRevision 必须等于当前 Revision。
-- 存在 APPROVED ChangeSet 时拒绝新 Plan。
-- 新 CHANGE Plan：同 Revision 全部 PLANNED 标记 SUPERSEDED，再创建新 PLANNED。
-- 新 NO_CHANGE Plan：同 Revision 全部 PLANNED 标记 SUPERSEDED，不创建 ChangeSet，不推进 Revision。
-- Simulate 使用已应用 TemplateState；Project 不存在且 expectedRevision=null 时用 null State 计算且不持久化。
+OpenAPI 必须固定全部错误码与 HTTP 状态映射。Core 错误到 HTTP 的映射只能在一个集中 Adapter 中定义，Controller 不得自行映射。
 
-Approve 仅允许 PLANNED 到 APPROVED，并验证 expected Revision。一个 Project/Revision 最多一个 APPROVED ChangeSet。
+#### 5.3.7 Stage3 验收
 
-Result 仅允许 APPROVED+SUCCEEDED 到 APPLIED 或 APPROVED+FAILED 到 FAILED。SUCCEEDED 在一个事务内推进 Project Revision、TemplateState 与 lastAppliedChangeSetId。相同终态和相同 Diagnostics 的重复 Result 幂等成功；其他重复 Result 报 CHANGESET_RESULT_CONFLICT。
+Stage3 集成测试使用 MockMvc 与真实 `engine-core`，不使用 H2/MySQL，不启动数据库。
 
-Plan、Approve、Result 要求 Idempotency-Key，键为 principalId、projectId、operation、key。Service 必须先查询幂等记录，再执行 Revision、状态和权限状态迁移判断：相同键和规范化请求返回原响应；相同键不同请求报 IDEMPOTENCY_CONFLICT。Simulate 不保存幂等记录。
+必须覆盖：
 
-认证使用服务端配置 Token 的 SHA-256 摘要映射 principalId、principalType、scopes，不保存明文 Token。Scope 固定为 template.plan、template.simulate、template.approve、template.read、template.apply-result；只有 XCODE_AGENT 加 template.apply-result 能提交 Result。
+- Service 启动成功、Source Root 缺失、Source 无效时启动失败。
+- Token 缺失、未知 Token、Scope 不足和合法 Scope。
+- `/v1/plan` 的首次、已有 State、Capability 增删、Refresh、NO_CHANGE；响应必须与直接调用 Core 的结果一致。
+- `/v1/generate` 生成完整 ZIP，`.xcodeagent/template-state.json` 等于 Core `nextTemplateState`；解压后的文件结果与 Stage2 首次 Apply Fixture 黄金结果一致。
+- `/v1/update` 的 CHANGE Package 中 `change-set.json`、`next-template-state.json` 与 Core 结果一致，Payload 与 File Operation content 一致。
+- `/v1/update` 的 NO_CHANGE 返回 204。
+- ZIP entry 不允许绝对路径、`..`、symlink 或越界路径，entry 顺序确定且 timestamp 固定。
+- 同一请求重复调用得到相同 Plan/State/ChangeSet/Payload，不依赖任何前一次请求留下的服务端状态。
+- 请求级临时目录在成功或失败后均被清理。
+- Service 不包含 JDBC/DataSource/Flyway/H2/MySQL/Redis 运行依赖，测试启动不需要任何数据库配置。
 
-Stage3 仅通过 MockMvc/Service 集成测试模拟 Result，不实现 Agent Apply 或恢复。
+#### 5.3.8 本地手工验收 Runbook
 
-必须覆盖：首次/并发 Plan、首次 Simulate、Revision 冲突、PLANNED Supersede、NO_CHANGE 清理旧 PLANNED、APPROVED 阻塞、非法 Approve/Result、重复 Result、认证、Scope、幂等、事务回滚、Service/Core 结果一致。
+本节是 **Stage3 实现完成后** 的人工验收步骤。它不是当前阶段可执行的启动说明：在 `engine-service` 模块、OpenAPI 生成代码和 Package Builder 尚未交付前，不能宣称 Service 已可启动。实现 Stage3 时必须同时提交本节引用的 `validation/stage3/application.yml` 与请求 Fixture；否则 Stage3 不可验收。
+
+验收机需要 JDK 11+、Maven 3.9+、`curl`、`jq` 和 `unzip`。所有命令从仓库根目录执行。Java 编译 target 仍可为 8；JDK 11 只是验收运行环境的下限。
+
+**1. 准备固定验收配置并启动。**
+
+实现必须提供 `validation/stage3/application.yml`，内容至少如下；Token 明文只用于本地 Fixture，不得进入生产配置。`stage3-demo-token` 的 SHA-256 为 `f807843a7ee53c652d63a1d2215e104ab2f265ed0d2bea0cf4c64f1486764593`，`stage3-plan-token` 的 SHA-256 为 `3a1af87bdeb7471c0124f17aa27e90ad46bbbee710dc7cad2c3f6dbd2feea646`。
+
+```yaml
+server:
+  port: 18080
+xcodeagent:
+  template-engine:
+    source-root: ${STAGE3_SOURCE_ROOT}
+    principals:
+      - principal-id: stage3-full
+        principal-type: XCODE_AGENT
+        token-sha256: f807843a7ee53c652d63a1d2215e104ab2f265ed0d2bea0cf4c64f1486764593
+        scopes: [template.plan, template.generate, template.update]
+      - principal-id: stage3-plan-only
+        principal-type: XCODE_AGENT
+        token-sha256: 3a1af87bdeb7471c0124f17aa27e90ad46bbbee710dc7cad2c3f6dbd2feea646
+        scopes: [template.plan]
+```
+
+```sh
+mvn -f template-engine/pom.xml -pl engine-service -am package
+export STAGE3_SOURCE_ROOT="$(pwd)/template-source"
+java -jar template-engine/engine-service/target/engine-service-*.jar \
+  --spring.config.additional-location="file:$(pwd)/validation/stage3/"
+```
+
+进程必须保持运行，且日志不得出现 DataSource、JDBC、Flyway 或数据库连接初始化。`STAGE3_SOURCE_ROOT` 为空、不存在，或指向非法 Source Root 时，进程必须在监听端口前失败退出并报 `TEMPLATE_SOURCE_INVALID`；这三种情况是启动失败验收，不应再继续发送 HTTP 请求。
+
+**2. 准备请求 Fixture。**
+
+实现必须提交下列两个 JSON Fixture（字段名及嵌套层级以最终 `engine-service-v1.yaml` 为唯一依据；本节的 JSON 是该 OpenAPI 必须接受的最小示例）。Fixture 只是为了让人工验收可重复；Service 的 Request Body 始终接收普通 `application/json` 对象，**不接收文件上传，也不感知 JSON 来自文件还是调用方内存**。
+
+`validation/stage3/requested-authorization.json`：
+
+```json
+{
+  "capabilities": {
+    "authorization": { "enabled": true, "config": {} }
+  }
+}
+```
+
+`validation/stage3/requested-login.json`：
+
+```json
+{
+  "capabilities": {
+    "login": { "enabled": true, "config": {} }
+  }
+}
+```
+
+首次 Plan 的普通 JSON 请求参数为：
+
+```json
+{
+  "currentTemplateState": null,
+  "requestedConfig": {
+    "capabilities": {
+      "authorization": { "enabled": true, "config": {} }
+    }
+  }
+}
+```
+
+下列命令只是在本地由 Fixture 组装该 JSON，便于复用，不改变接口契约：
+
+```sh
+jq -n --slurpfile requested validation/stage3/requested-authorization.json \
+  '{currentTemplateState: null, requestedConfig: $requested[0]}' \
+  > /private/tmp/stage3-plan-initial.json
+```
+
+**3. 验收首次 Plan 与认证。**
+
+```sh
+curl -sS -D /private/tmp/stage3-plan.headers \
+  -o /private/tmp/stage3-plan.json \
+  -X POST http://127.0.0.1:18080/v1/plan \
+  -H 'Authorization: Bearer stage3-demo-token' \
+  -H 'Content-Type: application/json' \
+  --data '{"currentTemplateState":null,"requestedConfig":{"capabilities":{"authorization":{"enabled":true,"config":{}}}}}'
+jq . /private/tmp/stage3-plan.json
+```
+
+预期为 HTTP `200` 和 JSON Plan：`kind` 为 `CHANGE`，`body` 非空，`nextTemplateState.templateRevision` 等于当前 `template-source/template-revision.txt`（当前为 `2026.09.04.1`），并且 `nextTemplateState.effective` 同时包含显式请求的 `authorization` 与其自动引入的 `login`。响应不得包含 projectId、changeSetId、状态机状态或其他服务端持久化标识。对相同请求重复执行两次，两个 JSON 的语义内容必须相同。
+
+```sh
+curl -sS -o /private/tmp/stage3-unauthorized.json -w '%{http_code}\n' \
+  -X POST http://127.0.0.1:18080/v1/plan \
+  -H 'Content-Type: application/json' \
+  --data '{"currentTemplateState":null,"requestedConfig":{"capabilities":{"authorization":{"enabled":true,"config":{}}}}}'
+curl -sS -o /private/tmp/stage3-forbidden.json -w '%{http_code}\n' \
+  -X POST http://127.0.0.1:18080/v1/generate \
+  -H 'Authorization: Bearer stage3-plan-token' \
+  -H 'Content-Type: application/json' \
+  --data '{"capabilities":{"authorization":{"enabled":true,"config":{}}}}'
+```
+
+前一个命令必须输出 `401`，后一个必须输出 `403`；两个响应均为统一错误 Envelope，`code` 分别为 `UNAUTHORIZED`、`FORBIDDEN`，且不泄露 Token digest 或明文 Token。
+
+**4. 验收首次生成 Package。**
+
+```sh
+curl -sS -D /private/tmp/stage3-generate.headers \
+  -o /private/tmp/stage3-generate.zip \
+  -X POST http://127.0.0.1:18080/v1/generate \
+  -H 'Authorization: Bearer stage3-demo-token' \
+  -H 'Content-Type: application/json' \
+  --data '{"capabilities":{"authorization":{"enabled":true,"config":{}}}}'
+unzip -t /private/tmp/stage3-generate.zip
+unzip -Z1 /private/tmp/stage3-generate.zip
+unzip -p /private/tmp/stage3-generate.zip .xcodeagent/template-state.json \
+  > /private/tmp/stage3-generated-state.json
+jq . /private/tmp/stage3-generated-state.json
+```
+
+预期为 HTTP `200`、`Content-Type: application/zip` 与可通过 `unzip -t` 的 ZIP。ZIP 至少包含 `frontend/`、`backend/` 的生成文件和 `.xcodeagent/template-state.json`；State 必须与步骤 3 Plan 的 `nextTemplateState` 语义相等，且其 effective capability 包含 `authorization` 和 `login`。所有 entry 均为相对普通文件路径，不得包含绝对路径、`..`、symlink 或越界路径。解压得到的内容须等于 Stage2 首次 Apply 的黄金结果。
+
+**5. 验收更新 CHANGE Package。**
+
+```sh
+jq -n \
+  --slurpfile state /private/tmp/stage3-generated-state.json \
+  --slurpfile requested validation/stage3/requested-login.json \
+  '{currentTemplateState: $state[0], requestedConfig: $requested[0]}' \
+  > /private/tmp/stage3-update-change.json
+curl -sS -D /private/tmp/stage3-update.headers \
+  -o /private/tmp/stage3-update.zip \
+  -X POST http://127.0.0.1:18080/v1/update \
+  -H 'Authorization: Bearer stage3-demo-token' \
+  -H 'Content-Type: application/json' \
+  --data @/private/tmp/stage3-update-change.json
+unzip -t /private/tmp/stage3-update.zip
+unzip -Z1 /private/tmp/stage3-update.zip
+unzip -p /private/tmp/stage3-update.zip change-set.json | jq .
+unzip -p /private/tmp/stage3-update.zip next-template-state.json \
+  > /private/tmp/stage3-next-state.json
+```
+
+预期为 HTTP `200`、`application/zip`，并且 ZIP 根目录恰有 `change-set.json`、`next-template-state.json` 与 `payload/`。`next-template-state.json` 的 effective capability 仅保留 `login`；`change-set.json` 必须含有删除 `authorization` 所有权文件的 `DELETE` Operation，且 DELETE 不得伪造对应的 payload 文件。新增或修改文件的 payload 必须存在，并与其 File Operation content 一致。
+
+**6. 验收 NO_CHANGE、确定性和无状态性。**
+
+```sh
+jq -n \
+  --slurpfile state /private/tmp/stage3-next-state.json \
+  --slurpfile requested validation/stage3/requested-login.json \
+  '{currentTemplateState: $state[0], requestedConfig: $requested[0]}' \
+  > /private/tmp/stage3-update-no-change.json
+curl -sS -D /private/tmp/stage3-no-change.headers -o /private/tmp/stage3-no-change.body \
+  -X POST http://127.0.0.1:18080/v1/update \
+  -H 'Authorization: Bearer stage3-demo-token' \
+  -H 'Content-Type: application/json' \
+  --data @/private/tmp/stage3-update-no-change.json
+```
+
+预期为 HTTP `204`、空响应体且不产生 ZIP。随后重启 Service，使用步骤 5 **同一份** `currentTemplateState` 与请求体再次调用 `/v1/update`；应仍得到语义相同的 CHANGE Package。对两次 Package 分别比较 entry 列表、`change-set.json`、`next-template-state.json` 和每个 payload 的 SHA-256，结果必须相同；ZIP 的二进制字节相同不是验收条件。该反向验证排除“第一次请求写入内存或数据库、第二次才能成功”的伪无状态实现。
+
+验收结束后停止进程。正常返回、4xx、5xx 之后都不得在 Source Root 或工作目录下留下由 Service 创建的临时工程、ZIP 或状态文件；仅允许本 Runbook 显式写入 `/private/tmp/stage3-*` 的验收产物。
+
+阶段三完成后，Engine Service 是纯计算 Core 的无状态网络入口与 Package Builder，不成为 Project Registry、ChangeSet Registry 或 Workspace Manager。
 
 ## 6. XcodeAgent 外部参考设计
 
 本章为非交付设计，不实现、不测试、不计入本项目完成标准。
 
-建议外部执行方：
+TemplateState 属于实际 Workspace，而不是 Engine Service。建议外部执行方在工程中保存：
 
-    获取 APPROVED ChangeSet
-    → Workspace Lock
-    → 读取本地 State
-    → 校验 fromRevision
-    → 写 pending-apply.json
+    .xcodeagent/template-state.json
+
+首次生成：
+
+    用户 RequestedConfig
+    → POST /v1/generate
+    → 解压完整工程 ZIP
+    → 获得 .xcodeagent/template-state.json
+
+已有工程更新：
+
+    读取本地 .xcodeagent/template-state.json
+    → 用户新的 RequestedConfig
+    → POST /v1/update
+    → 若 204，则无模板变更
+    → 若返回 Update Package，则 Workspace Lock
     → Workspace Preflight
-    → 顺序 Apply
+    → 按 change-set.json 原顺序 Apply
     → Blocking Validation
-    → 提交 Result
-    → Service 确认 APPLIED
-    → 原子推进本地 State
-    → 删除 Pending
+    → 成功后原子覆盖 .xcodeagent/template-state.json
+    → 失败时保持原 TemplateState 不变，并显式恢复或丢弃 Workspace 修改
 
-Pending 建议字段为 schemaVersion、projectId、changeSetId、fromRevision、toRevision、phase。Service 为 APPLIED 时本地 finalize；为 APPROVED 时可从首个 Operation 对账重放；为 FAILED、SUPERSEDED、NOT_FOUND 时进入 LOCAL_STATE_DIVERGED。Validation 失败后 Workspace 必须显式恢复或丢弃，不自动回滚。
+XcodeAgent 可以在自身体系中增加 Pending Apply、Workspace Revision、恢复、审计或任务幂等，但这些均属于调用方能力，不反向进入 Engine Service 协议。
 
-XcodeAgent 不得 Resolve Capability、修改 Operation 顺序或自行选择 Template Source。
+XcodeAgent 不得 Resolve Capability、修改 Operation 顺序、自行选择 Template Source、伪造 `nextTemplateState` 或在 Apply 失败后推进本地 TemplateState。
 
 ## 7. V1 完成标准
 
 1. Loader 拒绝旧 Manifest、非法 Source、未声明模板文件和 Extension/Route/Interceptor 冲突，不提供兼容层。
 2. Login 可独立生成和构建，不再反向依赖 Authorization。
 3. 阶段一通过 TemplateSourceContractTest。
-4. 阶段二仅通过 ./validation/verify-stage2.sh 完成真实临时 Workspace 闭环。
-5. 阶段三完成 Service HTTP、状态机、Revision、事务、认证、幂等和 OpenAPI 验收。
-6. XcodeAgent 只保留参考设计，不计入本项目 V1 完成范围。
-7. 新增 Capability、Point、State 字段、Operation 或错误码前，必须先扩展本文、Schema、Fixture 与验收测试。
+4. 阶段二仅通过 `./validation/verify-stage2.sh` 完成真实临时 Workspace 闭环，并保证 `CorePlanResult`、完整 `TemplateState`、结构化 Operation 与黄金输出全部符合第 4 章协议。
+5. 阶段三完成无状态 Service HTTP、Source 启动契约、认证、OpenAPI、首次工程 ZIP 与更新包 ZIP 验收；V1 不引入数据库、服务端 Project/ChangeSet 状态机或持久化幂等。
+6. XcodeAgent 只保留外部参考设计；实际 Workspace Apply、Validation 后 State 推进、Pending/恢复与审计不计入本项目 V1 完成范围。
+7. 新增 Capability、Point、State 字段、Operation、Package 字段或错误码前，必须先扩展本文、Schema/OpenAPI、Fixture 与验收测试。

@@ -13,6 +13,7 @@ files:
   - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/config/LoginPropertiesConfiguration.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/config/LoginPropertiesConfiguration.java }
   - { source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/config/MockLoginProperties.java, target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/config/MockLoginProperties.java }
   - { source: frontend/src/apis/login.ts, target: frontend/src/apis/login.ts }
+  - { source: frontend/src/components/wrapLoginRequired.tsx, target: frontend/src/components/wrapLoginRequired.tsx }
   - { source: frontend/src/login/constants.ts, target: frontend/src/login/constants.ts }
   - { source: frontend/src/login/types.ts, target: frontend/src/login/types.ts }
   - { source: frontend/src/pages/Login/index.tsx, target: frontend/src/pages/Login/index.tsx }
@@ -29,11 +30,15 @@ extensions:
   - point: frontend.root-routes
     id: login-route
     order: 100
-    payload: { path: /login, module: '@/pages/Login', export: default, exportType: default }
+    payload: { path: /login, entry: true, module: '@/pages/Login', export: default, exportType: default }
   - point: frontend.root-routes
     id: logout-route
     order: 110
     payload: { path: /logout, module: '@/pages/Logout', export: default, exportType: default }
+  - point: frontend.page-wrappers
+    id: login-required-page-wrapper
+    order: 100
+    payload: { module: '@/components/wrapLoginRequired', export: wrapLoginRequired, exportType: named }
   - point: backend.spring-interceptors
     id: login-current-user
     order: 100
