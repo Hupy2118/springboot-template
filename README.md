@@ -64,8 +64,10 @@ java -jar template-engine/engine-service/target/engine-service-1.0.0-SNAPSHOT.ja
 在另一终端中查看：
 
 ```sh
-tail -f /private/tmp/engine-service-tomcat/logs/access.log
+tail -F /private/tmp/engine-service-tomcat/logs/access.*.log
 ```
+
+Tomcat 默认会在文件名中加入日期，例如 `access.2026-09-09.log`，并且通常在收到第一条 HTTP 请求后才创建该文件。若尚未请求接口，请先调用一次 `/v1/plan`；也可先执行 `ls -la /private/tmp/engine-service-tomcat/logs/` 确认实际文件名。
 
 不要通过通用 HTTP 日志打印 `Authorization`、完整 `currentTemplateState` 或文件内容：它们可能包含 Token 或大体积工程内容。
 
