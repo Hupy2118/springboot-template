@@ -4,7 +4,6 @@ import com.xcodeagent.template.engine.source.TemplateSourceException;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -35,12 +34,17 @@ public final class ReconcileDecisionEngine {
         for (String id : order) {
             CapabilityDefinitionV2 definition = release.capabilities().get(id);
             for (ExistingTargetDefinition target : definition.existingTargets()) {
-                strategies.add(strategy("TRANSFORM_FILE", target.strategyId(), target.path(), target.order(), map("capabilityId", id)));
+                StrategyDefinition registered = release.strategies().get(target.strategyId());
+                Map<String, Object> parameters = new LinkedHashMap<String, Object>(registered.parameters());
+                parameters.put("capabilityId", id); parameters.put("registryType", registered.type());
+                String type = "ENSURE_NPM_DEPENDENCY".equals(registered.type()) ? "ENSURE_NPM_DEPENDENCY" : "TRANSFORM_FILE";
+                strategies.add(strategy(type, target.strategyId(), target.path(), target.order(), parameters));
             }
             for (AdditionDefinition addition : definition.additions()) {
                 AppliedAdditionState applied = current.appliedAdditions().get(addition.id());
                 if (applied == null) {
-                    Map<String, Object> parameters = map("additionId", addition.id(), "sourceRef", addition.source(), "precondition", "TARGET_MUST_NOT_EXIST");
+                    Map<String, Object> parameters = map("additionId", addition.id(), "capabilityId", id,
+                            "sourceRef", addition.source(), "precondition", "TARGET_MUST_NOT_EXIST");
                     strategies.add(strategy("ADD_FILE", addition.id(), addition.target(), 0, parameters));
                     nextAdditions.put(addition.id(), new AppliedAdditionState(id, addition.target(), release.revision()));
                 } else {
@@ -54,14 +58,6 @@ public final class ReconcileDecisionEngine {
             }
             validators.addAll(definition.validators());
         }
-        Collections.sort(strategies, new Comparator<ModificationStrategy>() {
-            public int compare(ModificationStrategy a, ModificationStrategy b) {
-                int result = a.target().compareTo(b.target());
-                if (result != 0) return result;
-                result = Integer.compare(a.order(), b.order());
-                return result != 0 ? result : a.strategyId().compareTo(b.strategyId());
-            }
-        });
         return UpdateResult.change(reasons, strategies,
                 new TemplateStateV2(release.revision(), release.digest(), normalizedRequested, targetEffective, nextAdditions),
                 new ValidationPlan(validators));

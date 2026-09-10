@@ -3,11 +3,57 @@ schemaVersion: 2
 defaultConfig: {}
 requires: []
 existingTargets:
-  - { path: frontend/src/App.tsx, strategyId: frontend.login.ensure-provider, order: 100 }
-  - { path: frontend/src/generated/capabilityRoutes.tsx, strategyId: frontend.login.ensure-routes, order: 110 }
-  - { path: frontend/package.json, strategyId: frontend.login.ensure-dependency, order: 120 }
-  - { path: backend/pom.xml, strategyId: backend.login.ensure-dependency, order: 130 }
+  - { strategyId: frontend.login.ensure-provider }
+  - { strategyId: frontend.login.ensure-login-route }
+  - { strategyId: frontend.login.ensure-logout-route }
+  - { strategyId: frontend.login.ensure-page-wrapper }
+  - { strategyId: backend.login.ensure-interceptor }
+  - { strategyId: frontend.login.ensure-dependency }
 additions:
+  - id: login.backend-src-main-java-com-cmbchina-backend-auth-adapter-web-mocklogincontroller
+    source: backend/src/main/java/com/cmbchina/backend/auth/adapter/web/MockLoginController.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/adapter/web/MockLoginController.java
+    maintainPolicy: { mode: NO_OP }
+  - id: login.backend-src-main-java-com-cmbchina-backend-auth-application-service-mockjwtservice
+    source: backend/src/main/java/com/cmbchina/backend/auth/application/service/MockJwtService.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/application/service/MockJwtService.java
+    maintainPolicy: { mode: NO_OP }
+  - id: login.backend-src-main-java-com-cmbchina-backend-auth-common-context-baseuserdata
+    source: backend/src/main/java/com/cmbchina/backend/auth/common/context/BaseUserData.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/common/context/BaseUserData.java
+    maintainPolicy: { mode: NO_OP }
+  - id: login.backend-src-main-java-com-cmbchina-backend-auth-common-context-baseuserdatathreadhodler
+    source: backend/src/main/java/com/cmbchina/backend/auth/common/context/BaseUserDataThreadHodler.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/common/context/BaseUserDataThreadHodler.java
+    maintainPolicy: { mode: NO_OP }
+  - id: login.backend-src-main-java-com-cmbchina-backend-auth-common-interceptor-userwebmvcinterceptor
+    source: backend/src/main/java/com/cmbchina/backend/auth/common/interceptor/UserWebMvcInterceptor.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/common/interceptor/UserWebMvcInterceptor.java
+    maintainPolicy: { mode: NO_OP }
+  - id: login.backend-src-main-java-com-cmbchina-backend-auth-infrastructure-config-loginpropertiesconfiguration
+    source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/config/LoginPropertiesConfiguration.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/config/LoginPropertiesConfiguration.java
+    maintainPolicy: { mode: NO_OP }
+  - id: login.backend-src-main-java-com-cmbchina-backend-auth-infrastructure-config-mockloginproperties
+    source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/config/MockLoginProperties.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/config/MockLoginProperties.java
+    maintainPolicy: { mode: NO_OP }
+  - id: login.frontend-src-apis-login
+    source: frontend/src/apis/login.ts
+    target: frontend/src/apis/login.ts
+    maintainPolicy: { mode: NO_OP }
+  - id: login.frontend-src-components-wraploginrequired
+    source: frontend/src/components/wrapLoginRequired.tsx
+    target: frontend/src/components/wrapLoginRequired.tsx
+    maintainPolicy: { mode: NO_OP }
+  - id: login.frontend-src-login-constants
+    source: frontend/src/login/constants.ts
+    target: frontend/src/login/constants.ts
+    maintainPolicy: { mode: NO_OP }
+  - id: login.frontend-src-login-types
+    source: frontend/src/login/types.ts
+    target: frontend/src/login/types.ts
+    maintainPolicy: { mode: NO_OP }
   - id: login.login-page
     source: frontend/src/pages/Login/index.tsx
     target: frontend/src/pages/Login/index.tsx
@@ -16,6 +62,10 @@ additions:
     source: frontend/src/pages/Logout/index.tsx
     target: frontend/src/pages/Logout/index.tsx
     maintainPolicy: { mode: NO_OP }
+  - id: login.frontend-src-providers-index
+    source: frontend/src/providers/index.tsx
+    target: frontend/src/providers/index.tsx
+    maintainPolicy: { mode: NO_OP }
 validators:
-  - { validatorId: login.frontend, order: 100 }
-  - { validatorId: login.backend, order: 200 }
+  - { validatorId: login.frontend }
+  - { validatorId: login.backend }

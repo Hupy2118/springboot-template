@@ -4,10 +4,272 @@ defaultConfig: {}
 requires:
   - id: login
 existingTargets:
-  - { path: frontend/src/App.tsx, strategyId: frontend.authorization.ensure-provider, order: 200 }
-  - { path: frontend/src/generated/capabilityRoutes.tsx, strategyId: frontend.authorization.ensure-routes, order: 210 }
-  - { path: backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java, strategyId: backend.authorization.ensure-interceptor, order: 220 }
+  - { strategyId: frontend.authorization.ensure-provider }
+  - { strategyId: frontend.authorization.ensure-page-route }
+  - { strategyId: frontend.authorization.ensure-page-wrapper }
+  - { strategyId: frontend.authorization.ensure-menu }
+  - { strategyId: backend.authorization.ensure-interceptor }
 additions:
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-adapter-web-membercontroller
+    source: backend/src/main/java/com/cmbchina/backend/auth/adapter/web/MemberController.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/adapter/web/MemberController.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-adapter-web-resourcecontroller
+    source: backend/src/main/java/com/cmbchina/backend/auth/adapter/web/ResourceController.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/adapter/web/ResourceController.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-adapter-web-rolecontroller
+    source: backend/src/main/java/com/cmbchina/backend/auth/adapter/web/RoleController.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/adapter/web/RoleController.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-application-assembler-resourceassembler
+    source: backend/src/main/java/com/cmbchina/backend/auth/application/assembler/ResourceAssembler.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/application/assembler/ResourceAssembler.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-application-assembler-roleassembler
+    source: backend/src/main/java/com/cmbchina/backend/auth/application/assembler/RoleAssembler.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/application/assembler/RoleAssembler.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-application-dto-memberdto
+    source: backend/src/main/java/com/cmbchina/backend/auth/application/dto/MemberDTO.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/application/dto/MemberDTO.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-application-dto-memberresourcesdto
+    source: backend/src/main/java/com/cmbchina/backend/auth/application/dto/MemberResourcesDTO.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/application/dto/MemberResourcesDTO.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-application-dto-resourcedto
+    source: backend/src/main/java/com/cmbchina/backend/auth/application/dto/ResourceDTO.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/application/dto/ResourceDTO.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-application-dto-roledto
+    source: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleDTO.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleDTO.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-application-dto-rolemembersdto
+    source: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleMembersDTO.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleMembersDTO.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-application-dto-roleresourcesdto
+    source: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleResourcesDTO.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleResourcesDTO.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-application-dto-rolestatusdto
+    source: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleStatusDTO.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleStatusDTO.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-application-dto-roleupsertdto
+    source: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleUpsertDTO.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/application/dto/RoleUpsertDTO.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-application-service-memberapplicationservice
+    source: backend/src/main/java/com/cmbchina/backend/auth/application/service/MemberApplicationService.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/application/service/MemberApplicationService.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-application-service-resourceapplicationservice
+    source: backend/src/main/java/com/cmbchina/backend/auth/application/service/ResourceApplicationService.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/application/service/ResourceApplicationService.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-application-service-roleapplicationservice
+    source: backend/src/main/java/com/cmbchina/backend/auth/application/service/RoleApplicationService.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/application/service/RoleApplicationService.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-bootstrap-authorizationbootstrapcommand
+    source: backend/src/main/java/com/cmbchina/backend/auth/bootstrap/AuthorizationBootstrapCommand.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/bootstrap/AuthorizationBootstrapCommand.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-common-annotation-requireanyresource
+    source: backend/src/main/java/com/cmbchina/backend/auth/common/annotation/RequireAnyResource.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/common/annotation/RequireAnyResource.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-common-interceptor-resourcepermissioninterceptor
+    source: backend/src/main/java/com/cmbchina/backend/auth/common/interceptor/ResourcePermissionInterceptor.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/common/interceptor/ResourcePermissionInterceptor.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-domain-constant-authconstants
+    source: backend/src/main/java/com/cmbchina/backend/auth/domain/constant/AuthConstants.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/domain/constant/AuthConstants.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-domain-entity-resource
+    source: backend/src/main/java/com/cmbchina/backend/auth/domain/entity/Resource.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/domain/entity/Resource.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-domain-entity-role
+    source: backend/src/main/java/com/cmbchina/backend/auth/domain/entity/Role.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/domain/entity/Role.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-domain-entity-rolemember
+    source: backend/src/main/java/com/cmbchina/backend/auth/domain/entity/RoleMember.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/domain/entity/RoleMember.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-domain-entity-roleresource
+    source: backend/src/main/java/com/cmbchina/backend/auth/domain/entity/RoleResource.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/domain/entity/RoleResource.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-domain-exception-autherrorcode
+    source: backend/src/main/java/com/cmbchina/backend/auth/domain/exception/AuthErrorCode.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/domain/exception/AuthErrorCode.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-domain-repository-resourcerepository
+    source: backend/src/main/java/com/cmbchina/backend/auth/domain/repository/ResourceRepository.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/domain/repository/ResourceRepository.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-domain-repository-rolememberrepository
+    source: backend/src/main/java/com/cmbchina/backend/auth/domain/repository/RoleMemberRepository.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/domain/repository/RoleMemberRepository.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-domain-repository-rolerepository
+    source: backend/src/main/java/com/cmbchina/backend/auth/domain/repository/RoleRepository.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/domain/repository/RoleRepository.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-domain-repository-roleresourcerepository
+    source: backend/src/main/java/com/cmbchina/backend/auth/domain/repository/RoleResourceRepository.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/domain/repository/RoleResourceRepository.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-infrastructure-mapper-resourcemapper
+    source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/mapper/ResourceMapper.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/mapper/ResourceMapper.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-infrastructure-mapper-rolemapper
+    source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/mapper/RoleMapper.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/mapper/RoleMapper.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-infrastructure-mapper-rolemembermapper
+    source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/mapper/RoleMemberMapper.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/mapper/RoleMemberMapper.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-infrastructure-mapper-roleresourcemapper
+    source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/mapper/RoleResourceMapper.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/mapper/RoleResourceMapper.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-infrastructure-po-resourcepo
+    source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/po/ResourcePO.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/po/ResourcePO.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-infrastructure-po-rolememberpo
+    source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/po/RoleMemberPO.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/po/RoleMemberPO.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-infrastructure-po-rolepo
+    source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/po/RolePO.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/po/RolePO.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-infrastructure-po-roleresourcepo
+    source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/po/RoleResourcePO.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/po/RoleResourcePO.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-infrastructure-repository-converter-resourceconverter
+    source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/converter/ResourceConverter.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/converter/ResourceConverter.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-infrastructure-repository-converter-roleconverter
+    source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/converter/RoleConverter.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/converter/RoleConverter.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-infrastructure-repository-converter-rolememberconverter
+    source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/converter/RoleMemberConverter.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/converter/RoleMemberConverter.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-infrastructure-repository-converter-roleresourceconverter
+    source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/converter/RoleResourceConverter.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/converter/RoleResourceConverter.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-infrastructure-repository-impl-resourcerepositoryimpl
+    source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/impl/ResourceRepositoryImpl.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/impl/ResourceRepositoryImpl.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-infrastructure-repository-impl-rolememberrepositoryimpl
+    source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/impl/RoleMemberRepositoryImpl.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/impl/RoleMemberRepositoryImpl.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-infrastructure-repository-impl-rolerepositoryimpl
+    source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/impl/RoleRepositoryImpl.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/impl/RoleRepositoryImpl.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-infrastructure-repository-impl-roleresourcerepositoryimpl
+    source: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/impl/RoleResourceRepositoryImpl.java
+    target: backend/src/main/java/com/cmbchina/backend/auth/infrastructure/repository/impl/RoleResourceRepositoryImpl.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-resources-mapper-auth-rolemapper
+    source: backend/src/main/resources/mapper/auth/RoleMapper.xml
+    target: backend/src/main/resources/mapper/auth/RoleMapper.xml
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-resources-mapper-auth-rolemembermapper
+    source: backend/src/main/resources/mapper/auth/RoleMemberMapper.xml
+    target: backend/src/main/resources/mapper/auth/RoleMemberMapper.xml
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-main-resources-mapper-auth-roleresourcemapper
+    source: backend/src/main/resources/mapper/auth/RoleResourceMapper.xml
+    target: backend/src/main/resources/mapper/auth/RoleResourceMapper.xml
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-test-java-com-cmbchina-backend-auth-authcontracttest
+    source: backend/src/test/java/com/cmbchina/backend/auth/AuthContractTest.java
+    target: backend/src/test/java/com/cmbchina/backend/auth/AuthContractTest.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-test-java-com-cmbchina-backend-auth-adapter-web-controllerresponsetest
+    source: backend/src/test/java/com/cmbchina/backend/auth/adapter/web/ControllerResponseTest.java
+    target: backend/src/test/java/com/cmbchina/backend/auth/adapter/web/ControllerResponseTest.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-test-java-com-cmbchina-backend-auth-application-service-memberapplicationservicetest
+    source: backend/src/test/java/com/cmbchina/backend/auth/application/service/MemberApplicationServiceTest.java
+    target: backend/src/test/java/com/cmbchina/backend/auth/application/service/MemberApplicationServiceTest.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-test-java-com-cmbchina-backend-auth-application-service-resourceapplicationservicetest
+    source: backend/src/test/java/com/cmbchina/backend/auth/application/service/ResourceApplicationServiceTest.java
+    target: backend/src/test/java/com/cmbchina/backend/auth/application/service/ResourceApplicationServiceTest.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-test-java-com-cmbchina-backend-auth-application-service-roleapplicationservicetest
+    source: backend/src/test/java/com/cmbchina/backend/auth/application/service/RoleApplicationServiceTest.java
+    target: backend/src/test/java/com/cmbchina/backend/auth/application/service/RoleApplicationServiceTest.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-test-java-com-cmbchina-backend-auth-common-interceptor-resourcepermissioninterceptortest
+    source: backend/src/test/java/com/cmbchina/backend/auth/common/interceptor/ResourcePermissionInterceptorTest.java
+    target: backend/src/test/java/com/cmbchina/backend/auth/common/interceptor/ResourcePermissionInterceptorTest.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-test-java-com-cmbchina-backend-auth-domain-exception-autherrorcodetest
+    source: backend/src/test/java/com/cmbchina/backend/auth/domain/exception/AuthErrorCodeTest.java
+    target: backend/src/test/java/com/cmbchina/backend/auth/domain/exception/AuthErrorCodeTest.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-test-java-com-cmbchina-backend-auth-infrastructure-mapper-mapperintegrationtest
+    source: backend/src/test/java/com/cmbchina/backend/auth/infrastructure/mapper/MapperIntegrationTest.java
+    target: backend/src/test/java/com/cmbchina/backend/auth/infrastructure/mapper/MapperIntegrationTest.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-test-java-com-cmbchina-backend-auth-infrastructure-po-resourcepometadatatest
+    source: backend/src/test/java/com/cmbchina/backend/auth/infrastructure/po/ResourcePOMetadataTest.java
+    target: backend/src/test/java/com/cmbchina/backend/auth/infrastructure/po/ResourcePOMetadataTest.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-src-test-java-com-cmbchina-backend-auth-infrastructure-po-rolepometadatatest
+    source: backend/src/test/java/com/cmbchina/backend/auth/infrastructure/po/RolePOMetadataTest.java
+    target: backend/src/test/java/com/cmbchina/backend/auth/infrastructure/po/RolePOMetadataTest.java
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.frontend-src-apis-authorization
+    source: frontend/src/apis/authorization.ts
+    target: frontend/src/apis/authorization.ts
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.frontend-src-components-authorization-permission
+    source: frontend/src/components/authorization/Permission.tsx
+    target: frontend/src/components/authorization/Permission.tsx
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.frontend-src-components-authorization-routeguard
+    source: frontend/src/components/authorization/RouteGuard.tsx
+    target: frontend/src/components/authorization/RouteGuard.tsx
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.frontend-src-components-authorization-wrapauthorizationpage
+    source: frontend/src/components/authorization/wrapAuthorizationPage.tsx
+    target: frontend/src/components/authorization/wrapAuthorizationPage.tsx
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.frontend-src-constants-resources
+    source: frontend/src/constants/resources.ts
+    target: frontend/src/constants/resources.ts
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.frontend-src-hooks-useauthorizationmenutransform
+    source: frontend/src/hooks/useAuthorizationMenuTransform.ts
+    target: frontend/src/hooks/useAuthorizationMenuTransform.ts
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.frontend-src-hooks-usepermission
+    source: frontend/src/hooks/usePermission.ts
+    target: frontend/src/hooks/usePermission.ts
+    maintainPolicy: { mode: NO_OP }
   - id: authorization.role-page
     source: frontend/src/pages/System/AuthorizationManagementPage/index.tsx
     target: frontend/src/pages/System/AuthorizationManagementPage/index.tsx
@@ -16,6 +278,14 @@ additions:
     source: frontend/src/providers/AuthProvider.tsx
     target: frontend/src/providers/AuthProvider.tsx
     maintainPolicy: { mode: STRATEGY, strategyId: frontend.authorization.reconcile-auth-provider, order: 300 }
+  - id: authorization.frontend-src-typings-authorization
+    source: frontend/src/typings/authorization.ts
+    target: frontend/src/typings/authorization.ts
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.frontend-src-typings-generated-authorizationapitypes
+    source: frontend/src/typings/generated/authorizationApiTypes.ts
+    target: frontend/src/typings/generated/authorizationApiTypes.ts
+    maintainPolicy: { mode: NO_OP }
 validators:
-  - { validatorId: authorization.frontend, order: 100 }
-  - { validatorId: authorization.backend, order: 200 }
+  - { validatorId: authorization.frontend }
+  - { validatorId: authorization.backend }

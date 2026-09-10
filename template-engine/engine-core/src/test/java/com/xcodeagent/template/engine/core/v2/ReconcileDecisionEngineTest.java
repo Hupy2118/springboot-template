@@ -1,7 +1,8 @@
 package com.xcodeagent.template.engine.core.v2;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.xcodeagent.template.engine.source.CapabilityV2Loader;
-import com.xcodeagent.template.engine.source.TemplateSourceContext;
 import com.xcodeagent.template.engine.source.TemplateSourceLoader;
 import org.junit.jupiter.api.Test;
 
@@ -9,13 +10,36 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ReconcileDecisionEngineTest {
+    @Test
+    @SuppressWarnings("unchecked")
+    void everyV1FileIsRepresentedByExactlyOneV2Addition() throws Exception {
+        Path root = sourceRoot();
+        TemplateRelease release = new CapabilityV2Loader().load(new TemplateSourceLoader().load(root));
+        ObjectMapper yaml = new ObjectMapper(new YAMLFactory());
+        for (String capabilityId : new String[] {"login", "authorization"}) {
+            Map<String, Object> legacy = yaml.readValue(root.resolve("capabilities").resolve(capabilityId).resolve("capability.yaml").toFile(), Map.class);
+            Set<String> expected = new HashSet<String>();
+            for (Object raw : (List<Object>) legacy.get("files")) {
+                Map<String, Object> file = (Map<String, Object>) raw;
+                expected.add(file.get("source") + "|" + file.get("target"));
+            }
+            Set<String> actual = new HashSet<String>();
+            for (AdditionDefinition addition : release.capabilities().get(capabilityId).additions())
+                actual.add(addition.source() + "|" + addition.target());
+            assertEquals(expected, actual, capabilityId);
+        }
+    }
+
     @Test
     void enableThenMaintainUsesMetadataPolicyDeterministically() {
         TemplateRelease release = release();
@@ -38,9 +62,12 @@ class ReconcileDecisionEngineTest {
     }
 
     private static TemplateRelease release() {
+        return new CapabilityV2Loader().load(new TemplateSourceLoader().load(sourceRoot()));
+    }
+
+    private static Path sourceRoot() {
         Path current = Paths.get(System.getProperty("user.dir")).toAbsolutePath();
         while (current != null && !Files.isDirectory(current.resolve("template-source"))) current = current.getParent();
-        TemplateSourceContext context = new TemplateSourceLoader().load(current.resolve("template-source"));
-        return new CapabilityV2Loader().load(context);
+        return current.resolve("template-source");
     }
 }

@@ -54,31 +54,24 @@ class EngineServiceIT {
     void planGenerateUpdateAndAuthenticationAreStateless() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(context).build();
         String requestedAuthorization = "{\"capabilities\":{\"authorization\":{\"enabled\":true,\"config\":{}}}}";
-        String initialPlan = "{\"currentTemplateState\":null,\"requestedConfig\":" + requestedAuthorization + "}";
-        String planned = mvc.perform(post("/v1/plan").header("Authorization", "Bearer stage3-demo-token").contentType(MediaType.APPLICATION_JSON).content(initialPlan))
-                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
-        JsonNode plan = JSON.readTree(planned);
-        assertEquals("CHANGE", plan.path("kind").asText());
-        assertEquals("2026.09.04.1", plan.path("nextTemplateState").path("templateRevision").asText());
-        assertTrue(plan.path("nextTemplateState").path("effective").has("login"));
-
         byte[] generated = mvc.perform(post("/v1/generate").header("Authorization", "Bearer stage3-demo-token").contentType(MediaType.APPLICATION_JSON).content("{\"requestedConfig\":" + requestedAuthorization + "}"))
                 .andExpect(status().isOk()).andExpect(content().contentType("application/zip")).andReturn().getResponse().getContentAsByteArray();
         JsonNode generatedState = zipJson(generated, ".xcodeagent/template-state.json");
-        assertEquals(plan.path("nextTemplateState"), generatedState);
+        assertEquals(2, generatedState.path("schemaVersion").asInt());
+        assertTrue(!generatedState.has("managedFiles"));
+        assertTrue(generatedState.path("appliedAdditions").has("authorization.role-page"));
 
-        String login = "{\"capabilities\":{\"login\":{\"enabled\":true,\"config\":{}}}}";
-        String update = "{\"currentTemplateState\":" + generatedState + ",\"requestedConfig\":" + login + "}";
+        String update = "{\"currentTemplateState\":" + generatedState + ",\"requestedConfig\":" + requestedAuthorization + ",\"mode\":\"RECONCILE\"}";
         byte[] changed = mvc.perform(post("/v1/update").header("Authorization", "Bearer stage3-demo-token").contentType(MediaType.APPLICATION_JSON).content(update))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
         JsonNode nextState = zipJson(changed, "next-template-state.json");
-        assertTrue(zipJson(changed, "change-set.json").path("operations").size() > 0);
+        assertTrue(zipJson(changed, "modification-strategy.json").size() > 0);
         assertTrue(nextState.path("effective").has("login"));
-        assertTrue(!nextState.path("effective").has("authorization"));
+        assertTrue(nextState.path("effective").has("authorization"));
 
-        String noChange = "{\"currentTemplateState\":" + nextState + ",\"requestedConfig\":" + login + "}";
+        String noChange = "{\"currentTemplateState\":" + nextState + ",\"requestedConfig\":" + requestedAuthorization + ",\"mode\":\"APPLY\"}";
         mvc.perform(post("/v1/update").header("Authorization", "Bearer stage3-demo-token").contentType(MediaType.APPLICATION_JSON).content(noChange)).andExpect(status().isNoContent());
-        mvc.perform(post("/v1/plan").contentType(MediaType.APPLICATION_JSON).content(initialPlan)).andExpect(status().isUnauthorized());
+        mvc.perform(post("/v1/generate").contentType(MediaType.APPLICATION_JSON).content("{\"requestedConfig\":" + requestedAuthorization + "}")).andExpect(status().isUnauthorized());
         mvc.perform(post("/v1/generate").header("Authorization", "Bearer stage3-plan-token").contentType(MediaType.APPLICATION_JSON).content("{\"requestedConfig\":" + requestedAuthorization + "}")).andExpect(status().isForbidden());
     }
 

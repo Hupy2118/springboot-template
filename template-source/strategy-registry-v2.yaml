@@ -1,0 +1,26 @@
+schemaVersion: 2
+targets:
+  - { id: frontend.capability-providers, path: frontend/src/generated/capabilityProviders.tsx }
+  - { id: frontend.capability-routes, path: frontend/src/generated/capabilityRoutes.tsx }
+  - { id: frontend.capability-menus, path: frontend/src/generated/capabilityMenus.ts }
+  - { id: backend.capability-webmvc, path: backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java }
+  - { id: frontend.package-json, path: frontend/package.json }
+  - { id: frontend.auth-provider, path: frontend/src/providers/AuthProvider.tsx }
+strategies:
+  - { id: frontend.login.ensure-provider, targetId: frontend.capability-providers, type: RENDER_EXTENSION, order: 100, parameters: { point: frontend.providers, contributionId: login-provider, module: '@/providers', export: GlobalContextProvider, exportType: named, props: {} } }
+  - { id: frontend.login.ensure-login-route, targetId: frontend.capability-routes, type: RENDER_EXTENSION, order: 110, parameters: { point: frontend.root-routes, contributionId: login-route, path: /login, entry: true, module: '@/pages/Login', export: default, exportType: default } }
+  - { id: frontend.login.ensure-logout-route, targetId: frontend.capability-routes, type: RENDER_EXTENSION, order: 120, parameters: { point: frontend.root-routes, contributionId: logout-route, path: /logout, module: '@/pages/Logout', export: default, exportType: default } }
+  - { id: frontend.login.ensure-page-wrapper, targetId: frontend.capability-routes, type: RENDER_EXTENSION, order: 130, parameters: { point: frontend.page-wrappers, contributionId: login-required-page-wrapper, module: '@/components/wrapLoginRequired', export: wrapLoginRequired, exportType: named } }
+  - { id: backend.login.ensure-interceptor, targetId: backend.capability-webmvc, type: RENDER_EXTENSION, order: 140, parameters: { point: backend.spring-interceptors, contributionId: login-current-user, className: com.cmbchina.backend.auth.common.interceptor.UserWebMvcInterceptor, interceptorOrder: 100, pathPatterns: ['/**'], excludePathPatterns: ['/api/login/mock'] } }
+  - { id: frontend.login.ensure-dependency, targetId: frontend.package-json, type: ENSURE_NPM_DEPENDENCY, order: 150, parameters: { name: ahooks, version: ^3.8.1 } }
+  - { id: frontend.authorization.ensure-provider, targetId: frontend.capability-providers, type: RENDER_EXTENSION, order: 200, parameters: { point: frontend.providers, contributionId: authorization-provider, module: '@/providers/AuthProvider', export: AuthProvider, exportType: named, props: {} } }
+  - { id: frontend.authorization.ensure-page-route, targetId: frontend.capability-routes, type: RENDER_EXTENSION, order: 210, parameters: { point: frontend.page-routes, contributionId: authorization-management-page, path: system/authorization, name: 权限管理, module: '@/pages/System/AuthorizationManagementPage', export: default, exportType: default, resourceKey: system_authorization_management } }
+  - { id: frontend.authorization.ensure-page-wrapper, targetId: frontend.capability-routes, type: RENDER_EXTENSION, order: 220, parameters: { point: frontend.page-wrappers, contributionId: authorization-page-guard, module: '@/components/authorization/wrapAuthorizationPage', export: wrapAuthorizationPage, exportType: named } }
+  - { id: frontend.authorization.ensure-menu, targetId: frontend.capability-menus, type: RENDER_EXTENSION, order: 230, parameters: { point: frontend.menu-hooks, contributionId: authorization-menu-transform, module: '@/hooks/useAuthorizationMenuTransform', export: useAuthorizationMenuTransform, exportType: named } }
+  - { id: backend.authorization.ensure-interceptor, targetId: backend.capability-webmvc, type: RENDER_EXTENSION, order: 240, parameters: { point: backend.spring-interceptors, contributionId: authorization-resource-permission, className: com.cmbchina.backend.auth.common.interceptor.ResourcePermissionInterceptor, interceptorOrder: 200, pathPatterns: ['/**'], excludePathPatterns: ['/api/login/mock', '/actuator/**'] } }
+  - { id: frontend.authorization.reconcile-auth-provider, targetId: frontend.auth-provider, type: TRANSFORM_FILE, order: 300, parameters: {} }
+validators:
+  - { id: login.frontend, order: 100, parameters: { scope: frontend } }
+  - { id: login.backend, order: 200, parameters: { scope: backend } }
+  - { id: authorization.frontend, order: 100, parameters: { scope: frontend } }
+  - { id: authorization.backend, order: 200, parameters: { scope: backend } }
