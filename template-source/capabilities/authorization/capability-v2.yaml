@@ -1,0 +1,21 @@
+id: authorization
+schemaVersion: 2
+defaultConfig: {}
+requires:
+  - id: login
+existingTargets:
+  - { path: frontend/src/App.tsx, strategyId: frontend.authorization.ensure-provider, order: 200 }
+  - { path: frontend/src/generated/capabilityRoutes.tsx, strategyId: frontend.authorization.ensure-routes, order: 210 }
+  - { path: backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java, strategyId: backend.authorization.ensure-interceptor, order: 220 }
+additions:
+  - id: authorization.role-page
+    source: frontend/src/pages/System/AuthorizationManagementPage/index.tsx
+    target: frontend/src/pages/System/AuthorizationManagementPage/index.tsx
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.auth-provider
+    source: frontend/src/providers/AuthProvider.tsx
+    target: frontend/src/providers/AuthProvider.tsx
+    maintainPolicy: { mode: STRATEGY, strategyId: frontend.authorization.reconcile-auth-provider, order: 300 }
+validators:
+  - { validatorId: authorization.frontend, order: 100 }
+  - { validatorId: authorization.backend, order: 200 }

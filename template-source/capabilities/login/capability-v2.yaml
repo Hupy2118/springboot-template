@@ -1,0 +1,21 @@
+id: login
+schemaVersion: 2
+defaultConfig: {}
+requires: []
+existingTargets:
+  - { path: frontend/src/App.tsx, strategyId: frontend.login.ensure-provider, order: 100 }
+  - { path: frontend/src/generated/capabilityRoutes.tsx, strategyId: frontend.login.ensure-routes, order: 110 }
+  - { path: frontend/package.json, strategyId: frontend.login.ensure-dependency, order: 120 }
+  - { path: backend/pom.xml, strategyId: backend.login.ensure-dependency, order: 130 }
+additions:
+  - id: login.login-page
+    source: frontend/src/pages/Login/index.tsx
+    target: frontend/src/pages/Login/index.tsx
+    maintainPolicy: { mode: NO_OP }
+  - id: login.logout-page
+    source: frontend/src/pages/Logout/index.tsx
+    target: frontend/src/pages/Logout/index.tsx
+    maintainPolicy: { mode: NO_OP }
+validators:
+  - { validatorId: login.frontend, order: 100 }
+  - { validatorId: login.backend, order: 200 }
