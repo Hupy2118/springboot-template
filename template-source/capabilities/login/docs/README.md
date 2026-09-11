@@ -4,7 +4,7 @@
 
 Login 提供当前用户上下文、JWT Cookie 解析、本地 `/api/login/mock` 入口以及前端登录/登出页面与 SSO 守卫。它不提供角色、成员关系、资源目录或任何权限判断。
 
-配置来自 `capability.yaml`：`enabled` 默认为 `true`；`mockLogin` 默认为 `true`，用于允许本地模拟登录入口。Login 无依赖，也没有迁移资产。
+配置来自 `capability-v2.yaml`：Capability State 固定为 `{ "enabled": true, "config": {} }`。Login 无依赖，也没有迁移资产。
 
 ## 文件归属
 

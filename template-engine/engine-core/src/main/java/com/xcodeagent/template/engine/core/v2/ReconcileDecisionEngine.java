@@ -4,6 +4,7 @@ import com.xcodeagent.template.engine.source.TemplateSourceException;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -21,70 +22,106 @@ public final class ReconcileDecisionEngine {
         Map<String, CapabilityState> normalizedRequested = enabledOnly(requested, release);
         Map<String, CapabilityState> targetEffective = resolve(normalizedRequested, release);
         removalGuard(current.effective(), targetEffective);
+        boolean additionsNeedCreate = additionStateRequiresChange(current, targetEffective, release);
 
-        List<ReconcileReason> reasons = reasons(current, normalizedRequested, targetEffective, mode, release);
+        List<ReconcileReason> reasons = reasons(current, normalizedRequested, targetEffective, mode, release, additionsNeedCreate);
         if (mode == Mode.RECONCILE && (reasons.contains(ReconcileReason.ENABLE) || reasons.contains(ReconcileReason.CONFIG_CHANGE)
                 || reasons.contains(ReconcileReason.RELEASE_REFRESH)))
             throw new TemplateSourceException("RECONCILE_STATE_CHANGE_REQUIRED");
         if (reasons.isEmpty()) return UpdateResult.noChange();
 
-        Set<String> selected = selectedCapabilities(current, targetEffective, reasons);
+        Set<String> selected = selectedCapabilities(current, targetEffective, reasons, release, additionsNeedCreate);
         List<String> order = executionOrder(selected, targetEffective, release);
         Map<String, AppliedAdditionState> nextAdditions = new LinkedHashMap<String, AppliedAdditionState>(current.appliedAdditions());
         List<ModificationStrategy> strategies = new ArrayList<ModificationStrategy>();
         List<Map<String, Object>> validators = new ArrayList<Map<String, Object>>();
 
-        for (String id : order) {
+        for (int capabilityRank = 0; capabilityRank < order.size(); capabilityRank++) {
+            String id = order.get(capabilityRank);
             CapabilityDefinitionV2 definition = release.capabilities().get(id);
             for (ExistingTargetDefinition target : definition.existingTargets()) {
                 StrategyDefinition registered = release.strategies().get(target.strategyId());
                 Map<String, Object> parameters = new LinkedHashMap<String, Object>(registered.parameters());
-                strategies.add(strategy(registered.type(), target.strategyId(), target.path(), registered.order(), parameters));
+                strategies.add(strategy(registered.type(), target.strategyId(), target.path(), capabilityRank, 1, registered.order(), parameters));
             }
             for (AdditionDefinition addition : definition.additions()) {
                 AppliedAdditionState applied = current.appliedAdditions().get(addition.id());
                 if (applied == null) {
-                    Map<String, Object> parameters = map("additionId", addition.id(), "capabilityId", id,
-                            "sourceRef", addition.source(), "precondition", "TARGET_MUST_NOT_EXIST");
-                    strategies.add(strategy("ADD_FILE", addition.id(), addition.target(), 0, parameters));
+                    Map<String, Object> parameters = map("capabilityId", id, "sourceRef", addition.source());
+                    strategies.add(strategy("ADD_FILE", addition.id(), addition.target(), capabilityRank, 0, 0, parameters));
                     nextAdditions.put(addition.id(), new AppliedAdditionState(id, addition.target(), release.revision()));
                 } else {
                     if (!id.equals(applied.capabilityId()) || !addition.target().equals(applied.target()))
                         throw new TemplateSourceException("ADDITION_IDENTITY_CHANGED: " + addition.id());
                     if (addition.maintainPolicy().mode() == MaintainPolicy.Mode.STRATEGY) {
-                        strategies.add(strategy("TRANSFORM_FILE", addition.maintainPolicy().strategyId(), addition.target(),
-                                addition.maintainPolicy().order(), map("additionId", addition.id(), "capabilityId", id)));
+                        StrategyDefinition registered = release.strategies().get(addition.maintainPolicy().strategyId());
+                        if (registered == null || !addition.target().equals(registered.target()))
+                            throw new TemplateSourceException("CAPABILITY_V2_INVALID: unknown or mismatched maintain strategy");
+                        strategies.add(strategy(registered.type(), registered.id(), registered.target(), capabilityRank, 1, registered.order(),
+                                new LinkedHashMap<String, Object>(registered.parameters())));
                     }
                 }
             }
             for (MigrationDefinition migration : definition.migrations()) {
-                strategies.add(strategy("ADD_FILE", "migration." + id + "." + migration.id(), migration.target(), 0,
+                strategies.add(strategy("ADD_FILE", "migration." + id + "." + migration.id(), migration.target(), capabilityRank, 0, 0,
                         map("capabilityId", id, "sourceRef", migration.source(), "migrationId", migration.id())));
             }
             validators.addAll(definition.validators());
         }
+        Collections.sort(strategies, new Comparator<ModificationStrategy>() {
+            @Override public int compare(ModificationStrategy left, ModificationStrategy right) {
+                int byCapability = Integer.compare(left.capabilityRank(), right.capabilityRank());
+                if (byCapability != 0) return byCapability;
+                int byPhase = Integer.compare(left.phase(), right.phase());
+                if (byPhase != 0) return byPhase;
+                int byOrder = Integer.compare(left.order(), right.order());
+                return byOrder != 0 ? byOrder : left.strategyId().compareTo(right.strategyId());
+            }
+        });
+        Set<String> strategyIds = new HashSet<String>();
+        for (ModificationStrategy strategy : strategies) if (!strategyIds.add(strategy.strategyId()))
+            throw new TemplateSourceException("STRATEGY_ID_DUPLICATE: " + strategy.strategyId());
         return UpdateResult.change(reasons, strategies,
                 new TemplateStateV2(release.revision(), normalizedRequested, targetEffective, nextAdditions),
                 new ValidationPlan(validators));
     }
 
     private static List<ReconcileReason> reasons(TemplateStateV2 current, Map<String, CapabilityState> requested,
-                                                  Map<String, CapabilityState> effective, Mode mode, TemplateRelease release) {
+                                                  Map<String, CapabilityState> effective, Mode mode, TemplateRelease release,
+                                                  boolean additionsNeedCreate) {
         List<ReconcileReason> result = new ArrayList<ReconcileReason>();
         for (String id : effective.keySet()) if (!current.effective().containsKey(id)) { result.add(ReconcileReason.ENABLE); break; }
-        if (!current.requested().equals(requested) || !current.effective().equals(effective)) result.add(ReconcileReason.CONFIG_CHANGE);
+        if (!current.requested().equals(requested) || !current.effective().equals(effective) || additionsNeedCreate) result.add(ReconcileReason.CONFIG_CHANGE);
         if (!current.templateRevision().equals(release.revision())) result.add(ReconcileReason.RELEASE_REFRESH);
         if (mode == Mode.RECONCILE) result.add(ReconcileReason.HEALTH_REPAIR);
         return result;
     }
 
     private static Set<String> selectedCapabilities(TemplateStateV2 current, Map<String, CapabilityState> effective,
-                                                     List<ReconcileReason> reasons) {
+                                                     List<ReconcileReason> reasons, TemplateRelease release, boolean additionsNeedCreate) {
         boolean all = reasons.contains(ReconcileReason.RELEASE_REFRESH) || reasons.contains(ReconcileReason.HEALTH_REPAIR);
         Set<String> selected = new LinkedHashSet<String>();
         for (String id : effective.keySet()) if (all || !current.effective().containsKey(id)
-                || !effective.get(id).equals(current.effective().get(id))) selected.add(id);
+                || !effective.get(id).equals(current.effective().get(id)) || (additionsNeedCreate && missingAddition(current, release.capabilities().get(id)))) selected.add(id);
         return selected;
+    }
+
+    private static boolean additionStateRequiresChange(TemplateStateV2 current, Map<String, CapabilityState> effective,
+                                                       TemplateRelease release) {
+        for (String id : effective.keySet()) {
+            CapabilityDefinitionV2 definition = release.capabilities().get(id);
+            for (AdditionDefinition addition : definition.additions()) {
+                AppliedAdditionState applied = current.appliedAdditions().get(addition.id());
+                if (applied == null) return true;
+                if (!id.equals(applied.capabilityId()) || !addition.target().equals(applied.target()))
+                    throw new TemplateSourceException("ADDITION_IDENTITY_CHANGED: " + addition.id());
+            }
+        }
+        return false;
+    }
+    private static boolean missingAddition(TemplateStateV2 current, CapabilityDefinitionV2 definition) {
+        for (AdditionDefinition addition : definition.additions()) if (!current.appliedAdditions().containsKey(addition.id())) return true;
+        return false;
     }
 
     private static Map<String, CapabilityState> enabledOnly(Map<String, CapabilityState> requested, TemplateRelease release) {
@@ -133,8 +170,9 @@ public final class ReconcileDecisionEngine {
             ordered(dependency, selected, effective, release, visited, result);
         result.add(id);
     }
-    private static ModificationStrategy strategy(String type, String id, String target, int order, Map<String, Object> parameters) {
-        return new ModificationStrategy(type, id, target, order, parameters);
+    private static ModificationStrategy strategy(String type, String id, String target, int capabilityRank, int phase, int order,
+                                                 Map<String, Object> parameters) {
+        return new ModificationStrategy(type, id, target, capabilityRank, phase, order, parameters);
     }
     private static Map<String, Object> map(Object... values) {
         Map<String, Object> result = new LinkedHashMap<String, Object>();

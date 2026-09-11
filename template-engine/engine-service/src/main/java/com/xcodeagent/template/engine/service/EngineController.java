@@ -38,7 +38,8 @@ public class EngineController {
         TemplateStateV2 initial = new TemplateStateV2(release.revision(), Collections.<String, com.xcodeagent.template.engine.core.v2.CapabilityState>emptyMap(),
                 Collections.<String, com.xcodeagent.template.engine.core.v2.CapabilityState>emptyMap(), Collections.<String, com.xcodeagent.template.engine.core.v2.AppliedAdditionState>emptyMap());
         UpdateResult bootstrap = reconcile.decide(initial, EngineMapper.requestedV2(request.get("requestedConfig")), ReconcileDecisionEngine.Mode.APPLY, release);
-        return zip(packages.generatedProject(generator.generate(bootstrap.nextTemplateState()), bootstrap.nextTemplateState()));
+        TemplateStateV2 target = bootstrap.kind() == UpdateResult.Kind.NO_CHANGE ? initial : bootstrap.nextTemplateState();
+        return zip(packages.generatedProject(generator.generate(target), target));
     }
 
     @PostMapping(value = "/v1/update", consumes = MediaType.APPLICATION_JSON_VALUE, produces = "application/zip")

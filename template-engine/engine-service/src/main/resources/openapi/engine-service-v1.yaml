@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: XcodeAgent Template Engine Service
-  version: v1
+  version: v2
 paths:
   /v1/generate:
     post:
@@ -48,6 +48,4 @@ components:
     CapabilityStateV2: { type: object, required: [enabled, config], additionalProperties: false, properties: { enabled: { type: boolean, enum: [true] }, config: { type: object } } }
     AppliedAdditionStateV2: { type: object, required: [capabilityId, target, installedRevision], additionalProperties: false, properties: { capabilityId: { type: string }, target: { type: string }, installedRevision: { type: string } } }
     TemplateStateV2: { type: object, required: [schemaVersion, templateRevision, requested, effective, appliedAdditions], additionalProperties: false, properties: { schemaVersion: { type: integer, enum: [2] }, templateRevision: { type: string }, requested: { type: object, additionalProperties: { $ref: '#/components/schemas/CapabilityStateV2' } }, effective: { type: object, additionalProperties: { $ref: '#/components/schemas/CapabilityStateV2' } }, appliedAdditions: { type: object, additionalProperties: { $ref: '#/components/schemas/AppliedAdditionStateV2' } } } }
-    ModificationStrategy: { type: object, required: [type, strategyId, target, order, parameters], additionalProperties: false, properties: { type: { type: string }, strategyId: { type: string }, target: { type: string }, order: { type: integer }, parameters: { type: object } } }
-    ValidationPlanV2: { type: object, required: [validators], additionalProperties: false, properties: { validators: { type: array, items: { type: object } } } }
     Error: { type: object, required: [code, message, details, traceId], additionalProperties: false, properties: { code: { type: string }, message: { type: string }, details: { type: object }, traceId: { type: string } } }

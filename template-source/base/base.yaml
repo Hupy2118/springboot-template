@@ -26,6 +26,7 @@ files:
   - { source: frontend/index.html, target: frontend/index.html }
   - { source: frontend/jest.config.cjs, target: frontend/jest.config.cjs }
   - { source: frontend/package.json, target: frontend/package.json }
+  - { source: frontend/pnpm-lock.yaml, target: frontend/pnpm-lock.yaml }
   - { source: frontend/postcss.config.js, target: frontend/postcss.config.js }
   - { source: frontend/public/favicon.svg, target: frontend/public/favicon.svg }
   - { source: frontend/rsbuild_copy.config.ts, target: frontend/rsbuild_copy.config.ts }
@@ -33,6 +34,9 @@ files:
   - { source: frontend/scripts/sourcePathPlugin.mjs, target: frontend/scripts/sourcePathPlugin.mjs }
   - { source: frontend/scripts/test-source-path-plugin.mjs, target: frontend/scripts/test-source-path-plugin.mjs }
   - { source: frontend/src/App.tsx, target: frontend/src/App.tsx }
+  - { source: frontend/src/generated/capabilityMenus.ts, target: frontend/src/generated/capabilityMenus.ts }
+  - { source: frontend/src/generated/capabilityProviders.tsx, target: frontend/src/generated/capabilityProviders.tsx }
+  - { source: frontend/src/generated/capabilityRoutes.tsx, target: frontend/src/generated/capabilityRoutes.tsx }
   - { source: frontend/src/apis/auth.ts, target: frontend/src/apis/auth.ts }
   - { source: frontend/src/apis/service.ts, target: frontend/src/apis/service.ts }
   - { source: frontend/src/apis/welcome.ts, target: frontend/src/apis/welcome.ts }
@@ -83,5 +87,3 @@ files:
   - { source: frontend/tsconfig.json, target: frontend/tsconfig.json }
   - { source: frontend/tsconfig.test.json, target: frontend/tsconfig.test.json }
   - { source: frontend/vite.config.ts, target: frontend/vite.config.ts }
-validationPlan:
-  - engine-core-contract-test

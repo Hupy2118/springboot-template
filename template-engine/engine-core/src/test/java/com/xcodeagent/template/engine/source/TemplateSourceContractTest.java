@@ -8,14 +8,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TemplateSourceContractTest {
     @Test
-    void currentTemplateSourceSatisfiesTheStageOneContract() {
+    void currentTemplateSourceSatisfiesTheAtomicReleaseContract() {
         Path root = findRepositoryRoot().resolve("template-source");
-        assertDoesNotThrow(() -> new TemplateSourceLoader().load(root));
+        new CapabilityV2Loader().load(root);
     }
 
     @Test
@@ -29,6 +29,16 @@ class TemplateSourceContractTest {
                 assertFalse(content.contains("mockAuthorizationLogin"), path.toString());
             } catch (IOException e) { throw new RuntimeException(e); }
         });
+    }
+
+    @Test
+    void baseNpmDependenciesArePinnedByTheReleaseContract() throws IOException {
+        Path frontend = findRepositoryRoot().resolve("template-source/base/frontend");
+        String packageJson = new String(Files.readAllBytes(frontend.resolve("package.json")), StandardCharsets.UTF_8);
+        String lockfile = new String(Files.readAllBytes(frontend.resolve("pnpm-lock.yaml")), StandardCharsets.UTF_8);
+        assertTrue(packageJson.contains("\"packageManager\": \"pnpm@11.9.0\""));
+        assertTrue(packageJson.contains("\"ahooks\": \"^3.8.1\""));
+        assertTrue(lockfile.contains("ahooks@3.10.0"));
     }
 
     private Path findRepositoryRoot() {

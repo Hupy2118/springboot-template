@@ -67,7 +67,7 @@ java -jar template-engine/engine-service/target/engine-service-1.0.0-SNAPSHOT.ja
 tail -F /private/tmp/engine-service-tomcat/logs/access.*.log
 ```
 
-Tomcat 默认会在文件名中加入日期，例如 `access.2026-09-09.log`，并且通常在收到第一条 HTTP 请求后才创建该文件。若尚未请求接口，请先调用一次 `/v1/plan`；也可先执行 `ls -la /private/tmp/engine-service-tomcat/logs/` 确认实际文件名。
+Tomcat 默认会在文件名中加入日期，例如 `access.2026-09-09.log`，并且通常在收到第一条 HTTP 请求后才创建该文件。若尚未请求接口，请先调用一次 `/v1/generate`；也可先执行 `ls -la /private/tmp/engine-service-tomcat/logs/` 确认实际文件名。
 
 不要通过通用 HTTP 日志打印 `Authorization`、完整 `currentTemplateState` 或文件内容：它们可能包含 Token 或大体积工程内容。
 
@@ -80,27 +80,7 @@ Tomcat 默认会在文件名中加入日期，例如 `access.2026-09-09.log`，�
 | `Content-Type` | `application/json` |
 | `Authorization` | `Bearer stage3-demo-token` |
 
-### 1. Plan
-
-`POST http://127.0.0.1:18080/v1/plan`
-
-```json
-{
-  "currentTemplateState": null,
-  "requestedConfig": {
-    "capabilities": {
-      "authorization": {
-        "enabled": true,
-        "config": {}
-      }
-    }
-  }
-}
-```
-
-预期 HTTP `200`、`kind: "CHANGE"`，以及 `nextTemplateState.templateRevision` 等于当前 `template-source/template-revision.txt`。`effective` 会包含显式启用的 `authorization` 及其依赖 `login`。Plan 响应中的 State 保存受管文件内容，因此响应可能较大。
-
-### 2. Generate
+### 1. Generate
 
 `POST http://127.0.0.1:18080/v1/generate`
 
@@ -119,26 +99,34 @@ Tomcat 默认会在文件名中加入日期，例如 `access.2026-09-09.log`，�
 
 预期 HTTP `200`、`Content-Type: application/zip`。在 Postman 选择 **Send and Download**；ZIP 应包含 `frontend/`、`backend/` 和 `.xcodeagent/template-state.json`。
 
-### 3. 鉴权检查
+### 2. 鉴权检查
 
-- 不发送 `Authorization` 请求 `/v1/plan`：预期 `401` 和 `UNAUTHORIZED`。
+- 不发送 `Authorization` 请求 `/v1/generate`：预期 `401` 和 `UNAUTHORIZED`。
 - 将 Token 改为 `stage3-plan-token` 请求 `/v1/generate`：预期 `403` 和 `FORBIDDEN`。
 
-### 4. Update
+### 3. Update
 
 `/v1/update` 是无状态接口。先从 Generate ZIP 取出 `.xcodeagent/template-state.json`，将其完整 JSON 作为 `currentTemplateState` 传回：
 
 ```json
 {
-  "currentTemplateState": { "templateRevision": "...", "managedFiles": {}, "requested": {}, "effective": {} },
+  "protocolVersion": "2",
+  "currentTemplateState": {
+    "schemaVersion": 2,
+    "templateRevision": "...",
+    "requested": {},
+    "effective": {},
+    "appliedAdditions": {}
+  },
   "requestedConfig": {
     "capabilities": {
       "login": { "enabled": true, "config": {} }
     }
-  }
+  },
+  "mode": "APPLY"
 }
 ```
 
-当配置改变时，预期 `200 application/zip`，ZIP 包含 `change-set.json`、`next-template-state.json` 和 `payload/`。将 `next-template-state.json` 与同一 RequestedConfig 再次提交，预期 `204 No Content`。
+当配置改变时，预期 `200 application/zip`，ZIP 仅包含 `strategy-update-package.json` 与可选 `payload/`。将该文件的 `nextTemplateState` 与同一 RequestedConfig 再次提交，预期 `204 No Content`。
 
 完整验收契约见 [docs/REFACTOR.md](docs/REFACTOR.md)。

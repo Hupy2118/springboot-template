@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.HashSet;
 
-/** Loads the V2 reconcile metadata without changing the legacy source loader. */
+/** Loads the V2 reconcile metadata and validates the Atomic Release contract. */
 public final class CapabilityV2Loader {
     private final ObjectMapper yaml = new ObjectMapper(new YAMLFactory());
 
@@ -32,17 +32,17 @@ public final class CapabilityV2Loader {
         try {
             String revision = new String(Files.readAllBytes(root.resolve("template-revision.txt")), StandardCharsets.UTF_8).trim();
             require(!revision.isEmpty(), "TEMPLATE_REVISION_MISSING");
-            return load(new TemplateSourceContext(root, revision));
+            return load(root, revision);
         } catch (IOException e) { throw invalid("cannot read template revision", e); }
     }
 
-    public TemplateRelease load(TemplateSourceContext source) {
-        Registry registry = registry(source.getRoot());
+    private TemplateRelease load(Path root, String revision) {
+        Registry registry = registry(root);
         Map<String, CapabilityDefinitionV2> capabilities = new LinkedHashMap<String, CapabilityDefinitionV2>();
         Set<String> additionIds = new HashSet<String>();
         Set<String> targets = new HashSet<String>();
         List<String> ids = new ArrayList<String>();
-        Path capabilitiesRoot = source.getRoot().resolve("capabilities");
+        Path capabilitiesRoot = root.resolve("capabilities");
         try {
             java.nio.file.DirectoryStream<Path> stream = Files.newDirectoryStream(capabilitiesRoot);
             try {
@@ -51,10 +51,10 @@ public final class CapabilityV2Loader {
         } catch (IOException e) { throw invalid("cannot list V2 capabilities", e); }
         Collections.sort(ids);
         for (String id : ids) {
-            Path root = capabilitiesRoot.resolve(id);
-            Path manifest = root.resolve("capability-v2.yaml");
+            Path capabilityRoot = capabilitiesRoot.resolve(id);
+            Path manifest = capabilityRoot.resolve("capability-v2.yaml");
             if (!Files.exists(manifest)) throw new TemplateSourceException("CAPABILITY_V2_INVALID: missing " + manifest);
-            CapabilityDefinitionV2 definition = definition(root, manifest, registry);
+            CapabilityDefinitionV2 definition = definition(capabilityRoot, manifest, registry);
             if (!id.equals(definition.id()) || capabilities.put(definition.id(), definition) != null)
                 throw new TemplateSourceException("CAPABILITY_V2_INVALID: duplicate or mismatched capability " + id);
             for (AdditionDefinition addition : definition.additions()) {
@@ -62,7 +62,7 @@ public final class CapabilityV2Loader {
                 if (!targets.add(addition.target())) throw new TemplateSourceException("CAPABILITY_V2_INVALID: duplicate addition target " + addition.target());
             }
         }
-        return new TemplateRelease(source.getTemplateRevision(), capabilities, registry.strategies, registry.validators);
+        return new TemplateRelease(revision, capabilities, registry.strategies, registry.validators);
     }
 
     @SuppressWarnings("unchecked")
@@ -109,7 +109,7 @@ public final class CapabilityV2Loader {
             } else if ("STRATEGY".equals(mode)) {
                 String strategyId = text(policy.get("strategyId"), "maintainPolicy.strategyId");
                 StrategyDefinition strategy = registry.strategies.get(strategyId);
-                require(strategy != null && target.equals(strategy.target()), "CAPABILITY_V2_INVALID: unknown or mismatched strategyId");
+                require(strategy != null && !"ADD_FILE".equals(strategy.type()) && target.equals(strategy.target()), "CAPABILITY_V2_INVALID: unknown or mismatched strategyId");
                 maintain = new MaintainPolicy(MaintainPolicy.Mode.STRATEGY, strategyId, strategy.order());
             } else throw new TemplateSourceException("CAPABILITY_V2_INVALID: maintainPolicy.mode");
             additions.add(new AdditionDefinition(additionId, source, target, maintain));
@@ -140,11 +140,16 @@ public final class CapabilityV2Loader {
         catch (IOException e) { throw invalid("cannot parse strategy registry", e); }
         require(raw != null && Integer.valueOf(2).equals(number(raw.get("schemaVersion"))), "CAPABILITY_V2_INVALID: strategy registry schemaVersion");
         Map<String, String> targets = new LinkedHashMap<String, String>();
-        for (Object value : list(raw.get("targets"), "targets")) { Map<String, Object> target = object(value, "target"); String id = text(target.get("id"), "target.id"); require(targets.put(id, path(target.get("path"))) == null, "CAPABILITY_V2_INVALID: duplicate target"); }
+        for (Object value : list(raw.get("targets"), "targets")) {
+            Map<String, Object> target = object(value, "target"); String id = text(target.get("id"), "target.id"); String targetPath = path(target.get("path"));
+            Path baseTarget = root.resolve("base").resolve(targetPath).normalize();
+            require(baseTarget.startsWith(root.resolve("base")) && Files.isRegularFile(baseTarget), "BASE_SURFACE_TARGET_MISSING: " + targetPath);
+            require(targets.put(id, targetPath) == null, "CAPABILITY_V2_INVALID: duplicate target");
+        }
         Map<String, StrategyDefinition> strategies = new LinkedHashMap<String, StrategyDefinition>();
-        for (Object value : list(raw.get("strategies"), "strategies")) { Map<String, Object> item = object(value, "strategy"); String id = text(item.get("id"), "strategy.id"); String target = targets.get(text(item.get("targetId"), "strategy.targetId")); require(target != null, "CAPABILITY_V2_INVALID: unknown strategy target"); String type = text(item.get("type"), "strategy.type"); require("ADD_FILE".equals(type) || "TEXT_ANCHOR_INSERT".equals(type) || "ENSURE_IMPORT".equals(type) || "ENSURE_NPM_DEPENDENCY".equals(type) || "ENSURE_MAVEN_DEPENDENCY".equals(type) || "ENSURE_REACT_PROVIDER".equals(type) || "ENSURE_ROUTE".equals(type) || "ENSURE_MENU_ITEM".equals(type) || "ENSURE_SPRING_BEAN".equals(type) || "ENSURE_INTERCEPTOR".equals(type), "CAPABILITY_V2_INVALID: strategy.type"); Map<String, Object> parameters = object(item.get("parameters"), "strategy.parameters"); validateStrategyParameters(type, parameters); require(strategies.put(id, new StrategyDefinition(id, target, type, integer(item.get("order"), "strategy.order"), parameters)) == null, "CAPABILITY_V2_INVALID: duplicate strategyId"); }
+        for (Object value : list(raw.get("strategies"), "strategies")) { Map<String, Object> item = object(value, "strategy"); String id = text(item.get("id"), "strategy.id"); String target = targets.get(text(item.get("targetId"), "strategy.targetId")); require(target != null, "CAPABILITY_V2_INVALID: unknown strategy target"); String type = text(item.get("type"), "strategy.type"); require("ADD_FILE".equals(type) || "TEXT_ANCHOR_INSERT".equals(type) || "ENSURE_IMPORT".equals(type) || "ENSURE_NPM_DEPENDENCY".equals(type) || "ENSURE_MAVEN_DEPENDENCY".equals(type) || "ENSURE_REACT_PROVIDER".equals(type) || "ENSURE_ROUTE".equals(type) || "ENSURE_MENU_ITEM".equals(type) || "ENSURE_SPRING_BEAN".equals(type) || "ENSURE_INTERCEPTOR".equals(type), "CAPABILITY_V2_INVALID: strategy.type"); Map<String, Object> parameters = object(item.get("parameters"), "strategy.parameters"); validateStrategyParameters(type, parameters); validateSurface(root, target, type, parameters); require(strategies.put(id, new StrategyDefinition(id, target, type, integer(item.get("order"), "strategy.order"), parameters)) == null, "CAPABILITY_V2_INVALID: duplicate strategyId"); }
         Map<String, ValidatorDefinition> validators = new LinkedHashMap<String, ValidatorDefinition>();
-        for (Object value : list(raw.get("validators"), "validators")) { Map<String, Object> item = object(value, "validator"); String id = text(item.get("id"), "validator.id"); require(validators.put(id, new ValidatorDefinition(id, integer(item.get("order"), "validator.order"), object(item.get("parameters"), "validator.parameters"))) == null, "CAPABILITY_V2_INVALID: duplicate validatorId"); }
+        for (Object value : list(raw.get("validators"), "validators")) { Map<String, Object> item = object(value, "validator"); String id = text(item.get("id"), "validator.id"); Map<String, Object> parameters = object(item.get("parameters"), "validator.parameters"); validateValidatorParameters(parameters); require(validators.put(id, new ValidatorDefinition(id, integer(item.get("order"), "validator.order"), parameters)) == null, "CAPABILITY_V2_INVALID: duplicate validatorId"); }
         return new Registry(strategies, validators);
     }
 
@@ -156,9 +161,77 @@ public final class CapabilityV2Loader {
             require(parameters.size() == 4 && parameters.get("anchor") instanceof String && parameters.get("managedMarker") instanceof String && parameters.get("content") instanceof String, "CAPABILITY_V2_INVALID: TEXT_ANCHOR_INSERT parameters");
             require("before".equals(parameters.get("position")) || "after".equals(parameters.get("position")), "CAPABILITY_V2_INVALID: TEXT_ANCHOR_INSERT position");
             String marker = (String) parameters.get("managedMarker"); String content = (String) parameters.get("content");
-            require(marker.matches("[a-z0-9][a-z0-9-]*") && content.contains("/* xcodeagent:" + marker + ":begin */") && content.contains("/* xcodeagent:" + marker + ":end */"), "CAPABILITY_V2_INVALID: TEXT_ANCHOR_INSERT marker");
+            String begin = "/* xcodeagent:" + marker + ":begin */", end = "/* xcodeagent:" + marker + ":end */";
+            require(marker.matches("[a-z0-9][a-z0-9-]*") && count(content, begin) == 1 && count(content, end) == 1 && content.indexOf(begin) < content.indexOf(end), "CAPABILITY_V2_INVALID: TEXT_ANCHOR_INSERT marker");
         }
     }
+
+    private static void validateSurface(Path root, String target, String type, Map<String, Object> parameters) {
+        if (!"TEXT_ANCHOR_INSERT".equals(type)) return;
+        String source;
+        try { source = new String(Files.readAllBytes(root.resolve("base").resolve(target)), StandardCharsets.UTF_8); }
+        catch (IOException e) { throw invalid("cannot read base target", e); }
+        String anchor = (String) parameters.get("anchor");
+        require(count(source, anchor) == 1, "ANCHOR_NOT_UNIQUE: " + anchor);
+        String marker = (String) parameters.get("managedMarker");
+        require(count(source, "/* xcodeagent:" + marker + ":begin */") == 0 && count(source, "/* xcodeagent:" + marker + ":end */") == 0, "MANAGED_MARKER_ALREADY_IN_BASE: " + marker);
+    }
+
+    private static void validateValidatorParameters(Map<String, Object> parameters) {
+        String type = text(parameters.get("type"), "validator.type");
+        require(parameters.get("blocking") instanceof Boolean && integer(parameters.get("timeoutSeconds"), "validator.timeoutSeconds") > 0
+                && text(parameters.get("workingDirectory"), "validator.workingDirectory") != null, "CAPABILITY_V2_INVALID: validator common parameters");
+        if ("CAPABILITY_POSTCONDITION".equals(type)) {
+            require(exactKeys(parameters, "type", "executionMode", "blocking", "timeoutSeconds", "workingDirectory", "capabilityId", "checks")
+                    && "REAL_WORKSPACE".equals(parameters.get("executionMode")) && text(parameters.get("capabilityId"), "validator.capabilityId") != null
+                    && postconditionChecks(parameters.get("checks")), "CAPABILITY_V2_INVALID: CAPABILITY_POSTCONDITION parameters"); return;
+        }
+        if ("FILE_EXISTS".equals(type)) {
+            require(exactKeys(parameters, "type", "executionMode", "blocking", "timeoutSeconds", "workingDirectory", "path")
+                    && "REAL_WORKSPACE".equals(parameters.get("executionMode")) && text(parameters.get("path"), "validator.path") != null, "CAPABILITY_V2_INVALID: FILE_EXISTS parameters"); return;
+        }
+        if ("STRUCTURE_CHECK".equals(type)) {
+            require(exactKeys(parameters, "type", "executionMode", "blocking", "timeoutSeconds", "workingDirectory", "path", "containsAll")
+                    && "REAL_WORKSPACE".equals(parameters.get("executionMode")) && text(parameters.get("path"), "validator.path") != null
+                    && nonEmptyStrings(parameters.get("containsAll")), "CAPABILITY_V2_INVALID: STRUCTURE_CHECK parameters"); return;
+        }
+        if ("JSON_STRUCTURE_CHECK".equals(type)) {
+            require(exactKeys(parameters, "type", "executionMode", "blocking", "timeoutSeconds", "workingDirectory", "path", "pointer")
+                    && "REAL_WORKSPACE".equals(parameters.get("executionMode")) && text(parameters.get("path"), "validator.path") != null
+                    && text(parameters.get("pointer"), "validator.pointer") != null, "CAPABILITY_V2_INVALID: JSON_STRUCTURE_CHECK parameters"); return;
+        }
+        require(("NPM_BUILD".equals(type) || "NPM_TEST".equals(type) || "MAVEN_TEST".equals(type) || "MAVEN_PACKAGE".equals(type))
+                && exactKeys(parameters, "type", "executionMode", "blocking", "timeoutSeconds", "workingDirectory")
+                && "SANDBOX".equals(parameters.get("executionMode")), "CAPABILITY_V2_INVALID: validator parameters");
+    }
+
+    @SuppressWarnings("unchecked") private static boolean postconditionChecks(Object value) {
+        if (!(value instanceof List) || ((List<?>) value).isEmpty()) return false;
+        for (Object raw : (List<Object>) value) {
+            if (!(raw instanceof Map)) return false;
+            Map<String, Object> check = (Map<String, Object>) raw;
+            Object type = check.get("type");
+            if ("FILE_EXISTS".equals(type) && exactKeys(check, "type", "path") && check.get("path") instanceof String) continue;
+            if ("STRUCTURE_CHECK".equals(type) && exactKeys(check, "type", "path", "containsAll") && check.get("path") instanceof String && nonEmptyStrings(check.get("containsAll"))) continue;
+            if ("JSON_STRUCTURE_CHECK".equals(type) && exactKeys(check, "type", "path", "pointer") && check.get("path") instanceof String && check.get("pointer") instanceof String) continue;
+            return false;
+        }
+        return true;
+    }
+
+    @SuppressWarnings("unchecked") private static boolean nonEmptyStrings(Object value) {
+        if (!(value instanceof List) || ((List<?>) value).isEmpty()) return false;
+        for (Object item : (List<Object>) value) if (!(item instanceof String) || ((String) item).trim().isEmpty()) return false;
+        return true;
+    }
+
+    private static boolean exactKeys(Map<String, Object> value, String... keys) {
+        if (value.size() != keys.length) return false;
+        Set<String> allowed = new HashSet<String>(); Collections.addAll(allowed, keys);
+        return allowed.containsAll(value.keySet());
+    }
+
+    private static int count(String source, String needle) { int count = 0, index = 0; while ((index = source.indexOf(needle, index)) >= 0) { count++; index += needle.length(); } return count; }
 
     private static TemplateSourceException invalid(String message, Exception cause) { return new TemplateSourceException("CAPABILITY_V2_INVALID: " + message + ": " + cause.getMessage()); }
     private static void require(boolean condition, String message) { if (!condition) throw new TemplateSourceException(message); }

@@ -16,7 +16,7 @@ strategies:
     targetId: frontend.capability-routes
     type: TEXT_ANCHOR_INSERT
     order: 130
-    parameters: { anchor: "// xcodeagent:capability-root-routes", position: before, managedMarker: login-route, content: "/* xcodeagent:login-route:begin */\n{ path: '/login', element: <LoginPage /> },\n/* xcodeagent:login-route:end */" }
+    parameters: { anchor: "// xcodeagent:capability-root-routes", position: before, managedMarker: login-route, content: "/* xcodeagent:login-route:begin */\n{ path: '/login', element: <LoginPage />, handle: { capabilityEntry: true } },\n/* xcodeagent:login-route:end */" }
   - { id: frontend.login.import-logout-route, targetId: frontend.capability-routes, type: ENSURE_IMPORT, order: 140, parameters: { importStatement: "import LogoutPage from '@/pages/Logout'" } }
   - id: frontend.login.register-logout-route
     targetId: frontend.capability-routes
@@ -29,16 +29,11 @@ strategies:
     type: TEXT_ANCHOR_INSERT
     order: 170
     parameters: { anchor: "// xcodeagent:capability-page-wrappers", position: before, managedMarker: login-page-wrapper, content: "/* xcodeagent:login-page-wrapper:begin */\nwrapLoginRequired,\n/* xcodeagent:login-page-wrapper:end */" }
-  - id: backend.login.register-interceptor-field
-    targetId: backend.capability-webmvc
-    type: TEXT_ANCHOR_INSERT
-    order: 180
-    parameters: { anchor: "// xcodeagent:capability-interceptor-fields", position: before, managedMarker: login-interceptor-field, content: "/* xcodeagent:login-interceptor-field:begin */\n@org.springframework.beans.factory.annotation.Autowired\nprivate com.cmbchina.backend.auth.common.interceptor.UserWebMvcInterceptor loginCurrentUserInterceptor;\n/* xcodeagent:login-interceptor-field:end */" }
   - id: backend.login.register-interceptor
     targetId: backend.capability-webmvc
     type: TEXT_ANCHOR_INSERT
     order: 190
-    parameters: { anchor: "// xcodeagent:capability-interceptors", position: before, managedMarker: login-interceptor, content: "/* xcodeagent:login-interceptor:begin */\nregistry.addInterceptor(loginCurrentUserInterceptor).order(100).addPathPatterns(\"/**\").excludePathPatterns(\"/api/login/mock\");\n/* xcodeagent:login-interceptor:end */" }
+    parameters: { anchor: "// xcodeagent:capability-interceptors", position: before, managedMarker: login-interceptor, content: "/* xcodeagent:login-interceptor:begin */\nregistry.addInterceptor(applicationContext.getBean(\n        com.cmbchina.backend.auth.common.interceptor.UserWebMvcInterceptor.class))\n    .order(100)\n    .addPathPatterns(\"/**\")\n    .excludePathPatterns(\"/api/login/mock\");\n/* xcodeagent:login-interceptor:end */" }
   - { id: frontend.authorization.import-provider, targetId: frontend.capability-providers, type: ENSURE_IMPORT, order: 200, parameters: { importStatement: "import { AuthProvider } from '@/providers/AuthProvider'" } }
   - id: frontend.authorization.register-provider
     targetId: frontend.capability-providers
@@ -63,20 +58,41 @@ strategies:
     type: TEXT_ANCHOR_INSERT
     order: 270
     parameters: { anchor: "// xcodeagent:capability-menu-transforms", position: before, managedMarker: authorization-menu-transform, content: "/* xcodeagent:authorization-menu-transform:begin */\ncurrent = useAuthorizationMenuTransform(current);\n/* xcodeagent:authorization-menu-transform:end */" }
-  - id: backend.authorization.register-interceptor-field
-    targetId: backend.capability-webmvc
-    type: TEXT_ANCHOR_INSERT
-    order: 280
-    parameters: { anchor: "// xcodeagent:capability-interceptor-fields", position: before, managedMarker: authorization-interceptor-field, content: "/* xcodeagent:authorization-interceptor-field:begin */\n@org.springframework.beans.factory.annotation.Autowired\nprivate com.cmbchina.backend.auth.common.interceptor.ResourcePermissionInterceptor authorizationResourcePermissionInterceptor;\n/* xcodeagent:authorization-interceptor-field:end */" }
   - id: backend.authorization.register-interceptor
     targetId: backend.capability-webmvc
     type: TEXT_ANCHOR_INSERT
     order: 290
-    parameters: { anchor: "// xcodeagent:capability-interceptors", position: before, managedMarker: authorization-interceptor, content: "/* xcodeagent:authorization-interceptor:begin */\nregistry.addInterceptor(authorizationResourcePermissionInterceptor).order(200).addPathPatterns(\"/**\").excludePathPatterns(\"/api/login/mock\", \"/actuator/**\");\n/* xcodeagent:authorization-interceptor:end */" }
+    parameters: { anchor: "// xcodeagent:capability-interceptors", position: before, managedMarker: authorization-interceptor, content: "/* xcodeagent:authorization-interceptor:begin */\nregistry.addInterceptor(applicationContext.getBean(\n        com.cmbchina.backend.auth.common.interceptor.ResourcePermissionInterceptor.class))\n    .order(200)\n    .addPathPatterns(\"/**\")\n    .excludePathPatterns(\"/api/login/mock\", \"/actuator/**\");\n/* xcodeagent:authorization-interceptor:end */" }
 validators:
-  - { id: login.postcondition, order: 10, parameters: { type: CAPABILITY_POSTCONDITION, executionMode: REAL_WORKSPACE, capabilityId: login, checks: ["xcodeagent:login-provider:begin", "xcodeagent:login-interceptor:begin"] } }
-  - { id: login.frontend, order: 100, parameters: { type: NPM_BUILD, executionMode: SANDBOX } }
-  - { id: login.backend, order: 200, parameters: { type: MAVEN_TEST, executionMode: SANDBOX } }
-  - { id: authorization.postcondition, order: 10, parameters: { type: CAPABILITY_POSTCONDITION, executionMode: REAL_WORKSPACE, capabilityId: authorization, checks: ["xcodeagent:authorization-provider:begin", "xcodeagent:authorization-interceptor:begin"] } }
-  - { id: authorization.frontend, order: 100, parameters: { type: NPM_BUILD, executionMode: SANDBOX } }
-  - { id: authorization.backend, order: 200, parameters: { type: MAVEN_TEST, executionMode: SANDBOX } }
+  - id: login.postcondition
+    order: 10
+    parameters:
+      type: CAPABILITY_POSTCONDITION
+      executionMode: REAL_WORKSPACE
+      blocking: true
+      timeoutSeconds: 30
+      workingDirectory: .
+      capabilityId: login
+      checks:
+        - { type: FILE_EXISTS, path: frontend/src/pages/Login/index.tsx }
+        - { type: STRUCTURE_CHECK, path: frontend/src/generated/capabilityProviders.tsx, containsAll: ["xcodeagent:login-provider:begin"] }
+        - { type: STRUCTURE_CHECK, path: backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java, containsAll: ["xcodeagent:login-interceptor:begin"] }
+  - id: authorization.postcondition
+    order: 20
+    parameters:
+      type: CAPABILITY_POSTCONDITION
+      executionMode: REAL_WORKSPACE
+      blocking: true
+      timeoutSeconds: 30
+      workingDirectory: .
+      capabilityId: authorization
+      checks:
+        - { type: FILE_EXISTS, path: frontend/src/pages/System/AuthorizationManagementPage/index.tsx }
+        - { type: STRUCTURE_CHECK, path: frontend/src/generated/capabilityProviders.tsx, containsAll: ["xcodeagent:authorization-provider:begin"] }
+        - { type: STRUCTURE_CHECK, path: backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java, containsAll: ["xcodeagent:authorization-interceptor:begin"] }
+  - id: frontend.build
+    order: 100
+    parameters: { type: NPM_BUILD, executionMode: SANDBOX, blocking: true, timeoutSeconds: 300, workingDirectory: frontend }
+  - id: backend.test
+    order: 200
+    parameters: { type: MAVEN_TEST, executionMode: SANDBOX, blocking: true, timeoutSeconds: 300, workingDirectory: backend }

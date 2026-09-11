@@ -5,7 +5,9 @@ import type { PageRouteDefinition } from '@/typings/routes';
 export const capabilityRootRoutes: RouteObject[] = [
   // xcodeagent:capability-root-routes
 ];
-export const capabilityEntryPath: string | undefined = undefined;
+/** The first capability route explicitly marked as an entry wins in source order. */
+export const capabilityEntryPath: string | undefined =
+  capabilityRootRoutes.find((route) => route.handle?.capabilityEntry)?.path;
 export const capabilityPageRoutes: PageRouteDefinition[] = [
   // xcodeagent:capability-page-routes
 ];

@@ -4,7 +4,7 @@
 
 Authorization 提供角色、成员、资源、接口权限校验、权限 API、授权管理页、权限 Provider、路由守卫和菜单过滤。它 `required` 依赖 Login，因为所有权限判断均从 Login 提供的当前用户上下文读取成员标识。
 
-配置项只有 `enabled`，默认 `true`。它通过结构化 npm 依赖声明 `ahooks`，不提交或拼接 Base 的 `package.json`。
+配置项只有 `enabled`，默认 `true`。当前内置 Capability 所需的 `ahooks` 已预置到 Base 的 `package.json` 与 `pnpm-lock.yaml`；本 Capability 不拼接或修改它们。
 
 ## 文件归属与前端接入
 

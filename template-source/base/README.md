@@ -18,6 +18,6 @@ Base 的 `App`、主路由和布局只导入下列受管文件：
 
 ## 扩展点与迁移
 
-唯一允许的共享扩展点在 `extension-registry.yaml` 中登记。Capability 只能以 manifest Contribution 使用已登记的 Provider、路由、页面路由、菜单或 Web MVC 拦截器扩展点；未登记的目标一律失败。
+Provider、路由、菜单与 Web MVC 的固定扩展面由 `strategy-registry-v2.yaml` 的 target registry 管理。它们是 platform-managed surface：Capability 只能通过已登记的 Atomic Strategy 追加受管块，不能整体重写文件骨架。
 
 Base 没有迁移资产和配置项。数据库、npm 或 Maven 变更必须由 Capability 通过结构化 `dependencies` 声明，不能复制或拼接 Base 的 `package.json`、`pom.xml`。
