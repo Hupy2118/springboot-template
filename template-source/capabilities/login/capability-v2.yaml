@@ -3,12 +3,16 @@ schemaVersion: 2
 defaultConfig: {}
 requires: []
 existingTargets:
-  - { strategyId: frontend.login.ensure-provider }
-  - { strategyId: frontend.login.ensure-login-route }
-  - { strategyId: frontend.login.ensure-logout-route }
-  - { strategyId: frontend.login.ensure-page-wrapper }
-  - { strategyId: backend.login.ensure-interceptor }
-  - { strategyId: frontend.login.ensure-dependency }
+  - { strategyId: frontend.login.import-provider }
+  - { strategyId: frontend.login.register-provider }
+  - { strategyId: frontend.login.import-login-route }
+  - { strategyId: frontend.login.register-login-route }
+  - { strategyId: frontend.login.import-logout-route }
+  - { strategyId: frontend.login.register-logout-route }
+  - { strategyId: frontend.login.import-page-wrapper }
+  - { strategyId: frontend.login.register-page-wrapper }
+  - { strategyId: backend.login.register-interceptor-field }
+  - { strategyId: backend.login.register-interceptor }
 additions:
   - id: login.backend-src-main-java-com-cmbchina-backend-auth-adapter-web-mocklogincontroller
     source: backend/src/main/java/com/cmbchina/backend/auth/adapter/web/MockLoginController.java
@@ -67,5 +71,6 @@ additions:
     target: frontend/src/providers/index.tsx
     maintainPolicy: { mode: NO_OP }
 validators:
+  - { validatorId: login.postcondition }
   - { validatorId: login.frontend }
   - { validatorId: login.backend }

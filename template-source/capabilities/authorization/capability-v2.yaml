@@ -4,11 +4,16 @@ defaultConfig: {}
 requires:
   - id: login
 existingTargets:
-  - { strategyId: frontend.authorization.ensure-provider }
-  - { strategyId: frontend.authorization.ensure-page-route }
-  - { strategyId: frontend.authorization.ensure-page-wrapper }
-  - { strategyId: frontend.authorization.ensure-menu }
-  - { strategyId: backend.authorization.ensure-interceptor }
+  - { strategyId: frontend.authorization.import-provider }
+  - { strategyId: frontend.authorization.register-provider }
+  - { strategyId: frontend.authorization.import-page-route }
+  - { strategyId: frontend.authorization.register-page-route }
+  - { strategyId: frontend.authorization.import-page-wrapper }
+  - { strategyId: frontend.authorization.register-page-wrapper }
+  - { strategyId: frontend.authorization.import-menu-transform }
+  - { strategyId: frontend.authorization.register-menu-transform }
+  - { strategyId: backend.authorization.register-interceptor-field }
+  - { strategyId: backend.authorization.register-interceptor }
 additions:
   - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-adapter-web-membercontroller
     source: backend/src/main/java/com/cmbchina/backend/auth/adapter/web/MemberController.java
@@ -277,7 +282,7 @@ additions:
   - id: authorization.auth-provider
     source: frontend/src/providers/AuthProvider.tsx
     target: frontend/src/providers/AuthProvider.tsx
-    maintainPolicy: { mode: STRATEGY, strategyId: frontend.authorization.reconcile-auth-provider, order: 300 }
+    maintainPolicy: { mode: NO_OP }
   - id: authorization.frontend-src-typings-authorization
     source: frontend/src/typings/authorization.ts
     target: frontend/src/typings/authorization.ts
@@ -287,5 +292,8 @@ additions:
     target: frontend/src/typings/generated/authorizationApiTypes.ts
     maintainPolicy: { mode: NO_OP }
 validators:
+  - { validatorId: authorization.postcondition }
   - { validatorId: authorization.frontend }
   - { validatorId: authorization.backend }
+migrations:
+  - { id: schema, source: migrations/001-schema.sql, target: backend/docs/auth/sql/ddl.sql, bootstrapConsumerPath: backend/docs/auth/sql/ddl.sql, executionTrigger: AUTHORIZATION_BOOTSTRAP_DDL }

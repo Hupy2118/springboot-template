@@ -6,6 +6,7 @@ files:
   - { source: backend/pom.xml, target: backend/pom.xml }
   - { source: backend/src/main/java/com/cmbchina/backend/Application.java, target: backend/src/main/java/com/cmbchina/backend/Application.java }
   - { source: backend/src/main/java/com/cmbchina/backend/common/config/CrosConfig.java, target: backend/src/main/java/com/cmbchina/backend/common/config/CrosConfig.java }
+  - { source: backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java, target: backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java }
   - { source: backend/src/main/java/com/cmbchina/backend/common/config/MybatisPlusConfiguration.java, target: backend/src/main/java/com/cmbchina/backend/common/config/MybatisPlusConfiguration.java }
   - { source: backend/src/main/java/com/cmbchina/backend/common/exception/AbstractBaseException.java, target: backend/src/main/java/com/cmbchina/backend/common/exception/AbstractBaseException.java }
   - { source: backend/src/main/java/com/cmbchina/backend/common/exception/BaseExceptionHandler.java, target: backend/src/main/java/com/cmbchina/backend/common/exception/BaseExceptionHandler.java }

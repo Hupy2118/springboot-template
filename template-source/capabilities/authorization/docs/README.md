@@ -14,4 +14,6 @@ Authorization 提供角色、成员、资源、接口权限校验、权限 API�
 
 ## 迁移
 
-`schema`（顺序 100）复制 `001-schema.sql`，`initialization`（顺序 200）复制 `002-initialization.sql`。迁移元数据位于 `migrations/migration.yaml`；它们是受管 SQL 资产，关闭 Capability 不会自动回滚已经执行的数据库变更，回滚方式为人工处理。
+V2 只登记 `001-schema.sql` 为 Schema Asset。Template Service 将其编译为 `ADD_FILE`，由 XCodeAgent 投放到 `backend/docs/auth/sql/ddl.sql`；`AuthorizationBootstrapCommand` 显式读取该路径。数据库执行不属于 Strategy Executor，也不记录在 TemplateStateV2。
+
+`002-initialization.sql` 是 V1 静态初始化遗留，不迁入 V2 Migration Asset；初始角色、资源和管理员数据由基于 TechnicalPlan / Application 的动态 Bootstrap 负责。

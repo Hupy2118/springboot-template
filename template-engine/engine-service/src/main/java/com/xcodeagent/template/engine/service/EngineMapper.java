@@ -74,12 +74,11 @@ final class EngineMapper {
 
     static TemplateStateV2 stateV2(Object input) {
         Map<String, Object> root = object(input, "currentTemplateState");
-        requireOnly(root, "currentTemplateState", "schemaVersion", "templateRevision", "releaseDigest", "requested", "effective", "appliedAdditions");
+        requireOnly(root, "currentTemplateState", "schemaVersion", "templateRevision", "requested", "effective", "appliedAdditions");
         if (!Integer.valueOf(TemplateStateV2.SCHEMA_VERSION).equals(number(root.get("schemaVersion"))))
             throw new ServiceException("TEMPLATE_STATE_SCHEMA_UNSUPPORTED", "currentTemplateState.schemaVersion must be 2", 400);
         String revision = nonEmpty(root.get("templateRevision"), "currentTemplateState.templateRevision");
-        String digest = nonEmpty(root.get("releaseDigest"), "currentTemplateState.releaseDigest");
-        return new TemplateStateV2(revision, digest, capabilityStates(root.get("requested"), "currentTemplateState.requested"),
+        return new TemplateStateV2(revision, capabilityStates(root.get("requested"), "currentTemplateState.requested"),
                 capabilityStates(root.get("effective"), "currentTemplateState.effective"), additions(root.get("appliedAdditions")));
     }
 
@@ -87,7 +86,6 @@ final class EngineMapper {
         Map<String, Object> output = new LinkedHashMap<String, Object>();
         output.put("schemaVersion", TemplateStateV2.SCHEMA_VERSION);
         output.put("templateRevision", state.templateRevision());
-        output.put("releaseDigest", state.releaseDigest());
         output.put("requested", capabilityStates(state.requested()));
         output.put("effective", capabilityStates(state.effective()));
         Map<String, Object> additions = new LinkedHashMap<String, Object>();

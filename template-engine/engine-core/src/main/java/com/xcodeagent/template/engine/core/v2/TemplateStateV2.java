@@ -8,17 +8,15 @@ import java.util.Map;
 public final class TemplateStateV2 {
     public static final int SCHEMA_VERSION = 2;
     private final String templateRevision;
-    private final String releaseDigest;
     private final Map<String, CapabilityState> requested;
     private final Map<String, CapabilityState> effective;
     private final Map<String, AppliedAdditionState> appliedAdditions;
 
-    public TemplateStateV2(String templateRevision, String releaseDigest,
+    public TemplateStateV2(String templateRevision,
                            Map<String, CapabilityState> requested,
                            Map<String, CapabilityState> effective,
                            Map<String, AppliedAdditionState> appliedAdditions) {
         this.templateRevision = templateRevision;
-        this.releaseDigest = releaseDigest;
         this.requested = immutable(requested);
         this.effective = immutable(effective);
         this.appliedAdditions = immutable(appliedAdditions);
@@ -29,7 +27,6 @@ public final class TemplateStateV2 {
     }
 
     public String templateRevision() { return templateRevision; }
-    public String releaseDigest() { return releaseDigest; }
     public Map<String, CapabilityState> requested() { return requested; }
     public Map<String, CapabilityState> effective() { return effective; }
     public Map<String, AppliedAdditionState> appliedAdditions() { return appliedAdditions; }

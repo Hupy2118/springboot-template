@@ -43,7 +43,7 @@ class ReconcileDecisionEngineTest {
     @Test
     void enableThenMaintainUsesMetadataPolicyDeterministically() {
         TemplateRelease release = release();
-        TemplateStateV2 empty = new TemplateStateV2("2026.09.04.1", release.digest(), Collections.<String, CapabilityState>emptyMap(),
+        TemplateStateV2 empty = new TemplateStateV2("2026.09.04.1", Collections.<String, CapabilityState>emptyMap(),
                 Collections.<String, CapabilityState>emptyMap(), Collections.<String, AppliedAdditionState>emptyMap());
         Map<String, CapabilityState> requested = new LinkedHashMap<String, CapabilityState>();
         requested.put("authorization", new CapabilityState(true, Collections.<String, Object>emptyMap()));
@@ -58,7 +58,7 @@ class ReconcileDecisionEngineTest {
         assertEquals(UpdateResult.Kind.CHANGE, maintained.kind());
         boolean hasMaintainStrategy = false;
         for (ModificationStrategy strategy : maintained.strategies()) if ("frontend.authorization.reconcile-auth-provider".equals(strategy.strategyId())) hasMaintainStrategy = true;
-        assertTrue(hasMaintainStrategy);
+        assertTrue(!hasMaintainStrategy);
     }
 
     private static TemplateRelease release() {

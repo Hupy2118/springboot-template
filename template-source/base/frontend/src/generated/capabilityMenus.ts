@@ -1,4 +1,8 @@
 import type { Route } from '@/typings/workbench';
 
-/** 由引擎生成的菜单变换链；无扩展时保持恒等。 */
-export const useCapabilityMenus = (menus: Route[]): Route[] => menus;
+/** 稳定扩展面；调用按 Registry 顺序静态插入。 */
+export const useCapabilityMenus = (menus: Route[]): Route[] => {
+  let current = menus;
+  // xcodeagent:capability-menu-transforms
+  return current;
+};

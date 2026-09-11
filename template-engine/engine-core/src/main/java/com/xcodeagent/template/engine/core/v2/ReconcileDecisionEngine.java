@@ -23,6 +23,9 @@ public final class ReconcileDecisionEngine {
         removalGuard(current.effective(), targetEffective);
 
         List<ReconcileReason> reasons = reasons(current, normalizedRequested, targetEffective, mode, release);
+        if (mode == Mode.RECONCILE && (reasons.contains(ReconcileReason.ENABLE) || reasons.contains(ReconcileReason.CONFIG_CHANGE)
+                || reasons.contains(ReconcileReason.RELEASE_REFRESH)))
+            throw new TemplateSourceException("RECONCILE_STATE_CHANGE_REQUIRED");
         if (reasons.isEmpty()) return UpdateResult.noChange();
 
         Set<String> selected = selectedCapabilities(current, targetEffective, reasons);
@@ -36,9 +39,7 @@ public final class ReconcileDecisionEngine {
             for (ExistingTargetDefinition target : definition.existingTargets()) {
                 StrategyDefinition registered = release.strategies().get(target.strategyId());
                 Map<String, Object> parameters = new LinkedHashMap<String, Object>(registered.parameters());
-                parameters.put("capabilityId", id); parameters.put("registryType", registered.type());
-                String type = "ENSURE_NPM_DEPENDENCY".equals(registered.type()) ? "ENSURE_NPM_DEPENDENCY" : "TRANSFORM_FILE";
-                strategies.add(strategy(type, target.strategyId(), target.path(), target.order(), parameters));
+                strategies.add(strategy(registered.type(), target.strategyId(), target.path(), registered.order(), parameters));
             }
             for (AdditionDefinition addition : definition.additions()) {
                 AppliedAdditionState applied = current.appliedAdditions().get(addition.id());
@@ -56,10 +57,14 @@ public final class ReconcileDecisionEngine {
                     }
                 }
             }
+            for (MigrationDefinition migration : definition.migrations()) {
+                strategies.add(strategy("ADD_FILE", "migration." + id + "." + migration.id(), migration.target(), 0,
+                        map("capabilityId", id, "sourceRef", migration.source(), "migrationId", migration.id())));
+            }
             validators.addAll(definition.validators());
         }
         return UpdateResult.change(reasons, strategies,
-                new TemplateStateV2(release.revision(), release.digest(), normalizedRequested, targetEffective, nextAdditions),
+                new TemplateStateV2(release.revision(), normalizedRequested, targetEffective, nextAdditions),
                 new ValidationPlan(validators));
     }
 
@@ -69,7 +74,6 @@ public final class ReconcileDecisionEngine {
         for (String id : effective.keySet()) if (!current.effective().containsKey(id)) { result.add(ReconcileReason.ENABLE); break; }
         if (!current.requested().equals(requested) || !current.effective().equals(effective)) result.add(ReconcileReason.CONFIG_CHANGE);
         if (!current.templateRevision().equals(release.revision())) result.add(ReconcileReason.RELEASE_REFRESH);
-        else if (!current.releaseDigest().equals(release.digest())) throw new TemplateSourceException("TEMPLATE_RELEASE_REVISION_REUSED");
         if (mode == Mode.RECONCILE) result.add(ReconcileReason.HEALTH_REPAIR);
         return result;
     }

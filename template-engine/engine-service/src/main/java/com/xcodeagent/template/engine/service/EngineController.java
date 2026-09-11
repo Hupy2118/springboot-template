@@ -35,7 +35,7 @@ public class EngineController {
                                            @RequestBody Map<String, Object> request) {
         auth.require(authorization, "template.generate");
         requireOnly(request, "requestedConfig");
-        TemplateStateV2 initial = new TemplateStateV2(release.revision(), release.digest(), Collections.<String, com.xcodeagent.template.engine.core.v2.CapabilityState>emptyMap(),
+        TemplateStateV2 initial = new TemplateStateV2(release.revision(), Collections.<String, com.xcodeagent.template.engine.core.v2.CapabilityState>emptyMap(),
                 Collections.<String, com.xcodeagent.template.engine.core.v2.CapabilityState>emptyMap(), Collections.<String, com.xcodeagent.template.engine.core.v2.AppliedAdditionState>emptyMap());
         UpdateResult bootstrap = reconcile.decide(initial, EngineMapper.requestedV2(request.get("requestedConfig")), ReconcileDecisionEngine.Mode.APPLY, release);
         return zip(packages.generatedProject(generator.generate(bootstrap.nextTemplateState()), bootstrap.nextTemplateState()));
@@ -45,7 +45,8 @@ public class EngineController {
     public ResponseEntity<byte[]> update(@RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
                                          @RequestBody Map<String, Object> request) {
         auth.require(authorization, "template.update");
-        requireOnly(request, "currentTemplateState", "requestedConfig", "mode");
+        requireOnly(request, "protocolVersion", "currentTemplateState", "requestedConfig", "mode");
+        if (!"2".equals(request.get("protocolVersion"))) throw new ServiceException("BAD_REQUEST", "protocolVersion must be 2", 400);
         if (request.get("currentTemplateState") == null) throw new ServiceException("BAD_REQUEST", "currentTemplateState is required", 400);
         Object rawMode = request.get("mode");
         if (!(rawMode instanceof String)) throw new ServiceException("BAD_REQUEST", "mode must be APPLY or RECONCILE", 400);
@@ -54,7 +55,7 @@ public class EngineController {
         catch (IllegalArgumentException e) { throw new ServiceException("BAD_REQUEST", "mode must be APPLY or RECONCILE", 400); }
         UpdateResult result = reconcile.decide(EngineMapper.stateV2(request.get("currentTemplateState")), EngineMapper.requestedV2(request.get("requestedConfig")), mode, release);
         if (result.kind() == UpdateResult.Kind.NO_CHANGE) return ResponseEntity.noContent().build();
-        return zip(packages.updatePackage(result));
+        return zip(packages.updatePackage(result, EngineMapper.stateV2(request.get("currentTemplateState")), mode.name()));
     }
 
     private ResponseEntity<byte[]> zip(byte[] body) {

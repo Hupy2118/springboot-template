@@ -24,6 +24,7 @@ public final class V2ProjectGenerator {
         for (String capabilityId : state.effective().keySet()) {
             CapabilityDefinitionV2 capability = release.capabilities().get(capabilityId);
             for (AdditionDefinition addition : capability.additions()) files.put(addition.target(), read(root.resolve("capabilities").resolve(capabilityId).resolve(addition.source())));
+            for (MigrationDefinition migration : capability.migrations()) files.put(migration.target(), read(root.resolve("capabilities").resolve(capabilityId).resolve(migration.source())));
             for (ExistingTargetDefinition target : capability.existingTargets()) strategies.add(release.strategies().get(target.strategyId()));
         }
         Collections.sort(strategies, new Comparator<StrategyDefinition>() { public int compare(StrategyDefinition a, StrategyDefinition b) { int c = Integer.compare(a.order(), b.order()); return c != 0 ? c : a.id().compareTo(b.id()); } });
@@ -36,9 +37,40 @@ public final class V2ProjectGenerator {
         return result;
     }
     private void render(Map<String, String> files, List<StrategyDefinition> all) {
-        List<StrategyDefinition> providers = point(all, "frontend.providers"), roots = point(all, "frontend.root-routes"), pages = point(all, "frontend.page-routes"), wrappers = point(all, "frontend.page-wrappers"), menus = point(all, "frontend.menu-hooks"), interceptors = point(all, "backend.spring-interceptors");
-        files.put("frontend/src/generated/capabilityProviders.tsx", providers(providers)); files.put("frontend/src/generated/capabilityRoutes.tsx", routes(roots, pages, wrappers)); files.put("frontend/src/generated/capabilityMenus.ts", menus(menus)); files.put("backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java", interceptors(interceptors));
-        for (StrategyDefinition strategy : all) if ("ENSURE_NPM_DEPENDENCY".equals(strategy.type())) npm(files, strategy.parameters());
+        for (StrategyDefinition strategy : all) {
+            String current = files.get(strategy.target());
+            if (current == null) throw new TemplateSourceException("BASE_SURFACE_TARGET_MISSING: " + strategy.target());
+            if ("ENSURE_IMPORT".equals(strategy.type())) files.put(strategy.target(), ensureImport(current, String.valueOf(strategy.parameters().get("importStatement"))));
+            else if ("TEXT_ANCHOR_INSERT".equals(strategy.type())) files.put(strategy.target(), managedInsert(current, strategy.parameters()));
+            else throw new TemplateSourceException("GENERATE_STRATEGY_UNSUPPORTED: " + strategy.type());
+        }
+    }
+
+    private static String ensureImport(String source, String statement) {
+        if (source.contains(statement)) return source;
+        int lastImport = source.lastIndexOf("import ");
+        if (lastImport < 0) throw new TemplateSourceException("IMPORT_SURFACE_MISSING");
+        int end = source.indexOf('\n', lastImport);
+        if (end < 0) end = source.length();
+        return source.substring(0, end + 1) + statement + "\n" + source.substring(end + 1);
+    }
+
+    private static String managedInsert(String source, Map<String, Object> parameters) {
+        String anchor = String.valueOf(parameters.get("anchor"));
+        String marker = String.valueOf(parameters.get("managedMarker"));
+        String content = String.valueOf(parameters.get("content"));
+        String begin = "/* xcodeagent:" + marker + ":begin */";
+        String end = "/* xcodeagent:" + marker + ":end */";
+        int firstBegin = source.indexOf(begin); int firstEnd = source.indexOf(end);
+        if (firstBegin >= 0 || firstEnd >= 0) {
+            if (firstBegin < 0 || firstEnd < firstBegin || source.indexOf(begin, firstBegin + begin.length()) >= 0 || source.indexOf(end, firstEnd + end.length()) >= 0)
+                throw new TemplateSourceException("MANAGED_BLOCK_INVALID: " + marker);
+            return source.substring(0, firstBegin) + content + source.substring(firstEnd + end.length());
+        }
+        int index = source.indexOf(anchor);
+        if (index < 0 || source.indexOf(anchor, index + anchor.length()) >= 0) throw new TemplateSourceException("ANCHOR_NOT_UNIQUE: " + anchor);
+        int insertion = "after".equals(parameters.get("position")) ? index + anchor.length() : index;
+        return source.substring(0, insertion) + content + "\n" + source.substring(insertion);
     }
     private List<StrategyDefinition> point(List<StrategyDefinition> all, String point) { List<StrategyDefinition> result = new ArrayList<StrategyDefinition>(); for (StrategyDefinition strategy : all) if (point.equals(strategy.parameters().get("point"))) result.add(strategy); return result; }
     private String providers(List<StrategyDefinition> all) { StringBuilder out = new StringBuilder("import type { PropsWithChildren } from 'react';\n"); for (StrategyDefinition s : all) out.append("import { ").append(p(s,"export")).append(" } from '").append(p(s,"module")).append("';\n"); out.append("\nexport function CapabilityProviders({ children }: PropsWithChildren) {\n  return "); for (StrategyDefinition s : all) out.append("<").append(p(s,"export")).append(">"); out.append("{children}"); for (int i=all.size()-1;i>=0;i--) out.append("</").append(p(all.get(i),"export")).append(">"); return out.append(";\n}\n").toString(); }

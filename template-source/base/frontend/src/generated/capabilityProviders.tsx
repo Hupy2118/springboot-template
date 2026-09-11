@@ -1,6 +1,13 @@
-import type { PropsWithChildren } from 'react';
+import type { ComponentType, PropsWithChildren } from 'react';
 
-/** Engine 生成的 Capability Provider 聚合入口；空能力集保持恒等包装。 */
+const capabilityProviders: ComponentType<PropsWithChildren>[] = [
+  // xcodeagent:capability-providers
+];
+
+/** 稳定扩展面；空能力集保持恒等包装。 */
 export function CapabilityProviders({ children }: PropsWithChildren) {
-  return <>{children}</>;
+  return capabilityProviders.reduceRight(
+    (current, Provider) => <Provider>{current}</Provider>,
+    children,
+  );
 }

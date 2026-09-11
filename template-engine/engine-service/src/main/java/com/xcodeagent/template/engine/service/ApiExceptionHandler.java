@@ -20,7 +20,7 @@ public class ApiExceptionHandler {
     ResponseEntity<Map<String, Object>> core(TemplateSourceException exception) {
         String message = exception.getMessage() == null ? "template source failure" : exception.getMessage();
         String code = message.contains(":") ? message.substring(0, message.indexOf(':')) : "TEMPLATE_SOURCE_INVALID";
-        return response(code, message, 400);
+        return response(code, message, "RECONCILE_STATE_CHANGE_REQUIRED".equals(code) ? 409 : 400);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

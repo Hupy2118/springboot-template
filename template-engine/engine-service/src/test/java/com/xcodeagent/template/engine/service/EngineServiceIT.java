@@ -60,31 +60,48 @@ class EngineServiceIT {
         assertEquals(2, generatedState.path("schemaVersion").asInt());
         assertTrue(!generatedState.has("managedFiles"));
         assertTrue(generatedState.path("appliedAdditions").has("authorization.role-page"));
+        assertTrue(zipText(generated, "backend/docs/auth/sql/ddl.sql").contains("CREATE TABLE `role`"));
+        assertTrue(!hasZipEntry(generated, "backend/docs/auth/sql/initialization.sql"));
 
-        String update = "{\"currentTemplateState\":" + generatedState + ",\"requestedConfig\":" + requestedAuthorization + ",\"mode\":\"RECONCILE\"}";
+        String update = "{\"protocolVersion\":\"2\",\"currentTemplateState\":" + generatedState + ",\"requestedConfig\":" + requestedAuthorization + ",\"mode\":\"RECONCILE\"}";
         byte[] changed = mvc.perform(post("/v1/update").header("Authorization", "Bearer stage3-demo-token").contentType(MediaType.APPLICATION_JSON).content(update))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
-        JsonNode nextState = zipJson(changed, "next-template-state.json");
-        assertTrue(zipJson(changed, "modification-strategy.json").size() > 0);
+        JsonNode updatePackage = zipJson(changed, "strategy-update-package.json");
+        JsonNode nextState = updatePackage.path("nextTemplateState");
+        assertEquals("2", updatePackage.path("protocolVersion").asText());
+        assertTrue(updatePackage.path("strategies").size() > 0);
+        assertTrue(updatePackage.path("payloadManifest").has("payload/backend/docs/auth/sql/ddl.sql"));
         assertTrue(nextState.path("effective").has("login"));
         assertTrue(nextState.path("effective").has("authorization"));
 
-        String noChange = "{\"currentTemplateState\":" + nextState + ",\"requestedConfig\":" + requestedAuthorization + ",\"mode\":\"APPLY\"}";
+        String noChange = "{\"protocolVersion\":\"2\",\"currentTemplateState\":" + nextState + ",\"requestedConfig\":" + requestedAuthorization + ",\"mode\":\"APPLY\"}";
         mvc.perform(post("/v1/update").header("Authorization", "Bearer stage3-demo-token").contentType(MediaType.APPLICATION_JSON).content(noChange)).andExpect(status().isNoContent());
         mvc.perform(post("/v1/generate").contentType(MediaType.APPLICATION_JSON).content("{\"requestedConfig\":" + requestedAuthorization + "}")).andExpect(status().isUnauthorized());
         mvc.perform(post("/v1/generate").header("Authorization", "Bearer stage3-plan-token").contentType(MediaType.APPLICATION_JSON).content("{\"requestedConfig\":" + requestedAuthorization + "}")).andExpect(status().isForbidden());
     }
 
     private static JsonNode zipJson(byte[] zip, String path) throws Exception {
+        return JSON.readTree(zipBytes(zip, path));
+    }
+    private static String zipText(byte[] zip, String path) throws Exception {
+        return new String(zipBytes(zip, path), StandardCharsets.UTF_8);
+    }
+    private static byte[] zipBytes(byte[] zip, String path) throws Exception {
         ZipInputStream input = new ZipInputStream(new ByteArrayInputStream(zip));
         java.util.zip.ZipEntry entry;
         while ((entry = input.getNextEntry()) != null) if (path.equals(entry.getName())) {
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             byte[] buffer = new byte[4096]; int count;
             while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
-            return JSON.readTree(output.toByteArray());
+            return output.toByteArray();
         }
         throw new AssertionError("missing ZIP entry " + path);
+    }
+    private static boolean hasZipEntry(byte[] zip, String path) throws Exception {
+        ZipInputStream input = new ZipInputStream(new ByteArrayInputStream(zip));
+        java.util.zip.ZipEntry entry;
+        while ((entry = input.getNextEntry()) != null) if (path.equals(entry.getName())) return true;
+        return false;
     }
     private static Path repositoryRoot() {
         Path current = Paths.get(System.getProperty("user.dir")).toAbsolutePath();
