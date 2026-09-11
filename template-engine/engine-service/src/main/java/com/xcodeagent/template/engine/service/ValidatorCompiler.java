@@ -45,8 +45,8 @@ final class ValidatorCompiler {
         for (int index = 0; index < sorted.size(); index++) {
             Candidate candidate = sorted.get(index);
             Map<String, Object> item = new LinkedHashMap<String, Object>();
-            item.put("validatorId", candidate.id); item.put("index", index); item.put("type", candidate.type);
-            item.put("parameters", candidate.parameters); output.add(item);
+            item.put("validationId", candidate.id); item.put("index", index); item.put("type", candidate.type);
+            item.putAll(candidate.parameters); output.add(item);
         }
         return output;
     }

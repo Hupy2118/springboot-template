@@ -79,6 +79,13 @@ class EngineServiceIT {
         assertTrue(updatePackage.path("strategies").size() > 0);
         assertTrue(updatePackage.path("payloadManifest").has("payload/backend/docs/auth/sql/ddl.sql"));
         assertEquals(updatePackage.path("strategies").size(), continuousIndexes(updatePackage.path("strategies")));
+        for (JsonNode validation : updatePackage.path("validationPlan")) {
+            assertTrue(validation.hasNonNull("validationId"));
+            assertTrue(!validation.has("validatorId"));
+            assertTrue(!validation.has("parameters"));
+            assertTrue(validation.has("executionMode") && validation.has("blocking")
+                    && validation.has("timeoutSeconds") && validation.has("workingDirectory"));
+        }
         for (JsonNode strategy : updatePackage.path("strategies")) {
             if ("ADD_FILE".equals(strategy.path("type").asText())) {
                 assertEquals(0, strategy.path("parameters").size());

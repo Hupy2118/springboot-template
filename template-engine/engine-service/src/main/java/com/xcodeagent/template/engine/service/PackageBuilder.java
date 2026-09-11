@@ -73,15 +73,14 @@ final class PackageBuilder {
         return zip(entries);
     }
 
-    @SuppressWarnings("unchecked") private void validateReconcile(String mode, TemplateStateV2 current,
-                                                                      TemplateStateV2 next, List<Map<String, Object>> validation) {
+    private void validateReconcile(String mode, TemplateStateV2 current,
+                                   TemplateStateV2 next, List<Map<String, Object>> validation) {
         if (!"RECONCILE".equals(mode)) return;
         if (!StateDigest.of(EngineMapper.stateV2(current)).equals(StateDigest.of(EngineMapper.stateV2(next))))
             throw new ServiceException("RECONCILE_STATE_CHANGE_REQUIRED", "RECONCILE must not change TemplateState", 409);
         java.util.Set<String> covered = new java.util.HashSet<String>();
         for (Map<String, Object> item : validation) if ("CAPABILITY_POSTCONDITION".equals(item.get("type"))) {
-            Map<String, Object> parameters = (Map<String, Object>) item.get("parameters");
-            Object capabilityId = parameters.get("capabilityId"); Object checks = parameters.get("checks");
+            Object capabilityId = item.get("capabilityId"); Object checks = item.get("checks");
             if (capabilityId instanceof String && checks instanceof List && !((List<?>) checks).isEmpty()) covered.add((String) capabilityId);
         }
         if (!covered.containsAll(next.effective().keySet())) throw new ServiceException("PACKAGE_BUILD_FAILED", "RECONCILE postconditions missing", 500);

@@ -14,6 +14,8 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ValidatorCompilerTest {
     @Test
@@ -30,8 +32,25 @@ class ValidatorCompilerTest {
         templates.add(template("npm-build", 50, common("NPM_BUILD", "SANDBOX")));
         List<Map<String, Object>> compiled = new ValidatorCompiler().compile(result(templates));
         assertEquals(8, compiled.size());
-        assertEquals("post", compiled.get(0).get("validatorId"));
-        for (int index = 0; index < compiled.size(); index++) assertEquals(index, compiled.get(index).get("index"));
+        assertEquals("post", compiled.get(0).get("validationId"));
+        for (int index = 0; index < compiled.size(); index++) {
+            Map<String, Object> item = compiled.get(index);
+            assertEquals(index, item.get("index"));
+            assertFalse(item.containsKey("validatorId"));
+            assertFalse(item.containsKey("parameters"));
+            assertTrue(item.containsKey("executionMode"));
+            assertTrue(item.containsKey("blocking"));
+            assertTrue(item.containsKey("timeoutSeconds"));
+            assertTrue(item.containsKey("workingDirectory"));
+            assertFalse(item.containsKey("order"));
+            assertEquals(expectedWireFieldCount((String) item.get("type")), item.size());
+        }
+        Map<String, Object> postcondition = compiled.get(0);
+        assertEquals("login", postcondition.get("capabilityId"));
+        assertTrue(postcondition.get("checks") instanceof List);
+        assertEquals("a.txt", compiled.get(1).get("path"));
+        assertEquals(Arrays.asList("x"), compiled.get(2).get("containsAll"));
+        assertEquals("/x", compiled.get(3).get("pointer"));
     }
 
     @Test
@@ -46,6 +65,12 @@ class ValidatorCompilerTest {
         return UpdateResult.change(Collections.emptyList(), Collections.emptyList(), state, new ValidationPlan(validators));
     }
     private static Map<String, Object> template(String id, int order, Map<String, Object> parameters) { return map("validatorId", id, "order", order, "parameters", parameters); }
+    private static int expectedWireFieldCount(String type) {
+        if ("CAPABILITY_POSTCONDITION".equals(type)) return 9;
+        if ("FILE_EXISTS".equals(type)) return 8;
+        if ("STRUCTURE_CHECK".equals(type) || "JSON_STRUCTURE_CHECK".equals(type)) return 9;
+        return 7;
+    }
     private static Map<String, Object> postcondition() { return real("CAPABILITY_POSTCONDITION", "capabilityId", "login", "checks", Collections.singletonList(map("type", "FILE_EXISTS", "path", "a.txt"))); }
     private static Map<String, Object> common(String type, String executionMode) { return map("type", type, "executionMode", executionMode, "blocking", true, "timeoutSeconds", 1, "workingDirectory", "."); }
     private static Map<String, Object> real(String type, Object... more) { Map<String, Object> value = common(type, "REAL_WORKSPACE"); for (int index = 0; index < more.length; index += 2) value.put((String) more[index], more[index + 1]); return value; }
