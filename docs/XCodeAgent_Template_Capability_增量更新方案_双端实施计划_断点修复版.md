@@ -36,6 +36,10 @@
 8. 冻结 TemplateState digest 算法，确保 Service 与 XCodeAgent 对同一 State 得到完全相同的摘要。
 9. `RECONCILE` 固定为**不改变 TemplateState 的健康修复模式**；任何需要 State 变化的场景必须进入 `APPLY`。
 10. TS-0、TS-4、TS-7、TS-8、TS-11、TS-13 的实施与验收标准同步调整，优先完成双端协议一致性后再继续后续功能实施。
+11. `StrategyRegistryV2` 收口为 **Wire Atomic Strategy Registry**：一个 `strategyId` 必须唯一对应一个 `StrategyDescriptorV2`，禁止运行时隐式 1:N 拆分。
+12. 冻结 10 种 `StrategyTypeV2` 的 per-type 参数契约；`parameters` 虽是 JSON object，但其行为语义由 XCodeAgent 当前 executor 冻结，Service 不得自定义同名字段含义。
+13. `astSelector` 固定采用 XCodeAgent 当前 `nodeType / position / name` 协议，删除 `kind: react-provider-root` 等 Service 私有 Selector DSL。
+14. `RECONCILE` 增加 effective Capability 后置条件硬约束；同时新增 Cross-language TemplateState Digest Golden Fixture，作为 Java/Python canonical digest 一致性的协议门禁。
 
 ---
 
@@ -90,6 +94,24 @@ V2 双端协议只允许存在一套权威 Wire Contract：
 ```text
 XCodeAgent StrategyUpdatePackageV2
 ```
+
+其中协议事实源进一步分为：
+
+```text
+Wire 数据结构
+→ XCodeAgent protocol_v2.py::StrategyUpdatePackageV2
+
+ZIP / payload 完整性
+→ XCodeAgent strategy_update_package.py
+
+Strategy parameters 实际执行语义
+→ XCodeAgent executor_v2.py + strategy_ast_v2.py
+
+Validation 执行语义
+→ XCodeAgent validation_v2.py
+```
+
+即：`StrategyUpdatePackageV2` 是唯一 Wire Schema；XCodeAgent 当前 Validator / Executor 对其中字段的消费语义，是该 Wire Schema 的行为契约。
 
 Template Service 可以存在自己的 Domain Model、Decision Model、Registry Model，但在 HTTP 边界前必须编译成该 Wire Contract。
 
@@ -251,6 +273,38 @@ sha256(
 
 任何一端不得使用 pretty JSON、字段插入顺序或其他 canonicalization 算法计算 State Digest。
 
+### 3.4 Cross-language Digest Golden Fixture
+
+仅在文档中描述算法不足以证明 Java / Python 的 canonicalization 完全一致，因此 TS-0 必须冻结一组跨语言 Golden Fixture：
+
+```text
+template-state-v2-golden.json
++
+template-state-v2-golden.sha256
+```
+
+其中：
+
+```text
+template-state-v2-golden.json
+→ 固定完整 TemplateStateV2 JSON
+
+template-state-v2-golden.sha256
+→ 对上述 State 按 3.3 算法计算得到的唯一 expected digest
+```
+
+验收硬约束：
+
+```text
+XCodeAgent Python digest(fixture)
+==
+Template Service Java digest(fixture)
+==
+fixture expected digest
+```
+
+任何一端产生不同 digest 都视为 Wire Contract 不兼容；不得通过在调用端重新计算并覆盖 Service 输出的方式掩盖差异。
+
 ---
 
 ## 4. Release Identity
@@ -328,6 +382,7 @@ requires:
   - id: login
 
 existingTargets:
+  - strategyId: frontend.authorization.ensure-provider-import
   - strategyId: frontend.authorization.ensure-provider
   - strategyId: frontend.authorization.ensure-page-route
   - strategyId: frontend.authorization.ensure-menu
@@ -351,7 +406,7 @@ validators:
   - validatorId: authorization.backend
 ```
 
-### 5.2 StrategyRegistryV2 是 Strategy 的唯一事实源
+### 5.2 StrategyRegistryV2 是 Wire Atomic Strategy 的唯一事实源
 
 Strategy 的下列事实只允许由 Registry 定义：
 
@@ -366,7 +421,52 @@ Validator Binding（如有）
 
 Capability Metadata 只引用 `strategyId`。
 
-### 5.3 Registry 的 Type 必须可编译为 Wire Type
+V2 固定采用 **Wire Atomic Strategy**：
+
+```text
+一个 strategyId
+=
+一个 Registry Strategy Entry
+=
+一个 StrategyDescriptorV2
+```
+
+禁止：
+
+```text
+一个高阶 Registry Strategy
+→ 运行时隐式拆成多个 Wire Strategy
+
+一个 strategyId
+→ 根据 target / 文件后缀 / Workspace 状态决定输出不同 Wire Type
+
+RENDER_EXTENSION
+→ 运行时猜测应该拆成 ENSURE_IMPORT + ENSURE_REACT_PROVIDER + ...
+```
+
+如果一个 Capability 的一个业务动作实际上需要多个原子动作，例如：
+
+```text
+先 ENSURE_IMPORT
+再 ENSURE_REACT_PROVIDER
+```
+
+则 Registry 必须显式定义两个不同 `strategyId`，Capability Metadata 分别引用它们；最终执行顺序由固定排序规则决定。
+
+因此 Wire Compiler 只负责：
+
+```text
+读取已确定 Registry Entry
+→ resolve target
+→ resolve parameters / payload
+→ stable sort
+→ assign index
+→ StrategyDescriptorV2
+```
+
+不得承担隐藏的 1:N DSL 编译职责。
+
+### 5.3 Registry 的 Type 必须直接落到 Wire Type
 
 V2 Wire Contract 不允许输出：
 
@@ -375,9 +475,9 @@ TRANSFORM_FILE
 RENDER_EXTENSION
 ```
 
-这类通用类型最多只能作为旧实现的迁移中间语义，不能跨 HTTP 边界。
+这类通用类型最多只能作为旧实现的一次性迁移输入，不能作为 V2 运行时 Registry 语义，也不能跨 HTTP 边界。
 
-最终 Registry 推荐直接使用 Wire Type：
+最终 Registry 应直接使用 Wire Type：
 
 ```yaml
 strategies:
@@ -388,17 +488,64 @@ strategies:
     parameters:
       managedMarker: "xcodeagent:authorization-provider"
       astSelector:
-        kind: "react-provider-root"
+        nodeType: "function_declaration"
+        name: "CapabilityProviders"
+        position: "beforeEnd"
     payloadSource: generated/authorization-provider.txt
 ```
 
-如果现有 Registry 仍保存旧的 `RENDER_EXTENSION / TRANSFORM_FILE`，则必须在实施 TS-4 时完成一次性迁移；运行时不得根据文件后缀或 target 名称猜测 Wire Type。
+上例中的 `astSelector` 仅用于说明 Wire 字段形状；实际 selector 必须针对目标 Template Source 选择**唯一且稳定**的 Tree-sitter 节点。
 
-无法唯一映射时必须 fail-closed：
+如果现有 Registry 仍保存旧的 `RENDER_EXTENSION / TRANSFORM_FILE`，则必须在实施 TS-2 / TS-4 时完成一次性迁移为多个明确的 Wire Atomic Strategy Entry；运行时不得继续解释旧 DSL。
+
+无法唯一迁移时必须 fail-closed：
 
 ```text
 STRATEGY_WIRE_TYPE_UNSUPPORTED
 ```
+
+### 5.4 Registry 与 XCodeAgent Executor 的语义边界
+
+Registry 中 `parameters` 的字段名和含义不得由 Service 自行发明。
+
+例如当前 XCodeAgent 对 `ENSURE_NPM_DEPENDENCY` 消费：
+
+```json
+{
+  "name": "axios",
+  "version": "^1.7.0",
+  "section": "dependencies"
+}
+```
+
+因此 Service 不得继续输出旧参数：
+
+```json
+{
+  "dependency": "axios",
+  "version": "^1.7.0"
+}
+```
+
+同理，结构化 Strategy 的 `astSelector` 固定为：
+
+```json
+{
+  "nodeType": "<non-empty Tree-sitter node type>",
+  "position": "before | after | beforeEnd",
+  "name": "<optional non-empty AST name>"
+}
+```
+
+禁止输出 Service 私有：
+
+```json
+{
+  "kind": "react-provider-root"
+}
+```
+
+具体 per-type 参数契约见第 12.5 节。
 
 ---
 
@@ -521,6 +668,14 @@ RECONCILE_STATE_CHANGE_REQUIRED
 
 由调用方重新以 `APPLY` 发起真正的状态变更。
 
+此外，RECONCILE Package 不是“只要 State digest 不变就合法”。它还必须为 `nextTemplateState.effective` 中的**每一个 Capability**提供至少一个绑定同一 `capabilityId` 的：
+
+```text
+CAPABILITY_POSTCONDITION
+```
+
+并且该 Validation Item 必须包含非空 `checks`。完整约束见第 14.3、17.5 节。
+
 ### 7.3 NO_CHANGE
 
 `APPLY` 下仅当：
@@ -617,6 +772,7 @@ CREATE 生成 Wire Strategy：
 - `precondition` 在 Wire Contract 中固定为 JSON object，禁止继续返回字符串 `"TARGET_MUST_NOT_EXIST"`。
 - 当前 ADD_FILE 的 retry-safe 行为由 XCodeAgent 根据“目标不存在 / 已存在且内容相同 / 已存在且内容冲突”三分支执行。
 - Service 不读取 Workspace，因此不在服务端判断目标是否存在。
+- 当前 XCodeAgent `ADD_FILE` executor 的执行事实依赖 `payloadRef`，不依赖 Service 私有 precondition DSL；Service 不得把关键语义只编码在 `precondition` 中。
 
 ### 9.2 MAINTAIN
 
@@ -677,7 +833,7 @@ Addition 已安装后
 TRANSFORM_FILE
 ```
 
-Service 必须通过 StrategyRegistryV2 将该 `strategyId` 编译成唯一支持的 Wire Type，例如：
+Service 必须通过 StrategyRegistryV2 将该 `strategyId` 解析为唯一 Wire Atomic Strategy，例如：
 
 ```json
 {
@@ -690,12 +846,16 @@ Service 必须通过 StrategyRegistryV2 将该 `strategyId` 编译成唯一支�
   "parameters": {
     "managedMarker": "xcodeagent:authorization-provider",
     "astSelector": {
-      "kind": "react-provider-root"
+      "nodeType": "function_declaration",
+      "name": "AuthProvider",
+      "position": "beforeEnd"
     }
   },
   "payloadRef": "payload/strategies/frontend.authorization.reconcile-auth-provider.txt"
 }
 ```
+
+这里的 `nodeType / name / position` 必须能在真实 Template Source 上唯一命中；不能用 `kind: react-provider-root` 等 Service 私有 selector。
 
 ### 10.3 Schema 硬约束
 
@@ -714,7 +874,7 @@ mode=NO_OP
 mode=STRATEGY
 → strategyId 必填
 → strategyId 必须存在于 StrategyRegistryV2
-→ strategyId 必须可唯一编译为受支持 Wire Type
+→ strategyId 必须唯一对应一个受支持 Wire Type
 ```
 
 禁止：
@@ -724,6 +884,7 @@ maintainPolicy 缺失 → Service 猜测
 maintainPolicy 缺失 → 默认 NO_OP
 source 变化 → 自动覆盖 Workspace
 target 后缀 → 猜 Strategy Type
+一个 strategyId → 隐式拆成多个 Wire Strategy
 ```
 
 ### 10.4 Source 演进
@@ -737,7 +898,7 @@ MAINTAIN + NO_OP
 
 MAINTAIN + STRATEGY
 → 使用固定 strategyId
-→ 由 Registry 决定 Wire Strategy
+→ 由 Registry 决定唯一 Wire Strategy
 → 不把 source 当作完整目标文件覆盖
 ```
 
@@ -847,7 +1008,7 @@ precondition
 → JSON object；不得输出字符串或隐式 DSL
 
 parameters
-→ 对应 Strategy Type 的严格参数
+→ 对应 Strategy Type 的严格参数；行为语义固定见 12.5
 
 payloadRef
 → 可选；若存在必须指向 payloadManifest 中的条目
@@ -889,6 +1050,168 @@ strategyId 不得重复
 index 不得跳号
 index 必须与数组顺序一致
 ```
+
+同时，一个 `strategyId` 在 Registry 中只能描述一个 Wire Atomic Strategy，不得在不同场景切换 Wire Type。
+
+### 12.5 Strategy Type Parameter Contract
+
+虽然 `StrategyDescriptorV2.parameters` 在 Wire DTO 中是 JSON object，但其字段并不是开放扩展点。V2 固定以 XCodeAgent 当前 executor 的实际消费行为作为参数契约。
+
+#### 12.5.1 `ADD_FILE`
+
+必须：
+
+```text
+payloadRef != null
+payloadRef 存在于 payloadManifest
+```
+
+执行语义：
+
+```text
+目标不存在
+→ 创建
+
+目标已存在且内容 == payload
+→ retry-safe no-op
+
+目标已存在且内容 != payload
+→ ADDITION_TARGET_CONFLICT
+```
+
+`ADD_FILE` 当前不依赖 `parameters.content`，也不依赖 Service 私有 `precondition` DSL 决定上述三分支。
+
+#### 12.5.2 `TEXT_ANCHOR_INSERT`
+
+参数：
+
+```text
+anchor: 非空字符串，目标文件中必须唯一
+position: before | after，可省略，默认 before
+```
+
+插入内容必须且只能来自一个来源：
+
+```text
+parameters.content
+XOR
+payloadRef
+```
+
+两者同时存在或同时不存在均拒绝。
+
+#### 12.5.3 `ENSURE_IMPORT`
+
+参数：
+
+```text
+importStatement: 非空字符串
+```
+
+当前执行器直接消费 `importStatement`，不通过 payload 生成 import。
+
+#### 12.5.4 `ENSURE_NPM_DEPENDENCY`
+
+参数：
+
+```text
+name: 非空字符串
+version: 非空字符串
+section: dependencies | devDependencies，可省略，默认 dependencies
+```
+
+旧字段：
+
+```text
+dependency
+```
+
+不是 V2 Wire 参数，禁止继续输出。
+
+#### 12.5.5 `ENSURE_MAVEN_DEPENDENCY`
+
+参数：
+
+```text
+groupId: 非空字符串
+artifactId: 非空字符串
+version: 非空字符串
+```
+
+XCodeAgent 对相同 `groupId + artifactId` 已存在但版本不同的情况 fail-closed。
+
+#### 12.5.6 五类结构化 Strategy
+
+适用于：
+
+```text
+ENSURE_REACT_PROVIDER
+ENSURE_ROUTE
+ENSURE_MENU_ITEM
+ENSURE_SPRING_BEAN
+ENSURE_INTERCEPTOR
+```
+
+必须提供：
+
+```text
+managedMarker: 非空字符串
+astSelector: object
+```
+
+插入内容必须且只能来自：
+
+```text
+parameters.content
+XOR
+payloadRef
+```
+
+并且插入内容本身必须包含 `managedMarker`。
+
+`astSelector` 固定结构：
+
+```json
+{
+  "nodeType": "<non-empty Tree-sitter node type>",
+  "position": "before",
+  "name": "<optional non-empty AST name>"
+}
+```
+
+`position` 只允许：
+
+```text
+before
+after
+beforeEnd
+```
+
+`name` 可省略；若提供必须为非空字符串。Selector 必须在目标文件 AST 中**唯一命中一个节点**，否则 XCodeAgent fail-closed。
+
+禁止：
+
+```text
+kind: react-provider-root
+kind: route-root
+Service 私有 selector 名称
+依赖文件后缀猜 selector
+```
+
+### 12.6 Producer 端参数门禁
+
+Template Service 必须在 Package Builder 之前对 Registry 产物做 per-type 参数校验，不能依赖 XCodeAgent 执行到一半才发现参数错误。
+
+原则：
+
+```text
+Service validation
+与
+XCodeAgent executor validation
+使用同一冻结语义
+```
+
+若参数无法满足 12.5，Package 构建 fail-closed，不返回半包。
 
 ---
 
@@ -995,6 +1318,65 @@ executionMode = REAL_WORKSPACE | SANDBOX
 
 Service 只生成计划，不执行。
 
+### 14.3 RECONCILE 的 Capability Postcondition 硬约束
+
+当：
+
+```text
+mode = RECONCILE
+```
+
+除 State 不变式外，还必须满足：
+
+```text
+nextTemplateState.effective 中的每个 capabilityId
+⊆
+validationPlan 中 type=CAPABILITY_POSTCONDITION 的 capabilityId 集合
+```
+
+换言之，每个 effective Capability 至少必须存在一个：
+
+```text
+CAPABILITY_POSTCONDITION
+```
+
+且：
+
+```text
+capabilityId 必填
+checks 必须非空
+```
+
+例如：
+
+```json
+{
+  "validationId": "authorization.postcondition",
+  "index": 2,
+  "type": "CAPABILITY_POSTCONDITION",
+  "capabilityId": "authorization",
+  "workingDirectory": ".",
+  "checks": [
+    {
+      "type": "FILE_EXISTS",
+      "path": "frontend/src/pages/System/AuthorizationManagementPage.tsx"
+    }
+  ],
+  "blocking": true,
+  "timeoutSeconds": 30,
+  "executionMode": "REAL_WORKSPACE"
+}
+```
+
+因此 ValidatorRegistryV2 / Validation Compiler 必须能够为所有 effective Capability 生成对应 Postcondition；只有 `frontend-build`、`backend-test` 等构建测试项不足以构成合法 RECONCILE Package。
+
+缺失任一 effective Capability 的 Postcondition：
+
+```text
+→ Package 不满足 XCodeAgent StrategyUpdatePackageV2
+→ fail-closed
+```
+
 ---
 
 ## 15. `/v1/update` Wire Contract
@@ -1064,8 +1446,8 @@ Validate protocolVersion
 → Resolve Mode / Reconcile Reason
 → Removal Guard
 → Classify Additions
-→ Build Domain Strategies
-→ Compile Wire Strategies
+→ Resolve Wire Atomic Strategies
+→ Validate per-type Strategy parameters
 → Build ValidationPlanItemV2[]
 → Build candidate nextTemplateState
 → Calculate State Digests
@@ -1279,13 +1661,37 @@ sha256:<64 lowercase hex>
 mode = RECONCILE
 ```
 
-必须满足：
+必须同时满足：
 
 ```text
 currentStateDigest == nextStateDigest
 ```
 
-同时 `nextTemplateState` 与 current State 在语义上保持一致。
+```text
+nextTemplateState 与 current State 在语义上保持一致
+```
+
+以及：
+
+```text
+nextTemplateState.effective 中每个 capabilityId
+都至少存在一个
+validationPlan[type=CAPABILITY_POSTCONDITION, capabilityId=<same id>]
+```
+
+每个 `CAPABILITY_POSTCONDITION` 必须包含非空 `checks`。
+
+因此以下 Package 即使 digest 相等仍然非法：
+
+```text
+RECONCILE
++
+只有 NPM_BUILD / MAVEN_TEST
++
+没有某个 effective Capability 的 CAPABILITY_POSTCONDITION
+```
+
+Service 必须在输出 ZIP 前完成此不变式校验，XCodeAgent 仍会进行独立 strict validation。
 
 ---
 
@@ -1373,12 +1779,16 @@ Service Runtime DTO
 =
 Service Package Builder
 =
+Service Strategy Parameter Validator
+=
 XCodeAgent ProtocolV2 Model
 =
 XCodeAgent Package Validator
+=
+XCodeAgent Strategy Executor Semantics
 ```
 
-任何一处 schema 变化必须同步修改：
+任何一处 schema 或行为契约变化必须同步修改：
 
 ```text
 Template Service Contract Test
@@ -1403,10 +1813,14 @@ TemplateStateV2
 UpdateRequestV2
 StrategyDescriptorV2
 StrategyTypeV2
+Strategy Type Parameter Contract
+AST Selector Contract
 ValidationPlanItemV2
+RECONCILE Postcondition Contract
 PayloadDescriptorV2
 StrategyUpdatePackageV2
 State Digest Algorithm
+Cross-language Digest Golden Fixture
 ZIP Layout
 Error Codes
 ```
@@ -1452,6 +1866,7 @@ TemplateStateV2 fixture
 StrategyUpdatePackageV2 fixture
 RECONCILE fixture
 ADD_FILE payload fixture
+每种 StrategyTypeV2 的最小合法参数 fixture
 ```
 
 验收：
@@ -1459,6 +1874,47 @@ ADD_FILE payload fixture
 ```text
 JSON Schema / OpenAPI Contract Test 全绿
 XCodeAgent Pydantic strict validation 全绿
+XCodeAgent Strategy Executor fixture 全绿
+```
+
+### TS-0.4 Cross-language Digest Golden Test
+
+固定：
+
+```text
+template-state-v2-golden.json
+template-state-v2-golden.sha256
+```
+
+两端测试必须证明：
+
+```text
+Java Template Service digest
+==
+Python XCodeAgent digest
+==
+expected golden digest
+```
+
+该测试不通过时，TS-0 不得标记完成。
+
+### TS-0.5 Strategy Parameter / AST Selector Contract
+
+对 10 种 StrategyTypeV2 固定参数 fixture，并明确：
+
+```text
+ENSURE_NPM_DEPENDENCY 使用 name/version/section
+结构化 Strategy 使用 managedMarker + astSelector
+astSelector 使用 nodeType/position/name
+TEXT_ANCHOR_INSERT 与结构化 Strategy 的 content/payloadRef 必须 XOR
+```
+
+以下旧字段 fixture 必须明确拒绝：
+
+```text
+dependency
+astSelector.kind
+Service 私有高阶 renderer 参数
 ```
 
 ---
@@ -1515,10 +1971,15 @@ validators
 ```text
 StrategyRegistryV2.type
 必须直接是受支持 Wire Type
-或存在确定性的静态映射到 Wire Type
+
+一个 strategyId
+必须唯一对应一个 StrategyDescriptorV2
+
+禁止运行时 1:N Wire Strategy 拆分
+禁止保留 RENDER_EXTENSION / TRANSFORM_FILE 作为 V2 Runtime Type
 ```
 
-长期目标：直接使用 Wire Type，清除 `RENDER_EXTENSION / TRANSFORM_FILE` V2 运行时语义。
+旧 Registry 的高阶 renderer 语义只能作为一次性迁移输入。若原一个旧 Entry 实际包含多个原子动作，迁移时必须拆为多个新的稳定 `strategyId`，并回写 Capability Metadata 的显式引用。
 
 验收：
 
@@ -1531,6 +1992,8 @@ unknown strategyId
 unknown validatorId
 unknown wire strategy type
 invalid strategy parameters
+invalid astSelector
+one strategyId mapped to multiple wire actions
 unsafe path
 dependency cycle
 ```
@@ -1598,25 +2061,34 @@ RECONCILE requiring state change → reject
 
 ## TS-4：实现 Wire Strategy Compiler
 
-原“Modification Strategy Builder”拆成两层：
+V2 Compiler 固定为**机械的一对一编译器**：
 
 ```text
-Metadata / Decision
-→ Domain Strategy
-→ Wire Strategy Compiler
+Registry Wire Atomic Strategy Entry
+→ resolve target / parameters / payload
+→ validate per-type contract
+→ stable sort
+→ assign index
 → StrategyDescriptorV2
 ```
 
-### TS-4.1 禁止 Wire `TRANSFORM_FILE`
+不再允许：
 
-以下不得进入最终 Package：
+```text
+高阶 Domain Strategy
+→ 运行时猜测并拆成 N 个 Wire Strategy
+```
+
+### TS-4.1 禁止 Wire / Runtime `TRANSFORM_FILE`
+
+以下不得进入 V2 Runtime Registry 或最终 Package：
 
 ```text
 TRANSFORM_FILE
 RENDER_EXTENSION
 ```
 
-必须编译为：
+必须在 Metadata 迁移阶段显式拆为：
 
 ```text
 ADD_FILE
@@ -1630,6 +2102,8 @@ ENSURE_MENU_ITEM
 ENSURE_SPRING_BEAN
 ENSURE_INTERCEPTOR
 ```
+
+并为每个原子动作分配独立稳定 `strategyId`。
 
 ### TS-4.2 最终排序与 index
 
@@ -1650,14 +2124,33 @@ index = 0..N-1
 
 不得把 `order` 作为 Wire 字段返回。
 
-### TS-4.3 测试
+### TS-4.3 参数与 Selector 编译
+
+Wire Compiler 必须直接产出第 12.5 节规定的参数字段。
+
+至少修复旧 Registry 中：
+
+```text
+ENSURE_NPM_DEPENDENCY:
+  dependency → name
+
+structured strategy:
+  astSelector.kind → astSelector.nodeType/position/name
+```
+
+结构化 Strategy 的 selector 必须由 Metadata 明确声明，Compiler 不得根据 target 名称或扩展名生成 Service 私有 selector。
+
+### TS-4.4 测试
 
 必须证明：
 
 ```text
 Strategy 构建不需要 Workspace 文件内容
 相同 State + Config + Release → Wire Strategies 完全一致
+一个 Registry strategyId → 恰好一个 StrategyDescriptorV2
 未知 Strategy Type → fail-closed
+非法 per-type parameters → fail-closed
+astSelector.kind → reject
 strategyId 重复 → reject
 index 非连续 → reject
 ```
@@ -1697,7 +2190,7 @@ NO_OP
 
 STRATEGY
 → Registry 指定 strategyId
-→ 编译为具体 StrategyTypeV2
+→ 唯一对应一个具体 StrategyTypeV2
 ```
 
 增加：
@@ -1805,6 +2298,16 @@ validationPlan
 payloadManifest
 nextTemplateState
 diagnostics
+```
+
+Builder 在写 ZIP 前必须完成：
+
+```text
+Strategy per-type 参数校验
+Strategy index / id 校验
+Validation index / id 校验
+RECONCILE State invariant 校验
+RECONCILE effective Capability Postcondition 校验
 ```
 
 ### TS-8.1 Payload 完整性
@@ -1976,6 +2479,8 @@ Config Change
 Release Refresh via APPLY
 RECONCILE state-preserving health repair
 RECONCILE requiring State change → reject
+RECONCILE missing effective Capability CAPABILITY_POSTCONDITION → reject
+RECONCILE CAPABILITY_POSTCONDITION checks empty → reject
 Removal reject
 Addition CREATE
 Addition MAINTAIN + NO_OP
@@ -1986,20 +2491,41 @@ Addition identity changed
 Unsupported State Schema
 Unsupported protocolVersion
 Unsupported Wire Strategy Type
+one Registry strategyId → exactly one StrategyDescriptorV2
 Strategy index non-contiguous reject
 Validation index non-contiguous reject
+ENSURE_NPM_DEPENDENCY uses name/version/section
+legacy dependency parameter reject
+structured Strategy uses managedMarker + astSelector
+astSelector nodeType missing reject
+astSelector invalid position reject
+astSelector kind-only reject
+TEXT_ANCHOR_INSERT content + payloadRef both present reject
+TEXT_ANCHOR_INSERT content + payloadRef both absent reject
+structured Strategy content + payloadRef both present reject
+structured Strategy content + payloadRef both absent reject
 payloadRef missing from manifest reject
 payloadManifest missing ZIP payload reject
 payload SHA mismatch reject
 payload size mismatch reject
 nextStateDigest mismatch reject
 RECONCILE currentStateDigest != nextStateDigest reject
+Cross-language State Digest Golden Fixture mismatch reject
 Update Package build failure
 ```
 
 ### TS-13.1 架构门禁
 
 `/v1/update` Request Schema 不得出现 Workspace 内容字段。
+
+同时：
+
+```text
+StrategyRegistryV2
+WireStrategyCompiler
+```
+
+不得依赖 Workspace 文件内容决定 Strategy Type、Selector 或参数。
 
 ### TS-13.2 Cross-repo Contract Test
 
@@ -2026,6 +2552,16 @@ XCodeAgent 使用手工构造 Mock ZIP
 
 必须至少有一条测试消费**真实 Service 返回包**。
 
+### TS-13.3 Cross-language Digest Gate
+
+Cross-repo 验收前必须先执行 TS-0.4 Golden Fixture：
+
+```text
+Java digest == Python digest == expected digest
+```
+
+否则不得继续把 Package Digest / State Binding 问题归因于网络、ZIP 或 Attempt 层。
+
 ---
 
 ## TS-14：清理 Legacy 更新语义
@@ -2049,8 +2585,9 @@ legacy TemplateState mapper
 同时清理 V2 Registry 运行时中的：
 
 ```text
-RENDER_EXTENSION wire type
-TRANSFORM_FILE wire type
+RENDER_EXTENSION wire/runtime type
+TRANSFORM_FILE wire/runtime type
+Service 私有 astSelector.kind DSL
 ```
 
 Architecture Test：
@@ -2073,8 +2610,11 @@ Addition CREATE / MAINTAIN
 MAINTAIN 后具体做什么
 由 Metadata.maintainPolicy 决定
 
-具体 Wire Strategy Type
+具体 Wire Strategy Type / Parameters
 由 StrategyRegistryV2 决定
+
+一个 Registry strategyId
+只对应一个 Wire Strategy
 
 Decision Engine 不包含任何基于 Workspace 运行时猜测的分支
 ```
@@ -2086,30 +2626,32 @@ Decision Engine 不包含任何基于 Workspace 运行时猜测的分支
 本轮先完成协议收口，再进行代码重构，顺序固定如下：
 
 ```text
-P0-1  更新本文档并冻结 StrategyUpdatePackageV2
+P0-1  更新本文档并冻结 StrategyUpdatePackageV2 + per-type parameters + RECONCILE postcondition
   ↓
-P0-2  更新 Service OpenAPI / JSON Contract
+P0-2  建立 Cross-language State Digest Golden Fixture
   ↓
-P0-3  更新 StrategyRegistryV2，消除 Wire TRANSFORM_FILE / RENDER_EXTENSION
+P0-3  更新 Service OpenAPI / JSON Contract
   ↓
-P0-4  实现 WireStrategyCompiler
+P0-4  更新 StrategyRegistryV2 为 Wire Atomic Strategy，消除 Runtime TRANSFORM_FILE / RENDER_EXTENSION
   ↓
-P0-5  修改 /v1/update Request，接受 protocolVersion="2"
+P0-5  实现一对一 WireStrategyCompiler + per-type 参数门禁
   ↓
-P0-6  重写 Update Package Builder 为单 strategy-update-package.json
+P0-6  修改 /v1/update Request，接受 protocolVersion="2"
   ↓
-P0-7  补齐 State Digest / payloadManifest / index / validationPlan
+P0-7  重写 Update Package Builder 为单 strategy-update-package.json
   ↓
-P0-8  用 XCodeAgent 当前 parser 做 Cross-repo Contract Test
+P0-8  补齐 State Digest / payloadManifest / index / validationPlan / CAPABILITY_POSTCONDITION
   ↓
-P0-9  打通真实 Generate → Update → Apply → Validation → State Commit
+P0-9  用 XCodeAgent 当前 parser + executor 做 Cross-repo Contract Test
   ↓
-P1    补全 Acceptance Matrix
+P0-10 打通真实 Generate → Update → Apply → Validation → State Commit
   ↓
-P2    清理 Legacy
+P1     补全 Acceptance Matrix
+  ↓
+P2     清理 Legacy
 ```
 
-在 P0-8 之前，不以“Service 自己的 MockMvc 集成测试通过”作为 V2 双端已调通的判定标准。
+在 P0-9 之前，不以“Service 自己的 MockMvc 集成测试通过”作为 V2 双端已调通的判定标准。
 
 ---
 
@@ -2122,7 +2664,9 @@ Config + State + Release
         ↓
 Deterministic Decision
         ↓
-Deterministic Domain Strategy
+Wire Atomic Strategy Registry
+        ↓
+Per-type Contract Validation
         ↓
 WireStrategyCompiler
         ↓
