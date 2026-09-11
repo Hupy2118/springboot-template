@@ -10,59 +10,59 @@ strategies:
     targetId: frontend.capability-providers
     type: TEXT_ANCHOR_INSERT
     order: 110
-    parameters: { anchor: "// xcodeagent:capability-providers", position: before, managedMarker: login-provider, content: "/* xcodeagent:login-provider:begin */\nGlobalContextProvider,\n/* xcodeagent:login-provider:end */" }
+    parameters: { anchor: "// xcodeagent:capability-providers", position: before, managedMarker: login-provider, content: "/* xcodeagent:login-provider:begin */\nGlobalContextProvider,\n/* xcodeagent:login-provider:end */\n" }
   - { id: frontend.login.import-login-route, targetId: frontend.capability-routes, type: ENSURE_IMPORT, order: 120, parameters: { importStatement: "import LoginPage from '@/pages/Login'" } }
   - id: frontend.login.register-login-route
     targetId: frontend.capability-routes
     type: TEXT_ANCHOR_INSERT
     order: 130
-    parameters: { anchor: "// xcodeagent:capability-root-routes", position: before, managedMarker: login-route, content: "/* xcodeagent:login-route:begin */\n{ path: '/login', element: <LoginPage />, handle: { capabilityEntry: true } },\n/* xcodeagent:login-route:end */" }
+    parameters: { anchor: "// xcodeagent:capability-root-routes", position: before, managedMarker: login-route, content: "/* xcodeagent:login-route:begin */\n{ path: '/login', element: <LoginPage />, handle: { capabilityEntry: true } },\n/* xcodeagent:login-route:end */\n" }
   - { id: frontend.login.import-logout-route, targetId: frontend.capability-routes, type: ENSURE_IMPORT, order: 140, parameters: { importStatement: "import LogoutPage from '@/pages/Logout'" } }
   - id: frontend.login.register-logout-route
     targetId: frontend.capability-routes
     type: TEXT_ANCHOR_INSERT
     order: 150
-    parameters: { anchor: "// xcodeagent:capability-root-routes", position: before, managedMarker: logout-route, content: "/* xcodeagent:logout-route:begin */\n{ path: '/logout', element: <LogoutPage /> },\n/* xcodeagent:logout-route:end */" }
+    parameters: { anchor: "// xcodeagent:capability-root-routes", position: before, managedMarker: logout-route, content: "/* xcodeagent:logout-route:begin */\n{ path: '/logout', element: <LogoutPage /> },\n/* xcodeagent:logout-route:end */\n" }
   - { id: frontend.login.import-page-wrapper, targetId: frontend.capability-routes, type: ENSURE_IMPORT, order: 160, parameters: { importStatement: "import { wrapLoginRequired } from '@/components/wrapLoginRequired'" } }
   - id: frontend.login.register-page-wrapper
     targetId: frontend.capability-routes
     type: TEXT_ANCHOR_INSERT
     order: 170
-    parameters: { anchor: "// xcodeagent:capability-page-wrappers", position: before, managedMarker: login-page-wrapper, content: "/* xcodeagent:login-page-wrapper:begin */\nwrapLoginRequired,\n/* xcodeagent:login-page-wrapper:end */" }
+    parameters: { anchor: "// xcodeagent:capability-page-wrappers", position: before, managedMarker: login-page-wrapper, content: "/* xcodeagent:login-page-wrapper:begin */\nwrapLoginRequired,\n/* xcodeagent:login-page-wrapper:end */\n" }
   - id: backend.login.register-interceptor
     targetId: backend.capability-webmvc
     type: TEXT_ANCHOR_INSERT
     order: 190
-    parameters: { anchor: "// xcodeagent:capability-interceptors", position: before, managedMarker: login-interceptor, content: "/* xcodeagent:login-interceptor:begin */\nregistry.addInterceptor(applicationContext.getBean(\n        com.cmbchina.backend.auth.common.interceptor.UserWebMvcInterceptor.class))\n    .order(100)\n    .addPathPatterns(\"/**\")\n    .excludePathPatterns(\"/api/login/mock\");\n/* xcodeagent:login-interceptor:end */" }
+    parameters: { anchor: "// xcodeagent:capability-interceptors", position: before, managedMarker: login-interceptor, content: "/* xcodeagent:login-interceptor:begin */\nregistry.addInterceptor(applicationContext.getBean(\n        com.cmbchina.backend.auth.common.interceptor.UserWebMvcInterceptor.class))\n    .order(100)\n    .addPathPatterns(\"/**\")\n    .excludePathPatterns(\"/api/login/mock\");\n/* xcodeagent:login-interceptor:end */\n" }
   - { id: frontend.authorization.import-provider, targetId: frontend.capability-providers, type: ENSURE_IMPORT, order: 200, parameters: { importStatement: "import { AuthProvider } from '@/providers/AuthProvider'" } }
   - id: frontend.authorization.register-provider
     targetId: frontend.capability-providers
     type: TEXT_ANCHOR_INSERT
     order: 210
-    parameters: { anchor: "// xcodeagent:capability-providers", position: before, managedMarker: authorization-provider, content: "/* xcodeagent:authorization-provider:begin */\nAuthProvider,\n/* xcodeagent:authorization-provider:end */" }
+    parameters: { anchor: "// xcodeagent:capability-providers", position: before, managedMarker: authorization-provider, content: "/* xcodeagent:authorization-provider:begin */\nAuthProvider,\n/* xcodeagent:authorization-provider:end */\n" }
   - { id: frontend.authorization.import-page-route, targetId: frontend.capability-routes, type: ENSURE_IMPORT, order: 220, parameters: { importStatement: "import AuthorizationManagementPage from '@/pages/System/AuthorizationManagementPage'" } }
   - id: frontend.authorization.register-page-route
     targetId: frontend.capability-routes
     type: TEXT_ANCHOR_INSERT
     order: 230
-    parameters: { anchor: "// xcodeagent:capability-page-routes", position: before, managedMarker: authorization-page-route, content: "/* xcodeagent:authorization-page-route:begin */\n{ routeId: 'authorization-management-page', path: 'system/authorization', name: '权限管理', component: AuthorizationManagementPage, resourceKey: 'system_authorization_management' },\n/* xcodeagent:authorization-page-route:end */" }
+    parameters: { anchor: "// xcodeagent:capability-page-routes", position: before, managedMarker: authorization-page-route, content: "/* xcodeagent:authorization-page-route:begin */\n{ routeId: 'authorization-management-page', path: 'system/authorization', name: '权限管理', component: AuthorizationManagementPage, resourceKey: 'system_authorization_management' },\n/* xcodeagent:authorization-page-route:end */\n" }
   - { id: frontend.authorization.import-page-wrapper, targetId: frontend.capability-routes, type: ENSURE_IMPORT, order: 240, parameters: { importStatement: "import { wrapAuthorizationPage } from '@/components/authorization/wrapAuthorizationPage'" } }
   - id: frontend.authorization.register-page-wrapper
     targetId: frontend.capability-routes
     type: TEXT_ANCHOR_INSERT
     order: 250
-    parameters: { anchor: "// xcodeagent:capability-page-wrappers", position: before, managedMarker: authorization-page-wrapper, content: "/* xcodeagent:authorization-page-wrapper:begin */\nwrapAuthorizationPage,\n/* xcodeagent:authorization-page-wrapper:end */" }
+    parameters: { anchor: "// xcodeagent:capability-page-wrappers", position: before, managedMarker: authorization-page-wrapper, content: "/* xcodeagent:authorization-page-wrapper:begin */\nwrapAuthorizationPage,\n/* xcodeagent:authorization-page-wrapper:end */\n" }
   - { id: frontend.authorization.import-menu-transform, targetId: frontend.capability-menus, type: ENSURE_IMPORT, order: 260, parameters: { importStatement: "import { useAuthorizationMenuTransform } from '@/hooks/useAuthorizationMenuTransform'" } }
   - id: frontend.authorization.register-menu-transform
     targetId: frontend.capability-menus
     type: TEXT_ANCHOR_INSERT
     order: 270
-    parameters: { anchor: "// xcodeagent:capability-menu-transforms", position: before, managedMarker: authorization-menu-transform, content: "/* xcodeagent:authorization-menu-transform:begin */\ncurrent = useAuthorizationMenuTransform(current);\n/* xcodeagent:authorization-menu-transform:end */" }
+    parameters: { anchor: "// xcodeagent:capability-menu-transforms", position: before, managedMarker: authorization-menu-transform, content: "/* xcodeagent:authorization-menu-transform:begin */\ncurrent = useAuthorizationMenuTransform(current);\n/* xcodeagent:authorization-menu-transform:end */\n" }
   - id: backend.authorization.register-interceptor
     targetId: backend.capability-webmvc
     type: TEXT_ANCHOR_INSERT
     order: 290
-    parameters: { anchor: "// xcodeagent:capability-interceptors", position: before, managedMarker: authorization-interceptor, content: "/* xcodeagent:authorization-interceptor:begin */\nregistry.addInterceptor(applicationContext.getBean(\n        com.cmbchina.backend.auth.common.interceptor.ResourcePermissionInterceptor.class))\n    .order(200)\n    .addPathPatterns(\"/**\")\n    .excludePathPatterns(\"/api/login/mock\", \"/actuator/**\");\n/* xcodeagent:authorization-interceptor:end */" }
+    parameters: { anchor: "// xcodeagent:capability-interceptors", position: before, managedMarker: authorization-interceptor, content: "/* xcodeagent:authorization-interceptor:begin */\nregistry.addInterceptor(applicationContext.getBean(\n        com.cmbchina.backend.auth.common.interceptor.ResourcePermissionInterceptor.class))\n    .order(200)\n    .addPathPatterns(\"/**\")\n    .excludePathPatterns(\"/api/login/mock\", \"/actuator/**\");\n/* xcodeagent:authorization-interceptor:end */\n" }
 validators:
   - id: login.postcondition
     order: 10

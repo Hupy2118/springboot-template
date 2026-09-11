@@ -144,15 +144,16 @@ public final class V2ProjectGenerator {
         if (firstBegin >= 0 || firstEnd >= 0) {
             if (firstBegin < 0 || firstEnd < firstBegin || count(source, begin) != 1 || count(source, end) != 1)
                 throw new TemplateSourceException("MANAGED_BLOCK_INVALID: " + marker);
-            return source.substring(0, firstBegin) + content + source.substring(firstEnd + end.length());
+            String remainder = source.substring(firstEnd + end.length());
+            if (remainder.startsWith("\n")) remainder = remainder.substring(1);
+            return source.substring(0, firstBegin) + content + remainder;
         }
         int anchorIndex = source.indexOf(anchor);
         if (anchorIndex < 0 || count(source, anchor) != 1) throw new TemplateSourceException("ANCHOR_NOT_UNIQUE: " + anchor);
         String position = parameters.get("position") instanceof String ? (String) parameters.get("position") : "before";
         if (!"before".equals(position) && !"after".equals(position)) throw new TemplateSourceException("ANCHOR_POSITION_INVALID");
         int insertion = "after".equals(position) ? anchorIndex + anchor.length() : anchorIndex;
-        String separator = "after".equals(position) ? "\n" : "";
-        return source.substring(0, insertion) + separator + content + "\n" + source.substring(insertion);
+        return source.substring(0, insertion) + content + source.substring(insertion);
     }
 
     private static int count(String value, String needle) {

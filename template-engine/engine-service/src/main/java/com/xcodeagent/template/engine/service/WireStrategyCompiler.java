@@ -44,7 +44,9 @@ final class WireStrategyCompiler {
     @SuppressWarnings("unchecked") private static boolean astSelector(Object value) {
         if (!(value instanceof Map)) return false;
         Map<String, Object> selector = (Map<String, Object>) value;
-        return exact(selector, "nodeType", "position") && text(selector, "nodeType") && ("before".equals(selector.get("position")) || "after".equals(selector.get("position")));
+        return allowed(selector, "nodeType", "position", "name") && text(selector, "nodeType") && text(selector, "position")
+                && ("before".equals(selector.get("position")) || "after".equals(selector.get("position")) || "beforeEnd".equals(selector.get("position")))
+                && (!selector.containsKey("name") || text(selector, "name"));
     }
     private static boolean marker(Object value) { return value instanceof String && ((String) value).matches("[a-z0-9][a-z0-9-]*"); }
     private static boolean contentHasMarker(Object value, String marker) {

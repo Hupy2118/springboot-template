@@ -26,6 +26,23 @@ class CapabilityV2LoaderContractTest {
         assertRejected("capabilities/authorization/capability-v2.yaml", "bootstrapConsumerPath: backend/docs/auth/sql/ddl.sql", "bootstrapConsumerPath: backend/docs/auth/sql/other.sql");
     }
 
+    @Test
+    void rejectsInvalidDependencyGraphExactParametersUnsupportedGenerateTypeAndTrigger() throws Exception {
+        assertRejected("capabilities/authorization/capability-v2.yaml", "- id: login", "- id: missing-capability");
+        assertRejected("capabilities/login/capability-v2.yaml", "requires: []", "requires: [login]");
+        assertRejected("strategy-registry-v2.yaml", "parameters: { importStatement: \"import { GlobalContextProvider } from '@/providers'\" }",
+                "parameters: { importStatement: \"import { GlobalContextProvider } from '@/providers'\", unexpected: true }");
+        assertRejected("strategy-registry-v2.yaml",
+                "- { id: frontend.login.import-provider, targetId: frontend.capability-providers, type: ENSURE_IMPORT, order: 100, parameters: { importStatement: \"import { GlobalContextProvider } from '@/providers'\" } }",
+                "- { id: frontend.login.import-provider, targetId: frontend.capability-providers, type: ENSURE_NPM_DEPENDENCY, order: 100, parameters: { name: react, version: 18.0.0 } }");
+        assertRejected("capabilities/authorization/capability-v2.yaml", "executionTrigger: AUTHORIZATION_BOOTSTRAP_DDL", "executionTrigger: UNKNOWN_TRIGGER");
+    }
+
+    @Test
+    void rejectsContentChangesReusingThePublishedRevision() throws Exception {
+        assertRejected("base/README.md", "#", "# publication-gate-change\n#");
+    }
+
     private static void assertRejected(String relative, String expected, String replacement) throws Exception {
         Path copy = copySource();
         Path file = copy.resolve(relative);

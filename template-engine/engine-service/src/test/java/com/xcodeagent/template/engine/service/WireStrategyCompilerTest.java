@@ -31,6 +31,7 @@ class WireStrategyCompilerTest {
         assertThrows(ServiceException.class, () -> compiler.compile(strategy("TEXT_ANCHOR_INSERT"), 0, map("anchor", "// anchor", "position", "before", "managedMarker", "bad marker", "content", "text"), null));
         assertThrows(ServiceException.class, () -> compiler.compile(strategy("ENSURE_IMPORT"), 0, map("importStatement", "import X", "extra", true), null));
         assertThrows(ServiceException.class, () -> compiler.compile(strategy("ENSURE_REACT_PROVIDER"), 0, map("managedMarker", "marker", "astSelector", map("nodeType", "x"), "content", marked("marker")), null));
+        assertThrows(ServiceException.class, () -> compiler.compile(strategy("ENSURE_REACT_PROVIDER"), 0, map("managedMarker", "marker", "astSelector", map("nodeType", "x", "position", "beforeEnd", "name", ""), "content", marked("marker")), null));
         assertThrows(ServiceException.class, () -> compiler.compile(strategy("ADD_FILE"), 0, map(), "outside-payload.txt"));
     }
 
@@ -42,7 +43,7 @@ class WireStrategyCompilerTest {
     }
     private static ModificationStrategy strategy(String type) { return new ModificationStrategy(type, "strategy-" + type.toLowerCase(), "frontend/file.ts", 1, map()); }
     private static Map<String, Object> textParameters(String anchor, String marker) { return map("anchor", anchor, "position", "before", "managedMarker", marker, "content", marked(marker)); }
-    private static Map<String, Object> structuralParameters(String marker) { return map("managedMarker", marker, "astSelector", map("nodeType", "identifier", "position", "before"), "content", marked(marker)); }
+    private static Map<String, Object> structuralParameters(String marker) { return map("managedMarker", marker, "astSelector", map("nodeType", "identifier", "position", "beforeEnd", "name", "root"), "content", marked(marker)); }
     private static String marked(String marker) { return "/* xcodeagent:" + marker + ":begin */\ncontent\n/* xcodeagent:" + marker + ":end */"; }
     private static Map<String, Object> map(Object... values) { Map<String, Object> result = new LinkedHashMap<String, Object>(); for (int i = 0; i < values.length; i += 2) result.put((String) values[i], values[i + 1]); return result; }
 }

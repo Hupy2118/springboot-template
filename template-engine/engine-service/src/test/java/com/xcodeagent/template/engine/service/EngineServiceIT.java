@@ -171,7 +171,7 @@ class EngineServiceIT {
             String content = parameters.path("content").asText();
             int index = source.indexOf(anchor);
             if (index < 0 || index != source.lastIndexOf(anchor)) throw new AssertionError("invalid Golden anchor " + target);
-            files.put(target, source.substring(0, index) + content + "\n" + source.substring(index));
+            files.put(target, source.substring(0, index) + content + source.substring(index));
         }
     }
     private static int continuousIndexes(JsonNode strategies) {

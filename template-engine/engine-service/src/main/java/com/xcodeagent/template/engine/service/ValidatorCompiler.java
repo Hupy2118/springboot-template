@@ -69,8 +69,8 @@ final class ValidatorCompiler {
                     && "REAL_WORKSPACE".equals(parameters.get("executionMode")) && text(parameters, "path") && strings(parameters.get("containsAll")), "STRUCTURE_CHECK parameters"); return;
         }
         if ("JSON_STRUCTURE_CHECK".equals(type)) {
-            require(exact(parameters, "executionMode", "blocking", "timeoutSeconds", "workingDirectory", "path", "pointer")
-                    && "REAL_WORKSPACE".equals(parameters.get("executionMode")) && text(parameters, "path") && text(parameters, "pointer"), "JSON_STRUCTURE_CHECK parameters"); return;
+            require(exact(parameters, "executionMode", "blocking", "timeoutSeconds", "workingDirectory", "path", "pointer", "expected")
+                    && "REAL_WORKSPACE".equals(parameters.get("executionMode")) && text(parameters, "path") && text(parameters, "pointer") && text(parameters, "expected"), "JSON_STRUCTURE_CHECK parameters"); return;
         }
         if (Arrays.asList("NPM_BUILD", "NPM_TEST", "MAVEN_TEST", "MAVEN_PACKAGE").contains(type)) {
             require(exact(parameters, "executionMode", "blocking", "timeoutSeconds", "workingDirectory")
@@ -87,7 +87,7 @@ final class ValidatorCompiler {
             Object type = item.get("type");
             if ("FILE_EXISTS".equals(type) && exact(item, "type", "path") && text(item, "path")) continue;
             if ("STRUCTURE_CHECK".equals(type) && exact(item, "type", "path", "containsAll") && text(item, "path") && strings(item.get("containsAll"))) continue;
-            if ("JSON_STRUCTURE_CHECK".equals(type) && exact(item, "type", "path", "pointer") && text(item, "path") && text(item, "pointer")) continue;
+            if ("JSON_STRUCTURE_CHECK".equals(type) && exact(item, "type", "path", "pointer", "expected") && text(item, "path") && text(item, "pointer") && text(item, "expected")) continue;
             return false;
         }
         return true;

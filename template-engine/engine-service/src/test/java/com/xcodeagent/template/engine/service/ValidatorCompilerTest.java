@@ -25,7 +25,7 @@ class ValidatorCompilerTest {
         templates.add(template("post", 10, postcondition()));
         templates.add(template("file", 20, real("FILE_EXISTS", "path", "a.txt")));
         templates.add(template("structure", 30, real("STRUCTURE_CHECK", "path", "a.txt", "containsAll", Arrays.asList("x"))));
-        templates.add(template("json", 40, real("JSON_STRUCTURE_CHECK", "path", "a.json", "pointer", "/x")));
+        templates.add(template("json", 40, real("JSON_STRUCTURE_CHECK", "path", "a.json", "pointer", "/x", "expected", "value")));
         templates.add(template("npm-build", 50, common("NPM_BUILD", "SANDBOX")));
         templates.add(template("npm-test", 60, common("NPM_TEST", "SANDBOX")));
         templates.add(template("maven-test", 70, common("MAVEN_TEST", "SANDBOX")));
@@ -51,6 +51,7 @@ class ValidatorCompilerTest {
         assertEquals("a.txt", compiled.get(1).get("path"));
         assertEquals(Arrays.asList("x"), compiled.get(2).get("containsAll"));
         assertEquals("/x", compiled.get(3).get("pointer"));
+        assertEquals("value", compiled.get(3).get("expected"));
     }
 
     @Test
@@ -68,7 +69,8 @@ class ValidatorCompilerTest {
     private static int expectedWireFieldCount(String type) {
         if ("CAPABILITY_POSTCONDITION".equals(type)) return 9;
         if ("FILE_EXISTS".equals(type)) return 8;
-        if ("STRUCTURE_CHECK".equals(type) || "JSON_STRUCTURE_CHECK".equals(type)) return 9;
+        if ("STRUCTURE_CHECK".equals(type)) return 9;
+        if ("JSON_STRUCTURE_CHECK".equals(type)) return 10;
         return 7;
     }
     private static Map<String, Object> postcondition() { return real("CAPABILITY_POSTCONDITION", "capabilityId", "login", "checks", Collections.singletonList(map("type", "FILE_EXISTS", "path", "a.txt"))); }
