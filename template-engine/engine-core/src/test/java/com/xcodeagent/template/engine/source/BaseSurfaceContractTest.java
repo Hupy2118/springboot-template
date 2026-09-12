@@ -61,6 +61,28 @@ class BaseSurfaceContractTest {
     }
 
     @Test
+    void capabilityDocumentationIsGeneratedOnlyWithItsCapability() throws Exception {
+        Path root = repositoryRoot().resolve("template-source");
+        TemplateRelease release = new CapabilityV2Loader().load(root);
+        Map<String, CapabilityState> login = new LinkedHashMap<String, CapabilityState>();
+        login.put("login", new CapabilityState(true, Collections.emptyMap()));
+
+        Map<String, String> loginGenerated = new V2ProjectGenerator(root, release).generate(
+                new TemplateStateV2(release.revision(), login, login, Collections.emptyMap()));
+        assertTrue(loginGenerated.containsKey("backend/docs/capabilities/login.md"));
+        assertTrue(loginGenerated.containsKey("frontend/docs/capabilities/login.md"));
+        assertFalse(loginGenerated.containsKey("backend/docs/capabilities/authorization.md"));
+        assertFalse(loginGenerated.containsKey("frontend/docs/capabilities/authorization.md"));
+
+        Map<String, CapabilityState> both = new LinkedHashMap<String, CapabilityState>(login);
+        both.put("authorization", new CapabilityState(true, Collections.emptyMap()));
+        Map<String, String> bothGenerated = new V2ProjectGenerator(root, release).generate(
+                new TemplateStateV2(release.revision(), both, both, Collections.emptyMap()));
+        assertTrue(bothGenerated.containsKey("backend/docs/capabilities/authorization.md"));
+        assertTrue(bothGenerated.containsKey("frontend/docs/capabilities/authorization.md"));
+    }
+
+    @Test
     void atomicStrategiesKeepProviderAndInterceptorOrderOnTheFixedSurfaces() throws Exception {
         Path root = repositoryRoot().resolve("template-source");
         TemplateRelease release = new CapabilityV2Loader().load(root);

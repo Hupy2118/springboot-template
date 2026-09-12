@@ -17,6 +17,8 @@
     <properties>
         <java.version>8</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- Spring Boot 2.7.2 manages Lombok 1.18.24, which cannot run on JDK 26. -->
+        <lombok.version>1.18.44</lombok.version>
         <mapstruct.version>1.4.2.Final</mapstruct.version>
     </properties>
 

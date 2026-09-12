@@ -3,6 +3,9 @@ version: 1.0.0
 files:
   - { source: backend/.env.example, target: backend/.env.example }
   - { source: backend/.gitignore, target: backend/.gitignore }
+  - { source: backend/AGENTS.md, target: backend/AGENTS.md }
+  - { source: backend/README.md, target: backend/README.md }
+  - { source: backend/docs/project-structure.md, target: backend/docs/project-structure.md }
   - { source: backend/pom.xml, target: backend/pom.xml }
   - { source: backend/src/main/java/com/cmbchina/backend/Application.java, target: backend/src/main/java/com/cmbchina/backend/Application.java }
   - { source: backend/src/main/java/com/cmbchina/backend/common/config/CrosConfig.java, target: backend/src/main/java/com/cmbchina/backend/common/config/CrosConfig.java }

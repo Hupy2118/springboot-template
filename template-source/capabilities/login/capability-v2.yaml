@@ -69,6 +69,14 @@ additions:
     source: frontend/src/providers/index.tsx
     target: frontend/src/providers/index.tsx
     maintainPolicy: { mode: NO_OP }
+  - id: login.backend-documentation
+    source: docs/backend.md
+    target: backend/docs/capabilities/login.md
+    maintainPolicy: { mode: NO_OP }
+  - id: login.frontend-documentation
+    source: docs/frontend.md
+    target: frontend/docs/capabilities/login.md
+    maintainPolicy: { mode: NO_OP }
 validators:
   - { validatorId: login.postcondition }
   - { validatorId: frontend.build }

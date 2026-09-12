@@ -290,6 +290,14 @@ additions:
     source: frontend/src/typings/generated/authorizationApiTypes.ts
     target: frontend/src/typings/generated/authorizationApiTypes.ts
     maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-documentation
+    source: docs/backend.md
+    target: backend/docs/capabilities/authorization.md
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.frontend-documentation
+    source: docs/frontend.md
+    target: frontend/docs/capabilities/authorization.md
+    maintainPolicy: { mode: NO_OP }
 validators:
   - { validatorId: authorization.postcondition }
   - { validatorId: frontend.build }

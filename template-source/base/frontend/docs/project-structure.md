@@ -35,6 +35,10 @@ src/
 - 基础业务页面由既有页面发现机制自动懒加载；能力页面由引擎生成的 `src/generated/capabilityRoutes.tsx` 以显式组件引用接入。不得绕开该生成入口手写第二份能力路由或菜单配置。
 - 菜单始终先由 `createLayoutMenus` 从基础路由与 `capabilityPageRoutes` 汇总，再交给引擎生成的 `useCapabilityMenus` 变换链；页面守卫同样只通过 `capabilityRoutes.tsx` 的生成包装链接入。
 
+## 动态 Capability 文档
+
+每个启用的 Capability 会与其代码一同生成 `docs/capabilities/<capability>.md`。该文档说明该能力实际加入的页面、路由、Provider、接口模块和维护边界。Capability 被禁用时，对应文档不会存在；不要手工维护一份脱离当前 Capability State 的功能清单。
+
 ## 依赖方向
 
 ```text

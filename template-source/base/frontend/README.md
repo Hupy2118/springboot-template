@@ -12,3 +12,5 @@ pnpm test
 ```
 
 新增业务页面和代码放置约定见 [项目结构文档](docs/project-structure.md)。
+
+启用的 Capability 会同时生成其前端说明至 `docs/capabilities/`；该目录只反映当前实际启用的能力。
