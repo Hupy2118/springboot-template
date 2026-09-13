@@ -43,7 +43,7 @@ public final class CapabilityV2Loader {
 
     private TemplateRelease load(Path root, String revision) {
         String releaseDigest = releaseDigest(root);
-        Registry registry = registry(root);
+        StrategyRegistry registry = new StrategyRegistryLoader().load(root);
         Map<String, CapabilityDefinitionV2> capabilities = new LinkedHashMap<String, CapabilityDefinitionV2>();
         Set<String> additionIds = new HashSet<String>();
         Set<String> targets = new HashSet<String>();
@@ -70,11 +70,11 @@ public final class CapabilityV2Loader {
         }
         validateDependencyGraph(capabilities);
         require(releaseDigest.equals(publishedDigest(root, revision)), "TEMPLATE_REVISION_REUSED: " + revision);
-        return new TemplateRelease(revision, capabilities, registry.strategies, registry.validators);
+        return new TemplateRelease(revision, capabilities, registry.strategies(), registry.validators());
     }
 
     @SuppressWarnings("unchecked")
-    private CapabilityDefinitionV2 definition(Path root, Path manifest, Registry registry) {
+    private CapabilityDefinitionV2 definition(Path root, Path manifest, StrategyRegistry registry) {
         Map<String, Object> map;
         try { map = yaml.readValue(manifest.toFile(), Map.class); }
         catch (IOException e) { throw invalid("cannot parse " + manifest, e); }
@@ -93,7 +93,7 @@ public final class CapabilityV2Loader {
         for (Object value : list(map.get("existingTargets"), "existingTargets")) {
             Map<String, Object> item = object(value, "existingTargets entry");
             require(item.size() == 1, "CAPABILITY_V2_INVALID: existingTargets entry");
-            StrategyDefinition strategy = registry.strategies.get(text(item.get("strategyId"), "strategyId"));
+            StrategyDefinition strategy = registry.strategies().get(text(item.get("strategyId"), "strategyId"));
             require(strategy != null, "CAPABILITY_V2_INVALID: unknown strategyId");
             String target = strategy.target();
             existing.add(new ExistingTargetDefinition(target, strategy.id(), strategy.order()));
@@ -117,7 +117,7 @@ public final class CapabilityV2Loader {
                 maintain = new MaintainPolicy(MaintainPolicy.Mode.NO_OP, null, 0);
             } else if ("STRATEGY".equals(mode)) {
                 String strategyId = text(policy.get("strategyId"), "maintainPolicy.strategyId");
-                StrategyDefinition strategy = registry.strategies.get(strategyId);
+                StrategyDefinition strategy = registry.strategies().get(strategyId);
                 require(strategy != null && !"ADD_FILE".equals(strategy.type()) && target.equals(strategy.target()), "CAPABILITY_V2_INVALID: unknown or mismatched strategyId");
                 maintain = new MaintainPolicy(MaintainPolicy.Mode.STRATEGY, strategyId, strategy.order());
             } else throw new TemplateSourceException("CAPABILITY_V2_INVALID: maintainPolicy.mode");
@@ -126,7 +126,7 @@ public final class CapabilityV2Loader {
         List<Map<String, Object>> validators = new ArrayList<Map<String, Object>>();
         for (Object value : list(map.get("validators"), "validators")) {
             Map<String, Object> item = object(value, "validators entry"); require(item.size() == 1, "CAPABILITY_V2_INVALID: validators entry");
-            ValidatorDefinition validator = registry.validators.get(text(item.get("validatorId"), "validatorId"));
+            ValidatorDefinition validator = registry.validators().get(text(item.get("validatorId"), "validatorId"));
             require(validator != null, "CAPABILITY_V2_INVALID: unknown validatorId");
             Map<String, Object> resolved = new LinkedHashMap<String, Object>(); resolved.put("validatorId", validator.id()); resolved.put("order", validator.order()); resolved.put("parameters", validator.parameters()); validators.add(resolved);
         }
@@ -143,27 +143,6 @@ public final class CapabilityV2Loader {
         }
         return new CapabilityDefinitionV2(id, requires, config, existing, additions, migrations, validators);
     }
-
-    private Registry registry(Path root) {
-        Map<String, Object> raw;
-        try { raw = yaml.readValue(root.resolve("strategy-registry-v2.yaml").toFile(), Map.class); }
-        catch (IOException e) { throw invalid("cannot parse strategy registry", e); }
-        require(raw != null && Integer.valueOf(2).equals(number(raw.get("schemaVersion"))), "CAPABILITY_V2_INVALID: strategy registry schemaVersion");
-        Map<String, String> targets = new LinkedHashMap<String, String>();
-        for (Object value : list(raw.get("targets"), "targets")) {
-            Map<String, Object> target = object(value, "target"); String id = text(target.get("id"), "target.id"); String targetPath = path(target.get("path"));
-            Path baseTarget = root.resolve("base").resolve(targetPath).normalize();
-            require(baseTarget.startsWith(root.resolve("base")) && Files.isRegularFile(baseTarget), "BASE_SURFACE_TARGET_MISSING: " + targetPath);
-            require(targets.put(id, targetPath) == null, "CAPABILITY_V2_INVALID: duplicate target");
-        }
-        Map<String, StrategyDefinition> strategies = new LinkedHashMap<String, StrategyDefinition>();
-        for (Object value : list(raw.get("strategies"), "strategies")) { Map<String, Object> item = object(value, "strategy"); String id = text(item.get("id"), "strategy.id"); String target = targets.get(text(item.get("targetId"), "strategy.targetId")); require(target != null, "CAPABILITY_V2_INVALID: unknown strategy target"); String type = text(item.get("type"), "strategy.type"); require(isWireStrategyType(type), "CAPABILITY_V2_INVALID: strategy.type"); Map<String, Object> parameters = object(item.get("parameters"), "strategy.parameters"); validateStrategyParameters(type, parameters); validateSurface(root, target, type, parameters); require(isGenerateSupported(type), "GENERATE_STRATEGY_UNSUPPORTED: " + type); require(strategies.put(id, new StrategyDefinition(id, target, type, integer(item.get("order"), "strategy.order"), parameters)) == null, "CAPABILITY_V2_INVALID: duplicate strategyId"); }
-        Map<String, ValidatorDefinition> validators = new LinkedHashMap<String, ValidatorDefinition>();
-        for (Object value : list(raw.get("validators"), "validators")) { Map<String, Object> item = object(value, "validator"); String id = text(item.get("id"), "validator.id"); Map<String, Object> parameters = object(item.get("parameters"), "validator.parameters"); validateValidatorParameters(parameters); require(validators.put(id, new ValidatorDefinition(id, integer(item.get("order"), "validator.order"), parameters)) == null, "CAPABILITY_V2_INVALID: duplicate validatorId"); }
-        return new Registry(strategies, validators);
-    }
-
-    private static final class Registry { final Map<String, StrategyDefinition> strategies; final Map<String, ValidatorDefinition> validators; Registry(Map<String, StrategyDefinition> strategies, Map<String, ValidatorDefinition> validators) { this.strategies = strategies; this.validators = validators; } }
 
     private static void validateStrategyParameters(String type, Map<String, Object> parameters) {
         if ("ADD_FILE".equals(type)) { require(exactKeys(parameters), "CAPABILITY_V2_INVALID: ADD_FILE parameters"); return; }

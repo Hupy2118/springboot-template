@@ -1,0 +1,50 @@
+package com.xcodeagent.template.authoring;
+
+import com.xcodeagent.template.engine.source.TemplateSourceException;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/** Command-line entry point for offline Capability authoring. */
+public final class CapabilityCli {
+    private CapabilityCli() { }
+
+    public static void main(String[] arguments) {
+        Path repository = repositoryRoot(Paths.get("").toAbsolutePath());
+        Path workbench = run(repository.resolve("template-source"), repository.resolve(".workbench"), arguments);
+        System.out.println(workbench);
+    }
+
+    static Path run(Path sourceRoot, Path workbenchesRoot, String[] arguments) {
+        if (arguments == null || arguments.length < 2) throw new TemplateSourceException("CAPABILITY_COMMAND_INVALID");
+        if ("capture".equals(arguments[0]) && arguments.length == 2) { new AuthoringWorkflow(sourceRoot, workbenchesRoot).capture(arguments[1]); return workbenchesRoot.resolve(arguments[1]); }
+        if ("compile".equals(arguments[0]) && arguments.length == 2) { new AuthoringWorkflow(sourceRoot, workbenchesRoot).compile(arguments[1]); return workbenchesRoot.resolve(arguments[1]); }
+        if ("verify".equals(arguments[0]) && arguments.length == 2) { new AuthoringWorkflow(sourceRoot, workbenchesRoot).verify(arguments[1]); return workbenchesRoot.resolve(arguments[1]); }
+        if (!"init".equals(arguments[0])) throw new TemplateSourceException("CAPABILITY_COMMAND_INVALID");
+        String capabilityId = arguments[1];
+        List<String> requires = requires(arguments);
+        return new WorkbenchInitializer(sourceRoot, workbenchesRoot).initialize(capabilityId, requires);
+    }
+
+    private static List<String> requires(String[] arguments) {
+        if (arguments.length == 2) return Collections.emptyList();
+        if (arguments.length != 4 || !"--requires".equals(arguments[2]))
+            throw new TemplateSourceException("CAPABILITY_COMMAND_INVALID");
+        String raw = arguments[3];
+        if (raw == null || raw.trim().isEmpty()) throw new TemplateSourceException("CAPABILITY_REQUIRE_INVALID");
+        List<String> result = new ArrayList<String>();
+        for (String value : raw.split(",")) result.add(value.trim());
+        return result;
+    }
+
+    private static Path repositoryRoot(Path current) {
+        Path candidate = current;
+        while (candidate != null && !Files.isDirectory(candidate.resolve("template-source"))) candidate = candidate.getParent();
+        if (candidate == null) throw new TemplateSourceException("TEMPLATE_SOURCE_ROOT_NOT_FOUND");
+        return candidate;
+    }
+}

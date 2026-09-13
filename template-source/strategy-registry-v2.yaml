@@ -4,6 +4,13 @@ targets:
   - { id: frontend.capability-routes, path: frontend/src/generated/capabilityRoutes.tsx }
   - { id: frontend.capability-menus, path: frontend/src/generated/capabilityMenus.ts }
   - { id: backend.capability-webmvc, path: backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java }
+anchors:
+  - { targetId: frontend.capability-providers, anchorKey: capability-providers, anchor: "// xcodeagent:capability-providers", position: before }
+  - { targetId: frontend.capability-routes, anchorKey: capability-root-routes, anchor: "// xcodeagent:capability-root-routes", position: before }
+  - { targetId: frontend.capability-routes, anchorKey: capability-page-routes, anchor: "// xcodeagent:capability-page-routes", position: before }
+  - { targetId: frontend.capability-routes, anchorKey: capability-page-wrappers, anchor: "// xcodeagent:capability-page-wrappers", position: before }
+  - { targetId: frontend.capability-menus, anchorKey: capability-menu-transforms, anchor: "// xcodeagent:capability-menu-transforms", position: before }
+  - { targetId: backend.capability-webmvc, anchorKey: capability-interceptors, anchor: "// xcodeagent:capability-interceptors", position: before }
 strategies:
   - { id: frontend.login.import-provider, targetId: frontend.capability-providers, type: ENSURE_IMPORT, order: 100, parameters: { importStatement: "import { GlobalContextProvider } from '@/providers'" } }
   - id: frontend.login.register-provider
