@@ -37,9 +37,9 @@ files:
   - { source: frontend/scripts/sourcePathPlugin.mjs, target: frontend/scripts/sourcePathPlugin.mjs }
   - { source: frontend/scripts/test-source-path-plugin.mjs, target: frontend/scripts/test-source-path-plugin.mjs }
   - { source: frontend/src/App.tsx, target: frontend/src/App.tsx }
-  - { source: frontend/src/generated/capabilityMenus.ts, target: frontend/src/generated/capabilityMenus.ts }
-  - { source: frontend/src/generated/capabilityProviders.tsx, target: frontend/src/generated/capabilityProviders.tsx }
-  - { source: frontend/src/generated/capabilityRoutes.tsx, target: frontend/src/generated/capabilityRoutes.tsx }
+  - { source: frontend/src/capability-extensions/menus.ts, target: frontend/src/capability-extensions/menus.ts }
+  - { source: frontend/src/capability-extensions/providers.tsx, target: frontend/src/capability-extensions/providers.tsx }
+  - { source: frontend/src/capability-extensions/routes.tsx, target: frontend/src/capability-extensions/routes.tsx }
   - { source: frontend/src/apis/auth.ts, target: frontend/src/apis/auth.ts }
   - { source: frontend/src/apis/service.ts, target: frontend/src/apis/service.ts }
   - { source: frontend/src/apis/welcome.ts, target: frontend/src/apis/welcome.ts }
@@ -76,6 +76,7 @@ files:
   - { source: frontend/src/pages/Welcome/index.tsx, target: frontend/src/pages/Welcome/index.tsx }
   - { source: frontend/src/react-app-env.d.ts, target: frontend/src/react-app-env.d.ts }
   - { source: frontend/src/routes/index.tsx, target: frontend/src/routes/index.tsx }
+  - { source: frontend/src/routes/capabilityRuntime.tsx, target: frontend/src/routes/capabilityRuntime.tsx }
   - { source: frontend/src/styles/index.less, target: frontend/src/styles/index.less }
   - { source: frontend/src/styles/theme.less, target: frontend/src/styles/theme.less }
   - { source: frontend/src/styles/variable.less, target: frontend/src/styles/variable.less }

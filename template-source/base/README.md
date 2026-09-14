@@ -8,13 +8,13 @@ Base 不拥有登录、认证、授权、角色、成员、资源表、权限 AP
 
 ## 前端受管组合入口
 
-Base 的 `App`、主路由和布局只导入下列受管文件：
+Base 的 `App`、主路由和布局只导入下列 Capability Extension Surface：
 
-- `frontend/src/generated/capabilityProviders.tsx`：按稳定顺序包装 Provider；空集为恒等包装。
-- `frontend/src/generated/capabilityRoutes.tsx`：提供根路由、页面路由与页面包装器；空集为空贡献。
-- `frontend/src/generated/capabilityMenus.ts`：提供菜单后处理；空集原样返回 Base 菜单。
+- `frontend/src/capability-extensions/providers.tsx`：声明 Provider 注册列表。
+- `frontend/src/capability-extensions/routes.tsx`：声明根路由、页面路由与页面包装器。
+- `frontend/src/capability-extensions/menus.ts`：提供菜单后处理。
 
-这些文件由 Core 完整生成，不能由 Capability、应用开发者或人工直接修改。Base 的其他共享文件也不得被 Capability 覆盖。
+这些文件是 Authoring 的唯一前端修改入口：只允许新增 import，以及在已登记 Anchor 前新增内容。Provider Tree、路由入口计算和页面包装执行位于 Base 内部文件，不能由 Capability 修改。Base 的其他共享文件也不得被 Capability 覆盖。
 
 ## 扩展点与迁移
 

@@ -11,6 +11,7 @@ import java.nio.file.Paths;
 import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -82,6 +83,31 @@ class WorkbenchInitializerTest {
         CapabilityCli.run(source, workbenches, new String[] { "verify", "workflow-test" });
 
         assertTrue(Files.isRegularFile(source.resolve("capabilities/workflow-test/capability-v2.yaml")));
+    }
+
+    @Test
+    void statusRecognizesAnExtensionSurfaceInsertAndRejectsRuntimeEdits() throws Exception {
+        Path source = copyTemplateSource(); Path workbenches = temporaryDirectory.resolve(".workbench");
+        CapabilityCli.run(source, workbenches, new String[] { "init", "surface-test" });
+        Path project = workbenches.resolve("surface-test/project");
+        Path routes = project.resolve("frontend/src/capability-extensions/routes.tsx");
+        String routeSource = new String(Files.readAllBytes(routes), StandardCharsets.UTF_8)
+                .replace("import type { RouteObject } from 'react-router-dom';\n", "import type { RouteObject } from 'react-router-dom';\nimport Page from '@/pages/Page';\n")
+                .replace("  // xcodeagent:capability-page-routes", "  { pageId: 'page', modulePath: 'page', component: Page },\n\n  // xcodeagent:capability-page-routes");
+        Files.write(routes, routeSource.getBytes(StandardCharsets.UTF_8));
+
+        CapabilityStatusReport ready = new AuthoringWorkflow(source, workbenches).status("surface-test");
+
+        assertEquals(CapabilityStatusReport.Status.READY, ready.status());
+        assertEquals(1, ready.importCount());
+        assertEquals(1, ready.anchorInsertCount());
+
+        Path runtime = project.resolve("frontend/src/routes/capabilityRuntime.tsx");
+        Files.write(runtime, "changed\n".getBytes(StandardCharsets.UTF_8));
+        CapabilityStatusReport blocked = new AuthoringWorkflow(source, workbenches).status("surface-test");
+
+        assertEquals(CapabilityStatusReport.Status.BLOCKED, blocked.status());
+        assertEquals("MODIFY_NON_SURFACE", blocked.unsupportedChanges().get(0).reason());
     }
 
     private Path copyTemplateSource() throws Exception {

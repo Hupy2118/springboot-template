@@ -5,7 +5,7 @@
 ## 注入内容
 
 - `src/apis/login.ts` 调用模拟登录接口。
-- `src/providers/index.tsx` 提供全局登录上下文；引擎将它接入受管 `capabilityProviders.tsx`。
+- `src/providers/index.tsx` 提供全局登录上下文；引擎将它接入 `src/capability-extensions/providers.tsx` 的受管注册列表。
 - `src/pages/Login/` 与 `src/pages/Logout/` 分别由引擎注册到 `/login` 和 `/logout` 根路由。
 - `wrapLoginRequired` 由受管页面包装链使用，为需要登录的能力页面提供守卫。
 

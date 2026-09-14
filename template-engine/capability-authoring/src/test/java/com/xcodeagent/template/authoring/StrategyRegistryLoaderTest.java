@@ -16,7 +16,7 @@ class StrategyRegistryLoaderTest {
     void exposesThePublishedRegistryAsReadOnlyAuthoringMetadata() {
         StrategyRegistry registry = new StrategyRegistryLoader().load(templateSource());
 
-        assertEquals("frontend/src/generated/capabilityProviders.tsx",
+        assertEquals("frontend/src/capability-extensions/providers.tsx",
                 registry.targets().get("frontend.capability-providers").path());
         assertEquals("ENSURE_IMPORT", registry.strategies().get("frontend.login.import-provider").type());
         assertEquals(10, registry.validators().get("login.postcondition").order());

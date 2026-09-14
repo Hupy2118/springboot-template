@@ -23,11 +23,11 @@ class BaseSurfaceContractTest {
     @Test
     void pristineBaseExposesExactlyOneStableAnchorPerExtensionSurface() throws Exception {
         Path base = repositoryRoot().resolve("template-source/base");
-        assertAnchor(base, "frontend/src/generated/capabilityProviders.tsx", "// xcodeagent:capability-providers");
-        assertAnchor(base, "frontend/src/generated/capabilityRoutes.tsx", "// xcodeagent:capability-root-routes");
-        assertAnchor(base, "frontend/src/generated/capabilityRoutes.tsx", "// xcodeagent:capability-page-routes");
-        assertAnchor(base, "frontend/src/generated/capabilityRoutes.tsx", "// xcodeagent:capability-page-wrappers");
-        assertAnchor(base, "frontend/src/generated/capabilityMenus.ts", "// xcodeagent:capability-menu-transforms");
+        assertAnchor(base, "frontend/src/capability-extensions/providers.tsx", "// xcodeagent:capability-providers");
+        assertAnchor(base, "frontend/src/capability-extensions/routes.tsx", "// xcodeagent:capability-root-routes");
+        assertAnchor(base, "frontend/src/capability-extensions/routes.tsx", "// xcodeagent:capability-page-routes");
+        assertAnchor(base, "frontend/src/capability-extensions/routes.tsx", "// xcodeagent:capability-page-wrappers");
+        assertAnchor(base, "frontend/src/capability-extensions/menus.ts", "// xcodeagent:capability-menu-transforms");
         assertAnchor(base, "backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java",
                 "// xcodeagent:capability-interceptors");
     }
@@ -35,12 +35,14 @@ class BaseSurfaceContractTest {
     @Test
     void baseKeepsTheRequiredStaticAndDeterministicSurfaceStructure() throws Exception {
         Path base = repositoryRoot().resolve("template-source/base");
-        String routes = read(base, "frontend/src/generated/capabilityRoutes.tsx");
-        String menus = read(base, "frontend/src/generated/capabilityMenus.ts");
+        String routes = read(base, "frontend/src/capability-extensions/routes.tsx");
+        String menus = read(base, "frontend/src/capability-extensions/menus.ts");
+        String runtime = read(base, "frontend/src/routes/capabilityRuntime.tsx");
         String webMvc = read(base, "backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java");
         assertTrue(routes.indexOf("capability-root-routes") < routes.indexOf("capability-page-routes"));
         assertTrue(routes.indexOf("capability-page-routes") < routes.indexOf("capability-page-wrappers"));
-        assertTrue(routes.contains("route.handle?.capabilityEntry"));
+        assertFalse(routes.contains("route.handle?.capabilityEntry"));
+        assertTrue(runtime.contains("route.handle?.capabilityEntry"));
         assertFalse(menus.contains(".reduce("));
         assertFalse(menus.contains(".map("));
         assertTrue(menus.contains("let current = menus;"));
@@ -54,9 +56,12 @@ class BaseSurfaceContractTest {
         TemplateRelease release = new CapabilityV2Loader().load(root);
         TemplateStateV2 empty = new TemplateStateV2(release.revision(), Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
         Map<String, String> generated = new V2ProjectGenerator(root, release).generate(empty);
-        assertEquals(read(root.resolve("base"), "frontend/src/generated/capabilityProviders.tsx"), generated.get("frontend/src/generated/capabilityProviders.tsx"));
-        assertEquals(read(root.resolve("base"), "frontend/src/generated/capabilityRoutes.tsx"), generated.get("frontend/src/generated/capabilityRoutes.tsx"));
-        assertEquals(read(root.resolve("base"), "frontend/src/generated/capabilityMenus.ts"), generated.get("frontend/src/generated/capabilityMenus.ts"));
+        assertEquals(read(root.resolve("base"), "frontend/src/capability-extensions/providers.tsx"), generated.get("frontend/src/capability-extensions/providers.tsx"));
+        assertEquals(read(root.resolve("base"), "frontend/src/capability-extensions/routes.tsx"), generated.get("frontend/src/capability-extensions/routes.tsx"));
+        assertEquals(read(root.resolve("base"), "frontend/src/capability-extensions/menus.ts"), generated.get("frontend/src/capability-extensions/menus.ts"));
+        assertFalse(generated.containsKey("frontend/src/generated/capabilityProviders.tsx"));
+        assertFalse(generated.containsKey("frontend/src/generated/capabilityRoutes.tsx"));
+        assertFalse(generated.containsKey("frontend/src/generated/capabilityMenus.ts"));
         assertEquals(read(root.resolve("base"), "backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java"), generated.get("backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java"));
     }
 
@@ -91,7 +96,7 @@ class BaseSurfaceContractTest {
         effective.put("authorization", new CapabilityState(true, Collections.emptyMap()));
         Map<String, String> generated = new V2ProjectGenerator(root, release).generate(
                 new TemplateStateV2(release.revision(), effective, effective, Collections.emptyMap()));
-        String providers = generated.get("frontend/src/generated/capabilityProviders.tsx");
+        String providers = generated.get("frontend/src/capability-extensions/providers.tsx");
         String webMvc = generated.get("backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java");
         assertTrue(providers.indexOf("xcodeagent:login-provider:begin") < providers.indexOf("xcodeagent:authorization-provider:begin"));
         assertTrue(webMvc.indexOf("xcodeagent:login-interceptor:begin") < webMvc.indexOf("xcodeagent:authorization-interceptor:begin"));

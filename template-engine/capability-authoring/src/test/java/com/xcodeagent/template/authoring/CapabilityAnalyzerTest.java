@@ -52,6 +52,38 @@ class CapabilityAnalyzerTest {
     }
 
     @Test
+    void acceptsIndentedInsertionWithBlankLinesAroundTheAnchor() throws Exception {
+        Path baseline = temporaryDirectory.resolve("baseline"); Path project = temporaryDirectory.resolve("project");
+        write(baseline, "surface.ts", "const base = true;\n\n// xcodeagent:slot\n");
+        write(project, "surface.ts", "const base = true;\n\n\n    registerFeature();\n\t\n// xcodeagent:slot\n");
+
+        CapabilityDraft draft = new CapabilityAnalyzer().analyze("feature", baseline, project, registry());
+
+        assertTrue(draft.compilable());
+        StrategyDraft anchor = draft.strategies().get(0);
+        assertEquals("TEXT_ANCHOR_INSERT", anchor.type());
+        assertEquals("/* xcodeagent:feature-frontend-surface-slot:begin */\n    registerFeature();\n/* xcodeagent:feature-frontend-surface-slot:end */\n", anchor.parameters().get("content"));
+    }
+
+    @Test
+    void rejectsChangedAnchorOrBaseContent() throws Exception {
+        Path baseline = temporaryDirectory.resolve("baseline"); Path project = temporaryDirectory.resolve("project");
+        write(baseline, "surface.ts", "const base = true;\n// xcodeagent:slot\n");
+        write(project, "surface.ts", "const changed = true;\nfeature();\n// xcodeagent:slot\n");
+
+        CapabilityDraft baseChanged = new CapabilityAnalyzer().analyze("feature", baseline, project, registry());
+
+        assertFalse(baseChanged.compilable());
+        assertEquals("UNEXPLAINED_SURFACE_MODIFICATION", baseChanged.unsupported().get(0).reason());
+
+        write(project, "surface.ts", "const base = true;\nfeature();\n// xcodeagent:renamed-slot\n");
+        CapabilityDraft anchorChanged = new CapabilityAnalyzer().analyze("feature", baseline, project, registry());
+
+        assertFalse(anchorChanged.compilable());
+        assertEquals("UNEXPLAINED_SURFACE_MODIFICATION", anchorChanged.unsupported().get(0).reason());
+    }
+
+    @Test
     void rejectsDistinctIdentitiesThatNormalizeToTheSameManagedMarker() throws Exception {
         Path baseline = temporaryDirectory.resolve("baseline"); Path project = temporaryDirectory.resolve("project");
         write(baseline, "one.ts", "// xcodeagent:slot\n"); write(baseline, "two.ts", "// xcodeagent:slot\n");

@@ -3,7 +3,8 @@ import Layout from '@/layout';
 import { PAGE_ROUTE, PAGE_ROUTES } from '@/constants/routes';
 import { createPageRoutes } from '@/utils/pageRoutes';
 import { findFirstPagePath } from '@/utils/route';
-import { capabilityEntryPath, capabilityPageRoutes, capabilityRootRoutes, wrapCapabilityPage } from '@/generated/capabilityRoutes';
+import { capabilityPageRoutes, capabilityRootRoutes } from '@/capability-extensions/routes';
+import { capabilityEntryPath, wrapCapabilityPage } from '@/routes/capabilityRuntime';
 
 const pages = [...PAGE_ROUTES, ...capabilityPageRoutes];
 const first = findFirstPagePath(pages, PAGE_ROUTE);

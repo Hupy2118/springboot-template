@@ -20,7 +20,7 @@ class CapabilityV2LoaderContractTest {
 
     @Test
     void rejectsMissingTargetAnchorMarkerAndMigrationConsumerMismatch() throws Exception {
-        assertRejected("strategy-registry-v2.yaml", "frontend/src/generated/capabilityProviders.tsx", "frontend/src/generated/missing.ts");
+        assertRejected("strategy-registry-v2.yaml", "frontend/src/capability-extensions/providers.tsx", "frontend/src/capability-extensions/missing.ts");
         assertRejected("strategy-registry-v2.yaml", "// xcodeagent:capability-providers", "// missing-anchor");
         assertRejected("strategy-registry-v2.yaml", "xcodeagent:login-provider:begin", "xcodeagent:other-provider:begin");
         assertRejected("capabilities/authorization/capability-v2.yaml", "bootstrapConsumerPath: backend/docs/auth/sql/ddl.sql", "bootstrapConsumerPath: backend/docs/auth/sql/other.sql");

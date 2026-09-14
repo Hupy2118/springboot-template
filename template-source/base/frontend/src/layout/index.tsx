@@ -2,8 +2,8 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { ProConfigProvider, ProLayout } from '@ant-design/pro-components';
 import { PAGE_ROUTE, PAGE_ROUTES } from '@/constants/routes';
 import { createLayoutMenus } from '@/utils/route';
-import { capabilityPageRoutes } from '@/generated/capabilityRoutes';
-import { useCapabilityMenus } from '@/generated/capabilityMenus';
+import { capabilityPageRoutes } from '@/capability-extensions/routes';
+import { useCapabilityMenus } from '@/capability-extensions/menus';
 
 export default function Layout() {
   const navigate = useNavigate();

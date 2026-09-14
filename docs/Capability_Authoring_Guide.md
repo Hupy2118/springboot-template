@@ -85,6 +85,8 @@ V1 只允许三类差异：
 | 在注册 Surface 新增 import | `ENSURE_IMPORT` | 引入页面、Provider、Bean |
 | 在注册 Anchor 前插入连续代码块 | `TEXT_ANCHOR_INSERT` | 路由、菜单、Provider、拦截器注册 |
 
+Anchor 行是不可变的稳定边界。Compiler 会忽略新增块紧邻 Anchor 的空行和空白格式差异，并保留新增代码块自身的格式；Anchor 本身、其后的 Base 内容，以及 Anchor 前既有的非空白 Base 内容仍必须保持不变。
+
 ### 新增文件
 
 直接在 `project/` 下新增，例如：

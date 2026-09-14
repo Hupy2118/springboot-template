@@ -1,8 +1,8 @@
 schemaVersion: 2
 targets:
-  - { id: frontend.capability-providers, path: frontend/src/generated/capabilityProviders.tsx }
-  - { id: frontend.capability-routes, path: frontend/src/generated/capabilityRoutes.tsx }
-  - { id: frontend.capability-menus, path: frontend/src/generated/capabilityMenus.ts }
+  - { id: frontend.capability-providers, path: frontend/src/capability-extensions/providers.tsx }
+  - { id: frontend.capability-routes, path: frontend/src/capability-extensions/routes.tsx }
+  - { id: frontend.capability-menus, path: frontend/src/capability-extensions/menus.ts }
   - { id: backend.capability-webmvc, path: backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java }
 anchors:
   - { targetId: frontend.capability-providers, anchorKey: capability-providers, anchor: "// xcodeagent:capability-providers", position: before }
@@ -82,7 +82,7 @@ validators:
       capabilityId: login
       checks:
         - { type: FILE_EXISTS, path: frontend/src/pages/Login/index.tsx }
-        - { type: STRUCTURE_CHECK, path: frontend/src/generated/capabilityProviders.tsx, containsAll: ["xcodeagent:login-provider:begin"] }
+        - { type: STRUCTURE_CHECK, path: frontend/src/capability-extensions/providers.tsx, containsAll: ["xcodeagent:login-provider:begin"] }
         - { type: STRUCTURE_CHECK, path: backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java, containsAll: ["xcodeagent:login-interceptor:begin"] }
   - id: authorization.postcondition
     order: 20
@@ -95,7 +95,7 @@ validators:
       capabilityId: authorization
       checks:
         - { type: FILE_EXISTS, path: frontend/src/pages/System/AuthorizationManagementPage/index.tsx }
-        - { type: STRUCTURE_CHECK, path: frontend/src/generated/capabilityProviders.tsx, containsAll: ["xcodeagent:authorization-provider:begin"] }
+        - { type: STRUCTURE_CHECK, path: frontend/src/capability-extensions/providers.tsx, containsAll: ["xcodeagent:authorization-provider:begin"] }
         - { type: STRUCTURE_CHECK, path: backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java, containsAll: ["xcodeagent:authorization-interceptor:begin"] }
   - id: frontend.build
     order: 100

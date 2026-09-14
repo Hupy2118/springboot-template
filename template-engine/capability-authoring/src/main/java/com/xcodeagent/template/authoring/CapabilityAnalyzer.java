@@ -46,10 +46,8 @@ public final class CapabilityAnalyzer {
         List<AnchorDefinition> anchors = anchors(targetId, registry);
         AnchorDefinition match = null; String content = null;
         for (AnchorDefinition strategy : anchors) {
-            String anchor = strategy.anchor(); int at = before.indexOf(anchor);
-            if (at < 0) continue;
-            String prefix = before.substring(0, at), suffix = before.substring(at);
-            if (after.startsWith(prefix) && after.endsWith(suffix)) { if (match != null) { unsupported.add(new UnsupportedChange(path, "AMBIGUOUS_ANCHOR_INSERT")); return; } match = strategy; content = after.substring(prefix.length(), after.length() - suffix.length()); }
+            String candidate = anchorInsertContent(before, after, strategy);
+            if (candidate != null) { if (match != null) { unsupported.add(new UnsupportedChange(path, "AMBIGUOUS_ANCHOR_INSERT")); return; } match = strategy; content = candidate; }
         }
         if (match == null || content == null || content.isEmpty()) { unsupported.add(new UnsupportedChange(path, "UNEXPLAINED_SURFACE_MODIFICATION")); return; }
         String anchor = match.anchor(); String key = match.anchorKey();
@@ -57,6 +55,50 @@ public final class CapabilityAnalyzer {
         String managed = "/* xcodeagent:" + marker + ":begin */\n" + content + (content.endsWith("\n") ? "" : "\n") + "/* xcodeagent:" + marker + ":end */\n";
         output.add(new StrategyDraft("TEXT_ANCHOR_INSERT", targetId, key, map("anchor", anchor, "position", "before", "managedMarker", marker, "content", managed)));
     }
+    /**
+     * Identifies an insertion by its registered anchor boundary, rather than by the
+     * complete text surrounding that insertion.  The anchor and everything after it
+     * are immutable; blank lines immediately adjacent to the inserted block are not.
+     */
+    private static String anchorInsertContent(String before, String after, AnchorDefinition strategy) {
+        if (!"before".equals(strategy.position())) return null;
+        String anchor = strategy.anchor();
+        if (occurrences(before, anchor) != 1 || occurrences(after, anchor) != 1) return null;
+        int beforeAnchor = before.indexOf(anchor), afterAnchor = after.indexOf(anchor);
+        int beforeAnchorLine = lineStart(before, beforeAnchor), afterAnchorLine = lineStart(after, afterAnchor);
+        if (!before.substring(beforeAnchorLine).equals(after.substring(afterAnchorLine))) return null;
+
+        String stablePrefix = withoutTrailingBlankLines(before.substring(0, beforeAnchorLine));
+        String insertionArea = after.substring(0, afterAnchorLine);
+        if (!insertionArea.startsWith(stablePrefix)) return null;
+        String inserted = withoutBoundaryBlankLines(insertionArea.substring(stablePrefix.length()));
+        return inserted.isEmpty() ? null : inserted;
+    }
+
+    private static int occurrences(String source, String value) {
+        int result = 0, offset = 0;
+        while ((offset = source.indexOf(value, offset)) >= 0) { result++; offset += value.length(); }
+        return result;
+    }
+
+    private static String withoutTrailingBlankLines(String source) {
+        int offset = 0, end = 0;
+        for (String line : lines(source)) { offset += line.length(); if (!line.trim().isEmpty()) end = offset; }
+        return source.substring(0, end);
+    }
+
+    private static String withoutBoundaryBlankLines(String source) {
+        int offset = 0, start = -1, end = -1;
+        for (String line : lines(source)) {
+            int lineEnd = offset + line.length();
+            if (!line.trim().isEmpty()) { if (start < 0) start = offset; end = lineEnd; }
+            offset = lineEnd;
+        }
+        return start < 0 ? "" : source.substring(start, end);
+    }
+
+    private static int lineStart(String source, int offset) { int newline = source.lastIndexOf('\n', offset - 1); return newline < 0 ? 0 : newline + 1; }
+    private static String[] lines(String source) { return source.split("(?<=\\n)", -1); }
     private static String targetId(String path, StrategyRegistry registry) { for (TargetDefinition target : registry.targets().values()) if (target.path().equals(path)) return target.id(); return null; }
     private static List<AnchorDefinition> anchors(String targetId, StrategyRegistry registry) { List<AnchorDefinition> r = new ArrayList<AnchorDefinition>(); for (AnchorDefinition anchor : registry.anchors().values()) if (targetId.equals(anchor.targetId())) r.add(anchor); return r; }
     private static List<String> imports(String source) { List<String> r = new ArrayList<String>(); for (String line : source.split("(?<=\\n)")) if (line.trim().startsWith("import ")) r.add(line.trim()); return r; }
