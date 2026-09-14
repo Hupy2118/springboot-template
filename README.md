@@ -7,7 +7,7 @@
 - `template-source/`：Base、Login、Authorization 等 Capability 的受管模板源。
 - `template-engine/engine-core/`：不依赖 Spring 的模板装载、Capability Resolve、渲染和文件级 Diff Core。
 - `template-engine/engine-service/`：无状态 HTTP API、Token/Scope 鉴权和 ZIP Package Builder。
-- `validation/`：Stage2/Stage3 的本地验证 Fixture 与脚本。
+- `scripts/ci/`：Template Release revision gate 与 Base Frontend 构建检查。
 
 ## 构建与测试
 
@@ -24,20 +24,28 @@ mvn -f template-engine/pom.xml -pl engine-service -am package
 template-engine/engine-service/target/engine-service-1.0.0-SNAPSHOT.jar
 ```
 
+Template Source 的发布门禁使用当前分支的共同基线执行：
+
+```sh
+./scripts/ci/verify-template-release-revision.sh origin/main
+```
+
 ## 启动 Engine Service
 
-Service 的 Source Root 只能来自部署配置，不能由 HTTP 请求指定。以下命令使用仓库内的 Stage3 本地验收配置，监听 `127.0.0.1:18080`。
+Service 的 Source Root 只能来自部署配置，不能由 HTTP 请求指定。以下命令使用 Engine Service 自己管理的本地配置，监听 `127.0.0.1:18080`。
 
 ```sh
 cd /Users/zhangrongrong/Documents/workspace/springboot-template
 
-export STAGE3_SOURCE_ROOT="$(pwd)/template-source"
+export TEMPLATE_ENGINE_SOURCE_ROOT="$(cd template-source && pwd)"
+export TEMPLATE_ENGINE_LOCAL_FULL_TOKEN_SHA256="$(printf %s 'local-full-token' | shasum -a 256 | awk '{print $1}')"
+export TEMPLATE_ENGINE_LOCAL_PLAN_TOKEN_SHA256="$(printf %s 'local-plan-token' | shasum -a 256 | awk '{print $1}')"
 
 java -jar template-engine/engine-service/target/engine-service-1.0.0-SNAPSHOT.jar \
-  --spring.config.additional-location="file:$(pwd)/validation/stage3/"
+  --spring.config.additional-location="file:$(pwd)/template-engine/engine-service/config/application-local.yml"
 ```
 
-`STAGE3_SOURCE_ROOT` 是环境变量，值为模板源的绝对路径。验收配置位于 `validation/stage3/application.yml`，其中包含仅供本地使用的两个 Token 的 SHA-256 摘要；不要将明文 Token 写入生产配置。
+`TEMPLATE_ENGINE_SOURCE_ROOT` 必须是模板源的绝对路径；没有默认相对路径。`application-local.yml` 只提交配置结构，Token digest 必须由环境变量注入；不要将明文 Token 或真实 digest 提交到仓库。
 
 启动成功后，可用以下 URL 访问：
 
@@ -51,7 +59,7 @@ http://127.0.0.1:18080
 
 ```sh
 java -jar template-engine/engine-service/target/engine-service-1.0.0-SNAPSHOT.jar \
-  --spring.config.additional-location="file:$(pwd)/validation/stage3/" \
+  --spring.config.additional-location="file:$(pwd)/template-engine/engine-service/config/application-local.yml" \
   --logging.level.org.springframework.web.servlet.DispatcherServlet=DEBUG \
   --server.tomcat.accesslog.enabled=true \
   --server.tomcat.basedir=/private/tmp/engine-service-tomcat \
@@ -78,7 +86,7 @@ Tomcat 默认会在文件名中加入日期，例如 `access.2026-09-09.log`，�
 | Header | Value |
 | --- | --- |
 | `Content-Type` | `application/json` |
-| `Authorization` | `Bearer stage3-demo-token` |
+| `Authorization` | `Bearer local-full-token` |
 
 ### 1. Generate
 
@@ -102,7 +110,7 @@ Tomcat 默认会在文件名中加入日期，例如 `access.2026-09-09.log`，�
 ### 2. 鉴权检查
 
 - 不发送 `Authorization` 请求 `/v1/generate`：预期 `401` 和 `UNAUTHORIZED`。
-- 将 Token 改为 `stage3-plan-token` 请求 `/v1/generate`：预期 `403` 和 `FORBIDDEN`。
+- 将 Token 改为 `local-plan-token` 请求 `/v1/generate`：预期 `403` 和 `FORBIDDEN`。
 
 ### 3. Update
 

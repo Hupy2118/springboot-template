@@ -706,7 +706,8 @@ frontend/src/generated/capabilityMenus.ts
 mvn -f template-engine/pom.xml \
   -pl capability-authoring -am test
 
-./validation/verify-stage2.sh
+mvn -f template-engine/pom.xml verify
+./scripts/ci/verify-base-frontend.sh
 
 git diff --check
 ```

@@ -21,6 +21,8 @@ additionId、strategyId、managedMarker
 在仓库根目录执行：
 
 ```bash
+# 创建基础工作区
+./capability init excel-export
 # 创建工作区；该能力依赖 login
 ./capability init excel-export --requires login
 
@@ -233,7 +235,8 @@ migrations:
 ./capability build <capabilityId>
 git diff -- template-source
 mvn -f template-engine/pom.xml -pl capability-authoring -am test
-./validation/verify-stage2.sh
+mvn -f template-engine/pom.xml verify
+./scripts/ci/verify-base-frontend.sh
 git diff --check
 ```
 

@@ -1,4 +1,4 @@
-# `validation/` 目录收敛改造方案
+# `validation/` 目录收敛改造方案（V3）
 
 ## 1. 背景
 
@@ -286,7 +286,7 @@ server:
 
 xcodeagent:
   template-engine:
-    source-root: ${TEMPLATE_ENGINE_SOURCE_ROOT:../../../template-source}
+    source-root: ${TEMPLATE_ENGINE_SOURCE_ROOT}
 
     principals:
       - principal-id: local-full
@@ -313,12 +313,16 @@ xcodeagent:
 
 开发者本地通过环境变量注入。
 
+`TEMPLATE_ENGINE_SOURCE_ROOT` 必须显式设置为绝对路径，不提供类似 `../../../template-source` 的默认值。原因是 Java/Spring 对相对文件路径的解析依赖进程启动目录（`user.dir`），而不是配置文件所在目录，在仓库根目录、IDE、CI 或 `engine-service/` 下启动时可能解析到不同位置。
+
 例如：
 
 ```bash
-export TEMPLATE_ENGINE_SOURCE_ROOT=/absolute/path/template-source
+export TEMPLATE_ENGINE_SOURCE_ROOT="$(cd template-source && pwd)"
 export TEMPLATE_ENGINE_LOCAL_FULL_TOKEN_SHA256=...
 ```
+
+如果未设置 `TEMPLATE_ENGINE_SOURCE_ROOT`，Service 应直接启动失败并提示配置缺失，而不是静默使用相对路径。
 
 ---
 
@@ -382,7 +386,24 @@ stage2-verification
 
 Profile。
 
-如果该 Profile 仅服务于历史 Stage2 流程，应一并删除。
+当前 `engine-service/pom.xml` 的 Surefire 已显式包含：
+
+```xml
+<include>**/*Test.java</include>
+<include>**/*IT.java</include>
+```
+
+因此 `EngineServiceIT` 已经进入正常 Maven 测试生命周期，不依赖 `stage2-verification` Profile。
+
+所以该 Profile 的处理应明确为：
+
+> 在确认 CI、外部脚本和开发文档不存在 `-Pstage2-verification` 调用后，直接删除。
+
+删除前执行：
+
+```bash
+grep -Rni   --exclude-dir=.git   --exclude-dir=target   'stage2-verification' .
+```
 
 最终标准测试入口统一为：
 
@@ -510,9 +531,9 @@ scripts/ci/verify-template-release-revision.sh
 
 迁移后按 Template Engine Digest V3 方案继续加强。
 
-### 13.1 Managed Scope
+### 13.1 Managed Scope：不得再使用目录级 Glob
 
-当前 Managed Scope 应明确维护为：
+原有写法：
 
 ```text
 template-source/base
@@ -520,54 +541,421 @@ template-source/capabilities
 template-source/strategy-registry-v2.yaml
 ```
 
-后续如果 Loader 增加新的 Release 输入，需要同步增加。
-
-禁止简单写成：
+仍然过宽，因为：
 
 ```text
-template-source/**
+git diff -- template-source/base
 ```
 
-避免 README / docs 等非运行时内容变化强制升级 revision。
+会把该目录下所有 README、docs、开发辅助文件都视为 Release 输入。
+
+同时，也不能简单通过：
+
+```text
+:(exclude)**/README.md
+:(exclude)**/docs/**
+```
+
+全局排除文档文件，因为是否属于 Release 输入不能由文件扩展名或目录名决定，而应该由 **Runtime 实际消费关系** 决定。
+
+当前代码的事实是：
+
+```text
+V2ProjectGenerator
+    → 读取 template-source/base/base.yaml
+    → 只 materialize base.yaml.files[].source
+
+StrategyRegistryLoader
+    → 读取 strategy-registry-v2.yaml
+    → 读取其中 targets 指向的 Base 文件
+
+CapabilityV2Loader
+    → 读取 capabilities/*/capability-v2.yaml
+    → 读取 additions[].source
+    → 读取 migrations[].source
+    → 读取 migration consumer 校验所需文件
+```
+
+因此 Managed Scope 应定义为“实际 Release 输入集合”，而不是目录。
+
+#### A. 固定入口文件
+
+始终纳入：
+
+```text
+template-source/base/base.yaml
+template-source/strategy-registry-v2.yaml
+template-source/template-revision.txt   # 仅用于 revision 比较，不作为 managed change 本身
+```
+
+`release-digests.yaml` 不再属于 Runtime Release Identity，因此不纳入 Managed Scope。
+
+#### B. Base Runtime 输入
+
+纳入：
+
+```text
+base/base.yaml -> files[].source
+```
+
+引用的所有文件。
+
+注意：
+
+当前 `base.yaml` 明确包含：
+
+```text
+backend/README.md
+backend/docs/project-structure.md
+frontend/README.md
+frontend/docs/project-structure.md
+```
+
+这些文件目前会进入 `/v1/generate` 的最终项目，因此在**不修改 template-source/base/base.yaml 的前提下，它们当前必须视为 Release 输入**。
+
+也就是说：
+
+> “README/docs 默认不触发 revision”这一目标在当前 Template Source Contract 下并不成立。
+
+如果未来明确希望文档变化不触发 revision，必须先改变 Template Source Contract，例如：
+
+```text
+从 base.yaml.files 中移除对应 README/docs
+```
+
+使它们不再进入生成项目；之后 CI 才可以自然忽略，而不是单独写排除规则。
+
+#### C. Capability Runtime 输入
+
+对每个：
+
+```text
+template-source/capabilities/<capabilityId>/capability-v2.yaml
+```
+
+纳入：
+
+```text
+capability-v2.yaml 本身
+additions[].source
+migrations[].source
+```
+
+以及 Loader 明确读取的其他校验输入。
+
+当前如果存在类似：
+
+```text
+AuthorizationBootstrapCommand.java
+```
+
+这类由 Loader 为 migration consumer contract 显式读取的文件，也必须纳入。
+
+#### D. Strategy Runtime 输入
+
+纳入：
+
+```text
+template-source/strategy-registry-v2.yaml
+```
+
+以及 registry 中：
+
+```text
+targets[].path
+```
+
+所引用的 Base 文件。
+
+这些文件通常已经包含于 `base.yaml.files`，但 CI 规则不得依赖“碰巧重合”；应按 Runtime Contract 构造集合后去重。
 
 ---
 
-### 13.2 Revision 单调性
+### 13.2 Managed Scope 的推荐实现
 
-在原：
+不建议继续维护一长串 Shell glob。
 
-```text
-managed input changed
-→ revision must change
-```
-
-基础上增加：
+推荐新增一个轻量脚本：
 
 ```text
-newRevision > baseRevision
+scripts/ci/list-template-release-inputs.py
 ```
 
-对于：
+职责：
+
+```text
+读取 base/base.yaml
+读取 strategy-registry-v2.yaml
+遍历 capabilities/*/capability-v2.yaml
+解析其中 source / target / migration contract
+输出排序后的仓库相对路径
+```
+
+输出示例：
+
+```text
+template-source/base/base.yaml
+template-source/base/backend/pom.xml
+template-source/base/backend/src/main/...
+template-source/base/frontend/package.json
+template-source/capabilities/authorization/capability-v2.yaml
+template-source/capabilities/authorization/backend/...
+template-source/strategy-registry-v2.yaml
+...
+```
+
+然后 Revision Gate 使用：
+
+```text
+git diff --name-only <base>...HEAD
+        ↓
+与 list-template-release-inputs.py 输出集合求交集
+        ↓
+managed_changes
+```
+
+只有：
+
+```text
+managed_changes != empty
+```
+
+时才要求 revision bump。
+
+这样可以同时解决两个问题：
+
+1. 不会因为目录内无关文件变化误触发；
+2. 新增 Runtime 引用时，只需要让 Manifest / Registry 成为事实来源，不再手工维护第二套 CI 路径规则。
+
+#### 新文件的特殊处理
+
+如果新增：
+
+```text
+capabilities/<new-id>/capability-v2.yaml
+```
+
+或修改 Manifest 使其引用新的 source 文件，新文件本身也必须被识别为 Managed Input。
+
+因此脚本计算集合时应基于：
+
+```text
+HEAD
+```
+
+的 Template Source Contract。
+
+对于删除的 Runtime 输入，还应同时基于：
+
+```text
+base ref
+```
+
+计算一次 Managed Input 集合。
+
+最终比较集合使用：
+
+```text
+managed_inputs(base) ∪ managed_inputs(HEAD)
+```
+
+否则“删除一个原先受管的文件/引用”可能漏检。
+
+---
+
+### 13.3 Revision 单调性：落成可执行规则
+
+Revision 格式固定为：
 
 ```text
 YYYY.MM.DD.N
 ```
 
-版本，应禁止：
+例如：
 
 ```text
-newRevision == baseRevision
-newRevision < baseRevision
+2026.09.14.1
+2026.09.14.2
+2026.09.15.1
+```
+
+#### 版本格式规则
+
+必须同时满足：
+
+```text
+YYYY = 4 位十进制数字
+MM   = 2 位十进制数字，01-12
+DD   = 2 位十进制数字，并且是 YYYY-MM 下合法日期
+N    = 十进制正整数，>= 1，不允许前导 +
+```
+
+非法示例：
+
+```text
+2026.9.14.1
+2026.09.31.1
+2026.09.14.0
+2026.09.14.-1
+v2026.09.14.1
+2026.09.14.01   # 建议禁止，避免同值多表示
+```
+
+#### 比较规则
+
+解析成四元组：
+
+```text
+(year, month, day, sequence)
+```
+
+按数值字典序比较：
+
+```text
+new > base
+```
+
+即：
+
+```text
+year 大于 → new 较新
+year 相同，month 大于 → new 较新
+年月相同，day 大于 → new 较新
+年月日相同，sequence 大于 → new 较新
+其他情况 → 非递增
+```
+
+禁止：
+
+```text
+new == base
+new < base
 历史 revision 重用
 ```
 
-合法回滚方式：
+合法回滚必须：
 
 ```text
-历史内容
+恢复历史 Template Source 内容
 +
-新的更高 revision
+发布新的更高 revision
 ```
+
+例如：
+
+```text
+当前 2026.09.14.3
+需要回滚到 2026.09.13.2 的内容
+→ 发布为 2026.09.14.4 或后续更高版本
+```
+
+---
+
+### 13.4 Revision Gate 的可执行实现
+
+建议把 revision 解析与比较从复杂 Shell 字符串判断中独立出来。
+
+推荐新增：
+
+```text
+scripts/ci/verify-template-release-revision.py
+```
+
+Shell 文件如果需要兼容现有 CI，可以仅作为薄 wrapper。
+
+伪代码：
+
+```python
+REVISION_RE = r"^(\d{4})\.(\d{2})\.(\d{2})\.([1-9]\d*)$"
+
+def parse_revision(value):
+    match = fullmatch(REVISION_RE, value.strip())
+    if not match:
+        fail("invalid template revision format")
+
+    year, month, day, sequence = map(int, match.groups())
+
+    # 同时校验真实日历日期，例如拒绝 2026.02.30
+    datetime.date(year, month, day)
+
+    return year, month, day, sequence
+```
+
+Revision 来源：
+
+```text
+baseRevision =
+    git show <base-ref>:template-source/template-revision.txt
+
+headRevision =
+    当前工作树 / HEAD 的 template-source/template-revision.txt
+```
+
+执行逻辑固定为：
+
+```text
+1. parse(baseRevision)
+2. parse(headRevision)
+3. 计算 managed_changes
+4. 如果 managed_changes 为空：
+       不强制 revision 变化
+5. 如果 managed_changes 非空：
+       要求 headRevision > baseRevision
+6. 否则 CI FAIL
+```
+
+注意：
+
+```text
+managed_changes 非空 + revision 只是“不相等”
+```
+
+不再足够。
+
+必须是：
+
+```text
+headRevision > baseRevision
+```
+
+#### 是否在“无 Managed Change”时禁止 revision 单独增长
+
+默认建议：
+
+```text
+允许
+```
+
+即允许只 bump revision 的提交。
+
+原因：
+
+- 可能用于重新发布；
+- 可能用于版本治理修复；
+- 不需要 CI 猜测发布意图。
+
+如果团队希望禁止空 bump，可额外增加规则，但不属于本次必须项。
+
+#### 跨日 Sequence 规则
+
+不要求：
+
+```text
+新日期时 N 必须重新从 1 开始
+```
+
+只要求四元组严格递增。
+
+例如：
+
+```text
+2026.09.14.8
+→ 2026.09.15.3
+```
+
+合法。
+
+这样避免把 CI 变成“版本号生成器”，只负责验证单调性。
 
 ---
 
@@ -594,6 +982,14 @@ validation/verify-base-frontend.sh
 TO
 scripts/ci/verify-base-frontend.sh
 ```
+
+迁移后同样必须把仓库根目录解析调整为：
+
+```sh
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+```
+
+脚本内部所有仓库路径都必须基于 `$root` 计算，不能依赖调用方当前工作目录。
 
 或者直接内联 CI Workflow。
 
@@ -749,6 +1145,14 @@ validation/verify-template-release-revision.sh
 scripts/ci/verify-template-release-revision.sh
 ```
 
+移动后必须同步修改脚本中的仓库根目录解析。原脚本位于 `validation/` 时使用 `..` 可以回到仓库根；迁移到 `scripts/ci/` 后必须改成：
+
+```sh
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+```
+
+否则 `root` 只会指向 `<repo>/scripts`。
+
 同步修改：
 
 ```text
@@ -769,6 +1173,12 @@ validation/verify-base-frontend.sh
 scripts/ci/verify-base-frontend.sh
 ```
 
+并固定：
+
+```sh
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+```
+
 同步所有调用路径。
 
 ---
@@ -786,6 +1196,20 @@ validation/stage3/application.yml
 ```text
 template-engine/engine-service/config/application-local.yml
 ```
+
+其中：
+
+```yaml
+source-root: ${TEMPLATE_ENGINE_SOURCE_ROOT}
+```
+
+必须由环境变量显式注入绝对路径，例如：
+
+```bash
+export TEMPLATE_ENGINE_SOURCE_ROOT="$(cd template-source && pwd)"
+```
+
+禁止继续使用 `../../../template-source` 一类依赖 Java 当前工作目录的默认相对路径。
 
 删除所有：
 
@@ -821,11 +1245,23 @@ validation/verify-stage2.sh
 validation/verify-stage3-http.sh
 ```
 
-如 Stage2 Maven Profile 已无独立价值，同时删除：
+由于 `EngineServiceIT` 已由 Surefire 的 `**/*IT.java` include 纳入正常 Maven 生命周期，`stage2-verification` Profile 不再承担独立测试入口职责。
+
+删除前仅需确认：
 
 ```text
-stage2-verification
+CI workflow
+外部脚本
+开发文档
 ```
+
+没有继续调用：
+
+```text
+-Pstage2-verification
+```
+
+确认无调用后，直接删除该 Profile。
 
 ---
 
@@ -904,14 +1340,76 @@ grep -Rni \
 5. Service 有明确、独立的本地启动配置；
 6. 启动配置不提交真实 Token；
 7. Template Release Revision CI Gate 仍然存在并正常执行；
-8. Managed Scope 仍能检测受管 Template Source 改动；
-9. Revision 单调性规则生效；
+8. Managed Scope 由 Runtime Manifest / Registry 推导，不再使用 `template-source/base`、`template-source/capabilities` 目录级 glob；
+9. Base Managed Inputs 以 `base/base.yaml -> files[].source` 为准；
+10. Capability Managed Inputs 以 `capability-v2.yaml` 及其实际 source 引用为准；
+11. 删除 Runtime Input 也能通过 base/head Managed Input 并集被识别；
+12. Revision 严格按 `YYYY.MM.DD.N` 解析，并校验真实日历日期；
+13. Managed Input 发生变化时必须满足 `headRevision > baseRevision`；
 10. Base Frontend Build 验证仍保留；
 11. `verify-stage2.sh`、`verify-stage3-http.sh` 被删除；
 12. `stage2-verification` Profile 如无其他用途被删除；
 13. 不新增 Workspace Apply / State Persist 到 Template Engine；
 14. `mvn test` / `mvn verify` 成为 Template Engine 标准测试入口；
-15. CI 不再依赖任何 `validation/...` 路径。
+15. CI 不再依赖任何 `validation/...` 路径；
+16. 所有迁移到 `scripts/ci/` 的脚本从任意当前工作目录执行都能正确定位仓库根；
+17. `application-local.yml` 不包含 `../../../template-source` 等相对 `source-root` 默认值；
+18. `TEMPLATE_ENGINE_SOURCE_ROOT` 必须使用显式绝对路径；
+19. 全仓确认不存在 `-Pstage2-verification` 外部调用后删除该 Profile；
+20. `EngineServiceIT` 仍通过正常 `mvn test` / `mvn verify` 执行。
+
+---
+
+
+## 28.1 实施前必须确认的两个契约事实
+
+### README / docs 是否应触发 Revision
+
+当前不能把它们机械排除。
+
+因为 `base/base.yaml` 当前明确把部分 README/docs 列为生成文件，所以它们属于 `/v1/generate` 的输出组成部分。
+
+因此本次规则是：
+
+```text
+是否触发 revision
+=
+是否属于 Runtime Managed Input
+```
+
+而不是：
+
+```text
+是不是 README/docs
+```
+
+如果后续产品决策希望 README/docs 完全不影响 Template Release，则应另行修改：
+
+```text
+template-source/base/base.yaml
+```
+
+把这些文件移出生成契约；之后 CI 自动不再把它们视为 Managed Input。
+
+### Managed Scope 的唯一事实源
+
+不允许同时维护：
+
+```text
+Loader/Generator 一套路径
++
+CI 手工白名单另一套路径
+```
+
+CI 必须尽可能从：
+
+```text
+base.yaml
+strategy-registry-v2.yaml
+capability-v2.yaml
+```
+
+推导 Runtime 输入，避免长期漂移。
 
 ---
 
@@ -952,6 +1450,28 @@ grep -Rni \
 15. 最终全仓不得存在对 validation/ 的有效代码、测试或 CI 引用。
 
 16. 本次不得新增 Workspace / State Persist 能力到 template-engine。
+
+17. 所有迁移到 `scripts/ci/` 的 Shell 脚本必须使用 `../..` 回到仓库根，不能沿用原 `validation/` 下的 `..`。
+
+18. CI 脚本必须与调用方当前工作目录无关，所有仓库内路径都基于脚本计算出的 `$root`。
+
+19. `TEMPLATE_ENGINE_SOURCE_ROOT` 必须显式传入绝对路径；禁止使用 `../../../template-source` 一类默认值。
+
+20. `stage2-verification` Profile 删除前只检查 CI / 外部脚本 / 文档引用；确认无引用后直接删除，因为 `EngineServiceIT` 已由 Surefire 正常执行。
+
+21. Revision Gate 不允许只判断“revision 是否变化”；Managed Input 有变化时必须严格满足 `headRevision > baseRevision`。
+
+22. Revision 格式固定为 `YYYY.MM.DD.N`，必须校验格式、真实日历日期和 N >= 1。
+
+23. Managed Scope 不允许继续使用 `template-source/base` 或 `template-source/capabilities` 整目录 glob。
+
+24. Managed Scope 必须从 Runtime Contract 推导：`base.yaml`、`strategy-registry-v2.yaml`、`capability-v2.yaml` 及其实际 source 引用。
+
+25. 计算 Managed Scope 时必须取 base ref 与 HEAD 两侧输入集合的并集，避免删除受管文件时漏检。
+
+26. 不允许仅按文件名排除所有 README/docs；当前 `base.yaml` 中被列入 files 的 README/docs 仍属于 Release 输入。
+
+27. 如果产品明确要求 README/docs 不触发 revision，必须先把它们从 Template Source 的生成契约移除，再调整 CI；不得只改 CI 绕过 Runtime Contract。
 ```
 
 ---
@@ -994,3 +1514,37 @@ Stage2 / Stage3 temporary validation
 ```
 
 最终 Template Engine 工程只保留长期稳定的正式能力，不再暴露重构阶段的 Stage2 / Stage3 验证脚手架。
+
+
+---
+
+# 附录：Revision Gate 最终判定矩阵
+
+| Managed Runtime Input | Revision | 结果 |
+|---|---|---|
+| 无变化 | 不变 | PASS |
+| 无变化 | 增大且格式合法 | PASS |
+| 有变化 | 不变 | FAIL |
+| 有变化 | 变小 | FAIL |
+| 有变化 | 格式非法 | FAIL |
+| 有变化 | 增大 | PASS |
+
+核心规则最终收敛为：
+
+```text
+Runtime Contract
+    ↓
+Managed Input Set(base ∪ HEAD)
+    ↓
+git diff
+    ↓
+managed_changes ?
+
+NO  → revision 可保持或合法增大
+
+YES → parse YYYY.MM.DD.N
+       ↓
+       headRevision > baseRevision
+       ↓
+       PASS
+```

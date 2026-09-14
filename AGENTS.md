@@ -13,7 +13,7 @@ Engine Service 是无状态计算入口，不是 Project Registry、Workspace Ma
 - `template-source/`：唯一受管模板源。修改 Base 或 Capability 文件时，必须同步其 `base.yaml` / `capability.yaml` 的 files、migrations、extensions 等声明。
 - `template-engine/engine-core/`：纯 Java Core；不得引入 Spring MVC、HTTP、持久化或 ZIP 打包依赖。
 - `template-engine/engine-service/`：Spring HTTP、认证、Core 映射、错误映射和 Package Builder。不得实现业务 Capability 逻辑。
-- `validation/`：可重复的本地验证数据和脚本；Stage3 Fixture 位于 `validation/stage3/`。
+- `scripts/ci/`：可重复使用的 CI Gate 与 Template Source 构建检查；脚本必须自行定位仓库根目录。
 - `docs/REFACTOR.md`：V1 设计与验收协议。任何新增 State 字段、Operation、Package 字段、错误码、HTTP 参数或 Capability 协议，必须先更新本文、Schema/OpenAPI、Fixture 与测试。
 
 ## 修改规则
@@ -38,7 +38,8 @@ git diff --check
 涉及 Template Source 或 Core 行为时，同时执行：
 
 ```sh
-./validation/verify-stage2.sh
+mvn -f template-engine/pom.xml verify
+./scripts/ci/verify-base-frontend.sh
 ```
 
-涉及 HTTP、认证、ZIP 或启动配置时，使用 `validation/stage3/application.yml` 进行真实 JAR 启动与 `/v1/plan`、`/v1/generate`、`/v1/update` 验收。详情见 `README.md` 和 `docs/REFACTOR.md`。
+涉及 HTTP、认证、ZIP 或启动配置时，使用 `template-engine/engine-service/config/application-local.yml` 进行真实 JAR 启动验收。该配置要求显式传入绝对 `TEMPLATE_ENGINE_SOURCE_ROOT` 及本地 Token digest；详情见 `README.md` 和 `docs/REFACTOR.md`。

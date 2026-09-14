@@ -2,7 +2,7 @@
 # Verifies the V2 empty-capability baseline without relying on a pre-existing node_modules.
 set -eu
 
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 workspace=$(mktemp -d "${TMPDIR:-/tmp}/xcodeagent-base-frontend.XXXXXX")
 trap 'rm -rf "$workspace"' EXIT HUP INT TERM
 
