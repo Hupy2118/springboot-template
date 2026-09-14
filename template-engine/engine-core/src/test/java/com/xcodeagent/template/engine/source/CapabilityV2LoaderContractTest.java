@@ -39,8 +39,13 @@ class CapabilityV2LoaderContractTest {
     }
 
     @Test
-    void rejectsContentChangesReusingThePublishedRevision() throws Exception {
-        assertRejected("base/README.md", "#", "# publication-gate-change\n#");
+    void loadsContentChangesWithoutReadingTheReleaseDigestManifest() throws Exception {
+        Path copy = copySource();
+        Path file = copy.resolve("base/README.md");
+        Files.write(file, "# publication-gate-change\n".getBytes(StandardCharsets.UTF_8));
+
+        assertDoesNotThrow(() -> new CapabilityV2Loader().load(copy));
+        delete(copy);
     }
 
     private static void assertRejected(String relative, String expected, String replacement) throws Exception {

@@ -49,6 +49,21 @@ class FileDifferTest {
         assertEquals(Arrays.<FileChange>asList(), new FileDiffer().compare(baseline, project));
     }
 
+    @Test
+    void comparesBinaryFileContentWithoutAContentDigest() throws Exception {
+        Path baseline = temporaryDirectory.resolve("baseline");
+        Path project = temporaryDirectory.resolve("project");
+        Path before = baseline.resolve("asset.bin");
+        Path after = project.resolve("asset.bin");
+        Files.createDirectories(before.getParent());
+        Files.createDirectories(after.getParent());
+        Files.write(before, new byte[] { 0, 1, 2, 3 });
+        Files.write(after, new byte[] { 0, 1, 2, 4 });
+
+        assertEquals(Arrays.asList(new FileChange(FileChange.Type.MODIFIED, "asset.bin")),
+                new FileDiffer().compare(baseline, project));
+    }
+
     private static void write(Path root, String relative, String content) throws IOException {
         Path file = root.resolve(relative);
         Files.createDirectories(file.getParent());

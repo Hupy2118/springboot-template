@@ -25,8 +25,6 @@ import java.util.HashSet;
 import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 
 /** Loads the V2 reconcile metadata and validates the Atomic Release contract. */
 public final class CapabilityV2Loader {
@@ -42,7 +40,6 @@ public final class CapabilityV2Loader {
     }
 
     private TemplateRelease load(Path root, String revision) {
-        String releaseDigest = releaseDigest(root);
         StrategyRegistry registry = new StrategyRegistryLoader().load(root);
         Map<String, CapabilityDefinitionV2> capabilities = new LinkedHashMap<String, CapabilityDefinitionV2>();
         Set<String> additionIds = new HashSet<String>();
@@ -69,7 +66,6 @@ public final class CapabilityV2Loader {
             }
         }
         validateDependencyGraph(capabilities);
-        require(releaseDigest.equals(publishedDigest(root, revision)), "TEMPLATE_REVISION_REUSED: " + revision);
         return new TemplateRelease(revision, capabilities, registry.strategies(), registry.validators());
     }
 
@@ -226,36 +222,6 @@ public final class CapabilityV2Loader {
         for (String id : capabilities.keySet()) visitDependency(id, capabilities, visiting, visited);
     }
 
-    private static String releaseDigest(Path root) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            List<Path> files = new ArrayList<Path>();
-            java.util.stream.Stream<Path> stream = Files.walk(root);
-            try { stream.forEach(path -> { if (Files.isSymbolicLink(path)) throw new TemplateSourceException("CAPABILITY_V2_INVALID: symlink " + path); if (Files.isRegularFile(path)) files.add(path); }); }
-            finally { stream.close(); }
-            Collections.sort(files);
-            for (Path file : files) {
-                if ("release-digests.yaml".equals(root.relativize(file).toString().replace('\\', '/'))) continue;
-                byte[] relative = root.relativize(file).toString().replace('\\', '/').getBytes(StandardCharsets.UTF_8);
-                digest.update(relative); digest.update((byte) 0);
-                digest.update(Files.readAllBytes(file)); digest.update((byte) 0);
-            }
-            StringBuilder output = new StringBuilder(); for (byte value : digest.digest()) output.append(String.format("%02x", value & 0xff));
-            return output.toString();
-        } catch (IOException e) { throw invalid("cannot digest release", e); }
-        catch (NoSuchAlgorithmException e) { throw new TemplateSourceException("CAPABILITY_V2_INVALID: SHA-256 unavailable"); }
-    }
-
-    @SuppressWarnings("unchecked") private String publishedDigest(Path root, String revision) {
-        try {
-            Map<String, Object> manifest = yaml.readValue(root.resolve("release-digests.yaml").toFile(), Map.class);
-            require(manifest != null && Integer.valueOf(1).equals(number(manifest.get("schemaVersion"))), "RELEASE_MANIFEST_INVALID: schemaVersion");
-            Map<String, Object> releases = object(manifest.get("releases"), "release manifest releases");
-            Object value = releases.get(revision);
-            require(value instanceof String && ((String) value).matches("[0-9a-f]{64}"), "RELEASE_MANIFEST_INVALID: revision " + revision);
-            return (String) value;
-        } catch (IOException e) { throw invalid("cannot read release digest manifest", e); }
-    }
     private static void visitDependency(String id, Map<String, CapabilityDefinitionV2> capabilities, Set<String> visiting, Set<String> visited) {
         if (visited.contains(id)) return;
         require(visiting.add(id), "CAPABILITY_CYCLE: " + id);

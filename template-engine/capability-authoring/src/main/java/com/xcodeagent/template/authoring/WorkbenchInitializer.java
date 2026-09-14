@@ -14,8 +14,6 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -46,7 +44,6 @@ public final class WorkbenchInitializer {
         Map<String, CapabilityState> effective = effectiveCapabilities(requires, release);
         Map<String, String> baseline = new V2ProjectGenerator(sourceRoot, release).generate(
                 new TemplateStateV2(release.revision(), effective, effective, Collections.<String, com.xcodeagent.template.engine.core.v2.AppliedAdditionState>emptyMap()));
-        String digest = digest(baseline);
 
         try {
             Files.createDirectories(workbenchesRoot);
@@ -54,7 +51,7 @@ public final class WorkbenchInitializer {
             try {
                 writeFiles(staging.resolve("baseline"), baseline);
                 writeFiles(staging.resolve("project"), baseline);
-                Files.write(staging.resolve("authoring.yaml"), authoringYaml(capabilityId, requires, release.revision(), digest).getBytes(StandardCharsets.UTF_8));
+                Files.write(staging.resolve("authoring.yaml"), authoringYaml(capabilityId, requires, release.revision()).getBytes(StandardCharsets.UTF_8));
                 move(staging, workbench);
                 return workbench;
             } catch (IOException e) {
@@ -108,31 +105,13 @@ public final class WorkbenchInitializer {
         }
     }
 
-    private static String authoringYaml(String capabilityId, List<String> requires, String revision, String digest) {
+    private static String authoringYaml(String capabilityId, List<String> requires, String revision) {
         StringBuilder value = new StringBuilder();
         value.append("capabilityId: ").append(capabilityId).append('\n');
         value.append("requires:\n");
         for (String dependency : requires) value.append("  - ").append(dependency).append('\n');
         value.append("templateRevision: ").append(revision).append('\n');
-        value.append("baselineDigest: sha256:").append(digest).append('\n');
         return value.toString();
-    }
-
-    private static String digest(Map<String, String> files) {
-        try {
-            MessageDigest algorithm = MessageDigest.getInstance("SHA-256");
-            List<String> paths = new ArrayList<String>(files.keySet());
-            Collections.sort(paths);
-            for (String path : paths) {
-                algorithm.update(path.getBytes(StandardCharsets.UTF_8));
-                algorithm.update((byte) 0);
-                algorithm.update(files.get(path).getBytes(StandardCharsets.UTF_8));
-                algorithm.update((byte) 0);
-            }
-            StringBuilder value = new StringBuilder();
-            for (byte item : algorithm.digest()) value.append(String.format("%02x", item & 0xff));
-            return value.toString();
-        } catch (NoSuchAlgorithmException e) { throw new TemplateSourceException("SHA-256_UNAVAILABLE"); }
     }
 
     private static void move(Path staging, Path target) throws IOException {

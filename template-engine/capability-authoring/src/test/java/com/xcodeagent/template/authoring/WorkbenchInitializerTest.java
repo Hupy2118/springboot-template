@@ -35,7 +35,7 @@ class WorkbenchInitializerTest {
         assertTrue(authoring.contains("capabilityId: excel-export"));
         assertTrue(authoring.contains("  - authorization"));
         assertTrue(authoring.contains("templateRevision: "));
-        assertTrue(authoring.matches("(?s).*baselineDigest: sha256:[0-9a-f]{64}.*"));
+        assertFalse(authoring.contains("baselineDigest"));
     }
 
     @Test

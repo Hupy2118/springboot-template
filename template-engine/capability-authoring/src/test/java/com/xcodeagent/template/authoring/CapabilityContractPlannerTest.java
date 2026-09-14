@@ -27,7 +27,7 @@ class CapabilityContractPlannerTest {
         write(project, "feature.ts", "export default 1;\n");
         write(project, "db/schema.sql", "create table feature(id bigint);\n");
         Path metadata = temporaryDirectory.resolve("authoring.yaml");
-        Files.write(metadata, ("capabilityId: feature\nrequires: []\ntemplateRevision: R1\nbaselineDigest: sha256:abc\n"
+        Files.write(metadata, ("capabilityId: feature\nrequires: []\ntemplateRevision: R1\n"
                 + "migrations:\n  - id: schema\n    source: db/schema.sql\n    bootstrapConsumerPath: backend/db/schema.sql\n    executionTrigger: AUTHORIZATION_BOOTSTRAP_DDL\n").getBytes(StandardCharsets.UTF_8));
         CapabilityDraft changes = new CapabilityDraft("feature",
                 Collections.singletonList(new AdditionDraft("feature.feature-ts", "feature.ts", "feature.ts")),
@@ -47,7 +47,7 @@ class CapabilityContractPlannerTest {
         Path project = temporaryDirectory.resolve("project");
         write(project, "db/schema.sql", "sql");
         Path metadata = temporaryDirectory.resolve("authoring.yaml");
-        Files.write(metadata, ("capabilityId: feature\nrequires: []\ntemplateRevision: R1\nbaselineDigest: sha256:abc\n"
+        Files.write(metadata, ("capabilityId: feature\nrequires: []\ntemplateRevision: R1\n"
                 + "migrations:\n  - id: schema\n    source: db/schema.sql\n    target: migrations/schema.sql\n    bootstrapConsumerPath: backend/db/schema.sql\n    executionTrigger: AUTHORIZATION_BOOTSTRAP_DDL\n").getBytes(StandardCharsets.UTF_8));
 
         assertThrows(TemplateSourceException.class, () -> new CapabilityContractPlanner().plan(metadata, project,
@@ -58,7 +58,7 @@ class CapabilityContractPlannerTest {
     void doesNotInferMigrationsWhenAuthoringMetadataDoesNotDeclareThem() throws Exception {
         Path project = temporaryDirectory.resolve("project"); write(project, "feature.ts", "export default 1;\n");
         Path metadata = temporaryDirectory.resolve("authoring.yaml");
-        Files.write(metadata, "capabilityId: feature\nrequires: []\ntemplateRevision: R1\nbaselineDigest: sha256:abc\n".getBytes(StandardCharsets.UTF_8));
+        Files.write(metadata, "capabilityId: feature\nrequires: []\ntemplateRevision: R1\n".getBytes(StandardCharsets.UTF_8));
 
         CapabilityContractDraft draft = new CapabilityContractPlanner().plan(metadata, project,
                 new CapabilityDraft("feature", Collections.singletonList(new AdditionDraft("feature.feature-ts", "feature.ts", "feature.ts")),
@@ -71,7 +71,7 @@ class CapabilityContractPlannerTest {
     void rejectsACompilableDraftWithoutAnyPostconditionCheck() throws Exception {
         Path project = temporaryDirectory.resolve("project"); Files.createDirectories(project);
         Path metadata = temporaryDirectory.resolve("authoring.yaml");
-        Files.write(metadata, "capabilityId: feature\nrequires: []\ntemplateRevision: R1\nbaselineDigest: sha256:abc\n".getBytes(StandardCharsets.UTF_8));
+        Files.write(metadata, "capabilityId: feature\nrequires: []\ntemplateRevision: R1\n".getBytes(StandardCharsets.UTF_8));
 
         assertThrows(TemplateSourceException.class, () -> new CapabilityContractPlanner().plan(metadata, project,
                 new CapabilityDraft("feature", Collections.<AdditionDraft>emptyList(), Collections.<StrategyDraft>emptyList(), Collections.<UnsupportedChange>emptyList()), registry()));

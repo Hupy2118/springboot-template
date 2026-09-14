@@ -284,7 +284,6 @@ capabilityId: excel-export
 requires:
   - login
 templateRevision: R10
-baselineDigest: sha256:...
 ```
 
 ### 验收
