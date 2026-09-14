@@ -5,12 +5,10 @@ import com.xcodeagent.template.engine.core.v2.TemplateRelease;
 import com.xcodeagent.template.engine.core.v2.TemplateStateV2;
 import com.xcodeagent.template.engine.core.v2.UpdateResult;
 import com.xcodeagent.template.engine.core.v2.V2ProjectGenerator;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
@@ -18,22 +16,19 @@ import java.util.Collections;
 
 @RestController
 public class EngineController {
-    private final TokenAuthenticator auth;
     private final PackageBuilder packages;
     private final ReconcileDecisionEngine reconcile;
     private final TemplateRelease release;
     private final V2ProjectGenerator generator;
 
-    EngineController(TokenAuthenticator auth, com.fasterxml.jackson.databind.ObjectMapper json,
+    EngineController(com.fasterxml.jackson.databind.ObjectMapper json,
                      ReconcileDecisionEngine reconcile, TemplateRelease release, TemplateEngineProperties properties, V2ProjectGenerator generator) {
-        this.auth = auth; this.packages = new PackageBuilder(json, java.nio.file.Paths.get(properties.getSourceRoot()));
+        this.packages = new PackageBuilder(json, java.nio.file.Paths.get(properties.getSourceRoot()));
         this.reconcile = reconcile; this.release = release; this.generator = generator;
     }
 
     @PostMapping(value = "/v1/generate", consumes = MediaType.APPLICATION_JSON_VALUE, produces = "application/zip")
-    public ResponseEntity<byte[]> generate(@RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-                                           @RequestBody Map<String, Object> request) {
-        auth.require(authorization, "template.generate");
+    public ResponseEntity<byte[]> generate(@RequestBody Map<String, Object> request) {
         requireOnly(request, "requestedConfig");
         TemplateStateV2 initial = new TemplateStateV2(release.revision(), Collections.<String, com.xcodeagent.template.engine.core.v2.CapabilityState>emptyMap(),
                 Collections.<String, com.xcodeagent.template.engine.core.v2.CapabilityState>emptyMap(), Collections.<String, com.xcodeagent.template.engine.core.v2.AppliedAdditionState>emptyMap());
@@ -43,9 +38,7 @@ public class EngineController {
     }
 
     @PostMapping(value = "/v1/update", consumes = MediaType.APPLICATION_JSON_VALUE, produces = "application/zip")
-    public ResponseEntity<byte[]> update(@RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-                                         @RequestBody Map<String, Object> request) {
-        auth.require(authorization, "template.update");
+    public ResponseEntity<byte[]> update(@RequestBody Map<String, Object> request) {
         requireOnly(request, "protocolVersion", "currentTemplateState", "requestedConfig", "mode");
         if (!"2".equals(request.get("protocolVersion"))) throw new ServiceException("BAD_REQUEST", "protocolVersion must be 2", 400);
         if (request.get("currentTemplateState") == null) throw new ServiceException("BAD_REQUEST", "currentTemplateState is required", 400);

@@ -3,8 +3,6 @@
 mvn -f template-engine/pom.xml -pl engine-service -am package
 
 export TEMPLATE_ENGINE_SOURCE_ROOT="$(cd template-source && pwd)"
-export TEMPLATE_ENGINE_LOCAL_FULL_TOKEN_SHA256="$(printf %s 'local-full-token' | shasum -a 256 | awk '{print $1}')"
-export TEMPLATE_ENGINE_LOCAL_PLAN_TOKEN_SHA256="$(printf %s 'local-plan-token' | shasum -a 256 | awk '{print $1}')"
 
 java -jar template-engine/engine-service/target/engine-service-*.jar \
   --spring.config.additional-location="file:$(pwd)/template-engine/engine-service/config/application-local.yml"
@@ -14,7 +12,6 @@ java -jar template-engine/engine-service/target/engine-service-*.jar \
 curl -sS -D /private/tmp/engine-service-generate.headers \
   -o /private/tmp/engine-service-generate.zip \
   -X POST http://127.0.0.1:18080/v1/generate \
-  -H 'Authorization: Bearer local-full-token' \
   -H 'Content-Type: application/json' \
   --data '{"requestedConfig":{"capabilities":{"authorization":{"enabled":true,"config":{}}}}}'
 

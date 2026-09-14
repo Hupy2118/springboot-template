@@ -24,9 +24,4 @@ public class ServiceConfiguration {
     V2ProjectGenerator v2ProjectGenerator(TemplateEngineProperties properties, TemplateRelease release) {
         return new V2ProjectGenerator(Paths.get(properties.getSourceRoot()), release);
     }
-
-    @Bean
-    TokenAuthenticator tokenAuthenticator(TemplateEngineProperties properties) {
-        return new TokenAuthenticator(properties.getPrincipals());
-    }
 }

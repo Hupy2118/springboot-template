@@ -22,7 +22,7 @@ Engine Service 是无状态计算入口，不是 Project Registry、Workspace Ma
 2. Capability 的 `config.schema.json`、依赖、Extension Contribution 和 Migration 都属于 Template Source 契约，不要在 Service 中按 Capability ID 写条件分支。
 3. `RequestedConfig` 是完整目标配置；省略 Capability 等同禁用。`TemplateState` 由调用方持有和提交，Service 不保存它。
 4. HTTP 契约以 `template-engine/engine-service/src/main/resources/openapi/engine-service-v1.yaml` 为唯一权威。Controller 不得私自增加字段或改变 Content-Type/状态码。
-5. Authorization 固定为 `Authorization: Bearer <token>`，Service 比对 UTF-8 Token 的 SHA-256。日志中不得记录 Token、Token digest、完整 Request Body 或完整受管文件内容。
+5. Local Service 固定监听 `127.0.0.1`，以 Loopback 作为网络暴露边界，不实施应用层认证。未来共享或远程部署时，认证应在 HTTP 接入层独立引入；日志中不得记录完整 Request Body 或完整受管文件内容。
 6. ZIP entry 必须使用相对安全路径、固定排序和固定 timestamp；Update Package 仅为 ADD_FILE / UPDATE_FILE 创建 payload，DELETE 不得生成伪 payload。
 7. 保持 Java 8 编译兼容；Spring Boot 2.7 运行依赖与 Jackson YAML/SnakeYAML 版本必须保持兼容，不要单独升级其中一个。
 
@@ -42,4 +42,4 @@ mvn -f template-engine/pom.xml verify
 ./scripts/ci/verify-base-frontend.sh
 ```
 
-涉及 HTTP、认证、ZIP 或启动配置时，使用 `template-engine/engine-service/config/application-local.yml` 进行真实 JAR 启动验收。该配置要求显式传入绝对 `TEMPLATE_ENGINE_SOURCE_ROOT` 及本地 Token digest；详情见 `README.md` 和 `docs/REFACTOR.md`。
+涉及 HTTP、ZIP 或启动配置时，使用 `template-engine/engine-service/config/application-local.yml` 进行真实 JAR 启动验收。该配置要求显式传入绝对 `TEMPLATE_ENGINE_SOURCE_ROOT`，并固定监听 `127.0.0.1`；详情见 `README.md` 和 `docs/REFACTOR.md`。

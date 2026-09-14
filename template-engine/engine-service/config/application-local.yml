@@ -1,15 +1,7 @@
 server:
+  address: 127.0.0.1
   port: ${TEMPLATE_ENGINE_PORT:18080}
 
 xcodeagent:
   template-engine:
     source-root: ${TEMPLATE_ENGINE_SOURCE_ROOT}
-    principals:
-      - principal-id: local-full
-        principal-type: XCODE_AGENT
-        token-sha256: ${TEMPLATE_ENGINE_LOCAL_FULL_TOKEN_SHA256}
-        scopes: [template.plan, template.generate, template.update]
-      - principal-id: local-plan
-        principal-type: XCODE_AGENT
-        token-sha256: ${TEMPLATE_ENGINE_LOCAL_PLAN_TOKEN_SHA256}
-        scopes: [template.plan]

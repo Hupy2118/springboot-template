@@ -187,6 +187,79 @@ Diff → Analyze → Unsupported Gate → Contract Plan
 git diff -- template-source
 ```
 
+## build 后：生成 ZIP 的端到端验收
+
+`build` 验证的是 Capability Draft 能否被编译并发布到 `template-source/`；它不替代
+Engine Service 的加载、HTTP 响应和 ZIP 打包验收。提交前应以刚刚 build 的
+`template-source/` 启动本地 Service，并请求一次 `/v1/generate`。以下以
+`excel-export` 为例；其他 Capability 只需替换请求中的 ID 和后续断言的文件、代码片段。
+
+先确保 Service JAR 已构建，然后在终端一启动它：
+
+```bash
+mvn -f template-engine/pom.xml -pl engine-service -am package
+
+export TEMPLATE_ENGINE_SOURCE_ROOT="$(cd template-source && pwd)"
+
+java -jar template-engine/engine-service/target/engine-service-1.0.0-SNAPSHOT.jar \
+  --spring.config.additional-location="file:$(pwd)/template-engine/engine-service/config/application-local.yml"
+```
+
+保持该进程运行。在终端二执行下面的请求；临时目录仅保存本次验收产物，可在验收后手工删除：
+
+```bash
+validation_dir="$(mktemp -d)"
+
+curl --fail --silent --show-error \
+  --dump-header "$validation_dir/headers.txt" \
+  --output "$validation_dir/project.zip" \
+  --header 'Content-Type: application/json' \
+  --request POST http://127.0.0.1:18080/v1/generate \
+  --data @- <<'JSON'
+{
+  "requestedConfig": {
+    "capabilities": {
+      "excel-export": {
+        "enabled": true,
+        "config": {}
+      }
+    }
+  }
+}
+JSON
+```
+
+预期响应为 HTTP `200` 且 `Content-Type` 为 `application/zip`。检查响应、ZIP 完整性及
+Capability 生成结果：
+
+```bash
+rg -i '^HTTP/.* 200|^content-type: application/zip' "$validation_dir/headers.txt"
+unzip -t "$validation_dir/project.zip"
+
+# 新增文件、注册 Surface 与调用方持有的 State 都必须存在。
+unzip -Z1 "$validation_dir/project.zip" | rg -x \
+  'frontend/src/pages/Home/index.tsx|frontend/src/capability-extensions/routes.tsx|\.xcodeagent/template-state\.json'
+unzip -p "$validation_dir/project.zip" frontend/src/capability-extensions/routes.tsx | \
+  rg -F "import Home from '@/pages/Home';"
+unzip -p "$validation_dir/project.zip" frontend/src/capability-extensions/routes.tsx | \
+  rg -F "pageId: 'home'"
+unzip -p "$validation_dir/project.zip" .xcodeagent/template-state.json | \
+  rg -F '"excel-export"'
+```
+
+上述断言验证 Service 实际加载了新 Release，并将 Addition、Anchor 注入和 State 打入 ZIP；
+它们不是对生成工程可编译性的充分证明。若要整体确认最终代码可用，解压后在生成工程内执行
+前后端构建（依赖安装可能访问本地缓存或依赖仓库）：
+
+```bash
+unzip -q "$validation_dir/project.zip" -d "$validation_dir/project"
+(cd "$validation_dir/project/frontend" && pnpm install --frozen-lockfile && pnpm build)
+(cd "$validation_dir/project/backend" && mvn test)
+```
+
+任何一步失败时，不应将其视为 Capability 已验收：先保留 `$validation_dir` 中的 ZIP、响应头和
+构建输出，分别判断是 Draft 内容、Template Release、Service 配置还是生成工程依赖的问题。
+
 ## 反复 build 与所有权
 
 首次成功 build 后，Workbench 的 `compile-state.yaml` 会记录其生成的 capability、strategy 与 validator ID。后续 build 仅替换这批可验证属于当前 Workbench 的 Draft 产物。

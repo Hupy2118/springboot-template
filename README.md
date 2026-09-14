@@ -6,7 +6,7 @@
 
 - `template-source/`：Base、Login、Authorization 等 Capability 的受管模板源。
 - `template-engine/engine-core/`：不依赖 Spring 的模板装载、Capability Resolve、渲染和文件级 Diff Core。
-- `template-engine/engine-service/`：无状态 HTTP API、Token/Scope 鉴权和 ZIP Package Builder。
+- `template-engine/engine-service/`：无状态 HTTP API 和 ZIP Package Builder。本地模式固定监听 Loopback，不做应用层认证。
 - `scripts/ci/`：Template Release revision gate 与 Base Frontend 构建检查。
 
 ## 构建与测试
@@ -38,14 +38,12 @@ Service 的 Source Root 只能来自部署配置，不能由 HTTP 请求指定�
 cd /Users/zhangrongrong/Documents/workspace/springboot-template
 
 export TEMPLATE_ENGINE_SOURCE_ROOT="$(cd template-source && pwd)"
-export TEMPLATE_ENGINE_LOCAL_FULL_TOKEN_SHA256="$(printf %s 'local-full-token' | shasum -a 256 | awk '{print $1}')"
-export TEMPLATE_ENGINE_LOCAL_PLAN_TOKEN_SHA256="$(printf %s 'local-plan-token' | shasum -a 256 | awk '{print $1}')"
 
 java -jar template-engine/engine-service/target/engine-service-1.0.0-SNAPSHOT.jar \
   --spring.config.additional-location="file:$(pwd)/template-engine/engine-service/config/application-local.yml"
 ```
 
-`TEMPLATE_ENGINE_SOURCE_ROOT` 必须是模板源的绝对路径；没有默认相对路径。`application-local.yml` 只提交配置结构，Token digest 必须由环境变量注入；不要将明文 Token 或真实 digest 提交到仓库。
+`TEMPLATE_ENGINE_SOURCE_ROOT` 必须是模板源的绝对路径；没有默认相对路径。`application-local.yml` 固定绑定 `127.0.0.1`，仅适用于本机 XCodeAgent 的辅助 Runtime；它不提供应用层认证。
 
 启动成功后，可用以下 URL 访问：
 
@@ -55,7 +53,7 @@ http://127.0.0.1:18080
 
 ## 查看请求日志
 
-默认启动日志不会逐条记录 HTTP 请求。推荐开启 Tomcat access log：它记录方法、路径、状态码、响应大小和耗时，但不会记录 Bearer Token 或完整 Request Body。
+默认启动日志不会逐条记录 HTTP 请求。推荐开启 Tomcat access log：它记录方法、路径、状态码、响应大小和耗时，但不会记录完整 Request Body。
 
 ```sh
 java -jar template-engine/engine-service/target/engine-service-1.0.0-SNAPSHOT.jar \
@@ -77,7 +75,7 @@ tail -F /private/tmp/engine-service-tomcat/logs/access.*.log
 
 Tomcat 默认会在文件名中加入日期，例如 `access.2026-09-09.log`，并且通常在收到第一条 HTTP 请求后才创建该文件。若尚未请求接口，请先调用一次 `/v1/generate`；也可先执行 `ls -la /private/tmp/engine-service-tomcat/logs/` 确认实际文件名。
 
-不要通过通用 HTTP 日志打印 `Authorization`、完整 `currentTemplateState` 或文件内容：它们可能包含 Token 或大体积工程内容。
+不要通过通用 HTTP 日志打印完整 `currentTemplateState` 或文件内容：它们可能包含大体积工程内容。
 
 ## Postman 本地验证
 
@@ -86,7 +84,6 @@ Tomcat 默认会在文件名中加入日期，例如 `access.2026-09-09.log`，�
 | Header | Value |
 | --- | --- |
 | `Content-Type` | `application/json` |
-| `Authorization` | `Bearer local-full-token` |
 
 ### 1. Generate
 
@@ -107,12 +104,7 @@ Tomcat 默认会在文件名中加入日期，例如 `access.2026-09-09.log`，�
 
 预期 HTTP `200`、`Content-Type: application/zip`。在 Postman 选择 **Send and Download**；ZIP 应包含 `frontend/`、`backend/` 和 `.xcodeagent/template-state.json`。
 
-### 2. 鉴权检查
-
-- 不发送 `Authorization` 请求 `/v1/generate`：预期 `401` 和 `UNAUTHORIZED`。
-- 将 Token 改为 `local-plan-token` 请求 `/v1/generate`：预期 `403` 和 `FORBIDDEN`。
-
-### 3. Update
+### 2. Update
 
 `/v1/update` 是无状态接口。先从 Generate ZIP 取出 `.xcodeagent/template-state.json`，将其完整 JSON 作为 `currentTemplateState` 传回：
 

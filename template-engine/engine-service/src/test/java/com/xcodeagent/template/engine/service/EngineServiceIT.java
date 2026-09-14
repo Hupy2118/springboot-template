@@ -44,23 +44,21 @@ class EngineServiceIT {
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
         registry.add("xcodeagent.template-engine.source-root", () -> repositoryRoot().resolve("template-source").toString());
-        registry.add("xcodeagent.template-engine.principals[0].principal-id", () -> "test-full");
-        registry.add("xcodeagent.template-engine.principals[0].principal-type", () -> "XCODE_AGENT");
-        registry.add("xcodeagent.template-engine.principals[0].token-sha256", () -> "f807843a7ee53c652d63a1d2215e104ab2f265ed0d2bea0cf4c64f1486764593");
-        registry.add("xcodeagent.template-engine.principals[0].scopes[0]", () -> "template.plan");
-        registry.add("xcodeagent.template-engine.principals[0].scopes[1]", () -> "template.generate");
-        registry.add("xcodeagent.template-engine.principals[0].scopes[2]", () -> "template.update");
-        registry.add("xcodeagent.template-engine.principals[1].principal-id", () -> "test-plan");
-        registry.add("xcodeagent.template-engine.principals[1].principal-type", () -> "XCODE_AGENT");
-        registry.add("xcodeagent.template-engine.principals[1].token-sha256", () -> "3a1af87bdeb7471c0124f17aa27e90ad46bbbee710dc7cad2c3f6dbd2feea646");
-        registry.add("xcodeagent.template-engine.principals[1].scopes[0]", () -> "template.plan");
     }
 
     @Test
-    void planGenerateUpdateAndAuthenticationAreStateless() throws Exception {
+    void localProfileBindsOnlyToIpv4Loopback() throws Exception {
+        String localProfile = new String(Files.readAllBytes(repositoryRoot()
+                .resolve("template-engine/engine-service/config/application-local.yml")), StandardCharsets.UTF_8);
+        assertTrue(localProfile.contains("address: 127.0.0.1"));
+        assertTrue(!localProfile.contains("address: 0.0.0.0"));
+    }
+
+    @Test
+    void planGenerateUpdateWithoutAuthenticationAreStateless() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(context).build();
         String requestedAuthorization = "{\"capabilities\":{\"authorization\":{\"enabled\":true,\"config\":{}}}}";
-        byte[] generated = mvc.perform(post("/v1/generate").header("Authorization", "Bearer stage3-demo-token").contentType(MediaType.APPLICATION_JSON).content("{\"requestedConfig\":" + requestedAuthorization + "}"))
+        byte[] generated = mvc.perform(post("/v1/generate").contentType(MediaType.APPLICATION_JSON).content("{\"requestedConfig\":" + requestedAuthorization + "}"))
                 .andExpect(status().isOk()).andExpect(content().contentType("application/zip")).andReturn().getResponse().getContentAsByteArray();
         JsonNode generatedState = zipJson(generated, ".xcodeagent/template-state.json");
         assertEquals(2, generatedState.path("schemaVersion").asInt());
@@ -71,7 +69,7 @@ class EngineServiceIT {
         assertTrue(!hasZipPrefix(generated, "frontend/node_modules/"));
 
         String update = "{\"protocolVersion\":\"2\",\"currentTemplateState\":" + generatedState + ",\"requestedConfig\":" + requestedAuthorization + ",\"mode\":\"RECONCILE\"}";
-        byte[] changed = mvc.perform(post("/v1/update").header("Authorization", "Bearer stage3-demo-token").contentType(MediaType.APPLICATION_JSON).content(update))
+        byte[] changed = mvc.perform(post("/v1/update").contentType(MediaType.APPLICATION_JSON).content(update))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
         JsonNode updatePackage = zipJson(changed, "strategy-update-package.json");
         JsonNode nextState = updatePackage.path("nextTemplateState");
@@ -94,16 +92,14 @@ class EngineServiceIT {
         }
         for (String entry : zipEntries(changed))
             assertTrue("strategy-update-package.json".equals(entry) || entry.startsWith("payload/"), entry);
-        byte[] repeated = mvc.perform(post("/v1/update").header("Authorization", "Bearer stage3-demo-token").contentType(MediaType.APPLICATION_JSON).content(update))
+        byte[] repeated = mvc.perform(post("/v1/update").contentType(MediaType.APPLICATION_JSON).content(update))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
         assertArrayEquals(changed, repeated);
         assertTrue(nextState.path("effective").has("login"));
         assertTrue(nextState.path("effective").has("authorization"));
 
         String noChange = "{\"protocolVersion\":\"2\",\"currentTemplateState\":" + nextState + ",\"requestedConfig\":" + requestedAuthorization + ",\"mode\":\"APPLY\"}";
-        mvc.perform(post("/v1/update").header("Authorization", "Bearer stage3-demo-token").contentType(MediaType.APPLICATION_JSON).content(noChange)).andExpect(status().isNoContent());
-        mvc.perform(post("/v1/generate").contentType(MediaType.APPLICATION_JSON).content("{\"requestedConfig\":" + requestedAuthorization + "}")).andExpect(status().isUnauthorized());
-        mvc.perform(post("/v1/generate").header("Authorization", "Bearer stage3-plan-token").contentType(MediaType.APPLICATION_JSON).content("{\"requestedConfig\":" + requestedAuthorization + "}")).andExpect(status().isForbidden());
+        mvc.perform(post("/v1/update").contentType(MediaType.APPLICATION_JSON).content(noChange)).andExpect(status().isNoContent());
     }
 
     @Test
@@ -127,7 +123,7 @@ class EngineServiceIT {
         byte[] generated = generate(mvc, authorization);
         String update = "{\"protocolVersion\":\"2\",\"currentTemplateState\":" + pristineState
                 + ",\"requestedConfig\":" + authorization + ",\"mode\":\"APPLY\"}";
-        byte[] updateZip = mvc.perform(post("/v1/update").header("Authorization", "Bearer stage3-demo-token")
+        byte[] updateZip = mvc.perform(post("/v1/update")
                         .contentType(MediaType.APPLICATION_JSON).content(update))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
         JsonNode updatePackage = zipJson(updateZip, "strategy-update-package.json");
@@ -144,7 +140,7 @@ class EngineServiceIT {
         return JSON.readTree(zipBytes(zip, path));
     }
     private static byte[] generate(MockMvc mvc, String requested) throws Exception {
-        return mvc.perform(post("/v1/generate").header("Authorization", "Bearer stage3-demo-token")
+        return mvc.perform(post("/v1/generate")
                         .contentType(MediaType.APPLICATION_JSON).content("{\"requestedConfig\":" + requested + "}"))
                 .andExpect(status().isOk()).andExpect(content().contentType("application/zip"))
                 .andReturn().getResponse().getContentAsByteArray();
