@@ -1,62 +1,204 @@
-# Capability Authoring 本地开发指南
+# Capability Authoring 指引：向模板注入能力代码
 
-本文面向在本仓库中新增 Template Capability 的开发者。Capability Compiler 是 Template Source 的离线生产工具；Template Engine / Service 不读取 Workbench，也不保存其状态。
+本文面向需要向模板工程新增前端页面、后端接口、菜单注册或初始化脚本的开发者。它只说明如何将业务代码编译为 Template Capability；不涉及 Template Runtime 的修改。
 
-## 1. 先决条件
+## 核心边界
 
-- 在 `template_refactor` 分支工作。
-- 使用 Java 8 兼容代码；通过 Maven 构建。
-- 不直接手工编辑生成的 `additionId`、`strategyId`、`managedMarker` 或 `capability-v2.yaml`。
-- `template-source/` 是唯一受管模板源。编译会修改它，因此先在干净工作区检查 diff，并为能力单独建分支。
+Capability Compiler 是离线 Template Source 生产工具。正式产物永远是 `template-source/`；Engine Core 与 Engine Service 不读取 `.workbench/`，也不保存 Authoring 状态。
 
-当前 CLI 主类为：
+开发者只写业务代码，不要手工维护：
 
 ```text
-com.xcodeagent.template.authoring.CapabilityCli
+capability-v2.yaml
+strategy-registry-v2.yaml
+additionId、strategyId、managedMarker
 ```
 
-仓库暂未提供安装到 PATH 的 `capability` 包装脚本；下文的 `capability ...` 表示该 CLI 的命令语义。可由 IDE、Maven Exec 或本地包装脚本调用该主类。
+这些由 Compiler 从受限的代码差异自动生成。不能解释的差异会失败，不存在 raw patch 回退。
 
-## 2. 标准开发流程
+## 日常流程
 
-```text
-init → 在 project 中开发 → capture → compile → verify → 外部 Release Gate → publish
-```
-
-### 2.1 初始化 Workbench
+在仓库根目录执行：
 
 ```bash
-capability init excel-export --requires login
+# 创建工作区；该能力依赖 login
+./capability init excel-export --requires login
+
+# 仅编辑 project
+cd .workbench/excel-export/project
+# 编写 React / Spring Boot 业务代码
+cd ../../..
+
+# 可选：查看差异如何被理解
+./capability status excel-export
+
+# 编译、验证并发布 Draft
+./capability build excel-export
+
+# 审阅受管结果后提交
+git diff -- template-source
+git add template-source
+git commit -m "feat: add excel-export capability"
 ```
 
-生成目录：
+主流程是：
 
 ```text
-.workbench/excel-export/
-├── baseline/       # Base + 传递 requires，禁止手工修改
-├── project/        # 唯一允许开发的目录
-└── authoring.yaml  # 能力元数据与显式 migration 声明
+init → 写代码 → status（可选）→ build → git diff → commit
 ```
 
-`authoring.yaml` 记录 capability ID、直接依赖、模板 revision 与 baseline digest。重复 `init` 不覆盖已有 Workbench。
+`capture`、`compile`、`verify` 仅供维护者排查问题，不是普通开发流程。
 
-### 2.2 在 `project/` 中开发
+## Workbench
 
-V1 自动识别的修改只有三类：
+`init` 创建：
 
-| 开发行为 | 生成物 |
-| --- | --- |
-| 新增文件 | Addition（`NO_OP` maintain policy） |
-| 已注册 Surface 中新增 import | `ENSURE_IMPORT` |
-| 在已注册 anchor 前插入代码 | `TEXT_ANCHOR_INSERT` |
+```text
+.workbench/<capabilityId>/
+├── baseline/             # Base + requires，只读
+├── project/              # 开发者唯一可编辑目录
+├── authoring.yaml        # requires 和显式 migration 声明
+└── compile-state.yaml    # 首次成功 build 后生成，本地所有权记录
+```
 
-可插入的位置以 `template-source/strategy-registry-v2.yaml` 的 `anchors` 为准。每个 anchor 都有稳定 `anchorKey`；不要自行复制、删除或改写 Base anchor。
+`baseline` 是 `Base + requires` 的完整生成结果；`project` 是其可编辑副本。不要编辑 `baseline`，也不要提交 `.workbench/`。
 
-不支持且会 fail-closed 的行为包括：删除 Base 文件、修改非 Surface Base 文件、删除/修改已有 import、改写 anchor、文件 rename/move，以及无法归并到单个 insertion block 的修改。
+ID 必须匹配：
 
-### 2.3 显式声明 Migration
+```text
+[a-z0-9][a-z0-9-]*
+```
 
-不要根据 `.sql` 文件名期待自动识别 Migration。需要时在 `.workbench/<id>/authoring.yaml` 加入：
+有效示例：`excel-export`、`audit-log-v2`。依赖必须已经存在且不得构成循环：
+
+```bash
+./capability init excel-export --requires login,authorization
+```
+
+## 可被 Compiler 识别的改动
+
+V1 只允许三类差异：
+
+| 代码改动 | Compiler 产物 | 典型用途 |
+| --- | --- | --- |
+| 新增文件 | Addition，`NO_OP` | 页面、组件、Controller、Service、DTO |
+| 在注册 Surface 新增 import | `ENSURE_IMPORT` | 引入页面、Provider、Bean |
+| 在注册 Anchor 前插入连续代码块 | `TEXT_ANCHOR_INSERT` | 路由、菜单、Provider、拦截器注册 |
+
+### 新增文件
+
+直接在 `project/` 下新增，例如：
+
+```text
+.workbench/excel-export/project/frontend/src/pages/ExcelExport/index.tsx
+```
+
+该文件会被编译为 Capability Addition。
+
+### 注册页面或服务
+
+新增文件通常还需要在已注册的 Surface 中添加 import，并在对应 Anchor 前加入注册代码。可用 Surface 和 Anchor 由 `template-source/strategy-registry-v2.yaml` 定义。
+
+例如：
+
+```tsx
+import ExcelExport from '@/pages/ExcelExport';
+
+{
+  path: '/excel-export',
+  element: <ExcelExport />,
+},
+// xcodeagent:page-routes
+```
+
+运行 `status` 后应出现一个 Import 和一个 Anchor insert。不要自行书写或改动 `managedMarker`；它由 Compiler 根据 Capability、Target、Anchor 自动生成。
+
+## 不支持的改动
+
+以下差异会使 `status` 输出 `BLOCKED`，并使 `build` 失败：
+
+```text
+删除 Base 文件
+修改未注册为 Surface 的 Base 文件
+删除或改写既有 import
+删除或改写既有 Anchor
+重命名或移动既有文件
+无法归并为单个 Anchor insertion block 的交错修改
+```
+
+这不是可绕过的限制，而是保证模板可重复生成的契约。若确实缺少扩展点，应先由模板维护者修改 Base 与 Registry，建立稳定 Target/Anchor，再开发 Capability。不要在 Service 中按 Capability ID 加分支，也不要使用 raw patch。
+
+## status：先理解差异
+
+```bash
+./capability status excel-export
+```
+
+成功示例：
+
+```text
+Capability: excel-export
+
+Detected:
+  Additions            3
+  Imports              1
+  Anchor inserts       1
+
+Unsupported:
+  0
+
+Status: READY
+```
+
+失败时会给出路径与原因：
+
+```text
+Unsupported:
+  frontend/src/utils/common.ts
+  Reason: MODIFY_NON_SURFACE
+
+Status: BLOCKED
+```
+
+`status` 是只读操作：不会修改 `template-source/`、Workbench 或 Registry。
+
+## build：事务性发布 Draft
+
+```bash
+./capability build excel-export
+```
+
+固定过程：
+
+```text
+Diff → Analyze → Unsupported Gate → Contract Plan
+→ Compile 到 staging Template Source
+→ Draft Validation → Round-trip Verify
+→ 原子替换正式 template-source
+```
+
+任何一步失败，staging 会被丢弃，正式 `template-source/` 保持 build 前状态。成功后必须审阅：
+
+```bash
+git diff -- template-source
+```
+
+## 反复 build 与所有权
+
+首次成功 build 后，Workbench 的 `compile-state.yaml` 会记录其生成的 capability、strategy 与 validator ID。后续 build 仅替换这批可验证属于当前 Workbench 的 Draft 产物。
+
+下列情况会以 `CAPABILITY_OWNERSHIP_CONFLICT` fail-closed：
+
+- 已存在同名 Capability，但没有当前 Workbench 的 state；
+- state 的 Capability ID 不匹配；
+- state 记录的 strategy / validator 缺失、重复或与 Registry 不一致；
+- 现有 Capability 不属于当前 Workbench。
+
+不要手工删除 Registry 条目或伪造 state。已发布 Capability 不允许被本地 Draft 静默覆盖。
+
+## Migration
+
+Migration 不能根据文件名自动推断；必须在 `authoring.yaml` 显式声明：
 
 ```yaml
 migrations:
@@ -66,89 +208,49 @@ migrations:
     executionTrigger: AUTHORIZATION_BOOTSTRAP_DDL
 ```
 
-可选 `target` 若填写，必须与 `bootstrapConsumerPath` 完全相同；否则会报 `MIGRATION_CONTRACT_INVALID`。`source` 必须是 `project/` 中真实存在的文件。
+规则：
 
-### 2.4 Capture、Compile、Verify
+- `source` 必须是 `project/` 下存在的普通文件；
+- 如填写 `target`，它必须与 `bootstrapConsumerPath` 相同；
+- Compiler 只生成 Migration Contract，**不会执行 SQL**；
+- 违反规则时返回 `MIGRATION_CONTRACT_INVALID`。
 
-```bash
-capability capture excel-export
-capability compile excel-export
-capability verify excel-export
-```
+## 常见错误
 
-- `capture` 对比 `baseline/` 与 `project/`，并生成内部 Draft；不支持的修改会拒绝后续编译。
-- `compile` 将 Draft 原子化写入 `template-source/`：Capability 文件、Registry Strategy、Validator 与 migration metadata。相同 capability ID 不能重复编译。
-- `verify` 使用临时副本写入仅用于验证的 digest，运行正式 Loader，再比较 `V2ProjectGenerator` 输出与 Workbench `project/`。
+| 错误 | 应对方式 |
+| --- | --- |
+| `CAPABILITY_CAPTURE_UNSUPPORTED` | 先执行 `status`，根据首个 path/reason 将改动改为 Addition、Import 或单一 Anchor Insert。 |
+| `ROUND_TRIP_MISMATCH` | 根据首个不一致文件检查遗漏的新文件、错误 Surface 或不正确的 Anchor 位置。 |
+| `CAPABILITY_OWNERSHIP_CONFLICT` | 停止修改正式模板，使用原 Workbench 或由发布维护者处理所有权。 |
+| `CAPABILITY_ALREADY_EXISTS` | 多见于高级 `compile`；日常流程请使用 `build`。 |
 
-Round-trip 比较文件集合与文件内容；仅接受 CRLF/LF 与末尾换行差异。
-
-## 3. Marker 与 Anchor 规则
-
-`TEXT_ANCHOR_INSERT` 身份为：
-
-```text
-(capabilityId, targetId, anchorKey)
-```
-
-```text
-markerTargetId = targetId 中的 "." 替换为 "-"
-managedMarker = <capabilityId>-<markerTargetId>-<anchorKey>
-```
-
-- `capabilityId` 与 `anchorKey` 必须匹配 `[a-z0-9][a-z0-9-]*`。
-- marker 不依赖内容、顺序、UUID、timestamp 或 hash。
-- 同一身份最多一个 insertion block；不同身份产生相同 marker 时为 `MANAGED_MARKER_COLLISION`。
-- 修改已生成 insertion 内容时，必须保留同一 marker。
-
-## 4. 本地验证清单
-
-每次能力开发至少执行：
+## 提交前检查
 
 ```bash
+./capability status <capabilityId>
+./capability build <capabilityId>
+git diff -- template-source
 mvn -f template-engine/pom.xml -pl capability-authoring -am test
 ./validation/verify-stage2.sh
 git diff --check
 ```
 
-涉及 Service、HTTP、ZIP 或启动配置时，按仓库 `AGENTS.md` 再执行 Service package 与 Stage 3 HTTP 验收。
+提交受管内容通常是：
 
-建议在 `compile` 后检查：
-
-```bash
-git diff -- template-source
+```text
+template-source/capabilities/<capabilityId>/**
+template-source/strategy-registry-v2.yaml
+该能力确实需要的 Base / Surface 契约变化
 ```
 
-确认只出现目标 Capability、Registry、Validator、必要 migration 文件与发布元数据的预期改动。
+不得提交 `.workbench/`、`compile-state.yaml` 或本机依赖目录。
 
-## 5. 发布边界
+## 高级命令
 
-`template publish` 尚未提供可独立执行的本地 CLI 命令。发布必须由 CI/Release Gate 统一执行，且同时要求：
+```bash
+./capability capture <capabilityId>  # 仅 Diff + Analyze
+./capability compile <capabilityId>  # 仅编译
+./capability verify <capabilityId>   # 单独 Draft + Round-trip 验证
+```
 
-1. Draft Validation；
-2. Round-trip Verify；
-3. Template V2 跨端 Contract Test（Java Generator 与 XCodeAgent Executor V2）；
-4. Capability postcondition、前端 build、后端 test；
-5. 新 `templateRevision` 与对应 `release-digests.yaml` digest；
-6. 正式 `CapabilityV2Loader` 校验通过。
-
-跨端 Contract Test 不属于 Capability Compiler Runtime；不得以另一份 Java 代码或跳过 digest 来替代 XCodeAgent Executor 验证。
-
-## 6. 常见失败处理
-
-| 错误 | 处理方式 |
-| --- | --- |
-| `CAPABILITY_CAPTURE_UNSUPPORTED` | 检查是否修改了未注册 Surface、删除/改写 Base 内容或产生无法归并的 anchor 插入。 |
-| `AMBIGUOUS_ANCHOR_INSERT` | 将改动收敛为单一已注册 anchor 的一个 insertion block。 |
-| `MANAGED_MARKER_COLLISION` | 调整 Registry target/anchor 设计；不要手工修改 marker 规避冲突。 |
-| `MIGRATION_CONTRACT_INVALID` | 显式配置 migration，确保 source 存在且 target 等于 consumer path。 |
-| `CAPABILITY_POSTCONDITION_MISSING` | 至少新增一个可检查的文件或受管 anchor block。 |
-| `ROUND_TRIP_MISMATCH` | 对照生成项目与 Workbench，检查遗漏 Addition、import、anchor 内容或依赖。 |
-| `TEMPLATE_REVISION_REUSED` | 发布时递增 revision，并重新计算/登记 digest；不得修改已有 revision 内容。 |
-
-## 7. 维护原则
-
-- Runtime Contract 先稳定，Compiler 才可自动生成相应 Strategy。
-- 不要在 Engine Service 以 capability ID 写分支。
-- 不要引入第二套 Target、Strategy 或 Validator Registry。
-- 无法解释的变更永远 fail-closed；禁止 raw patch fallback。
-- 将 Workbench 视为本地开发输入，最终受管产物始终是 `template-source/`。
+它们用于定位框架或模板契约问题，不能替代 `build`。

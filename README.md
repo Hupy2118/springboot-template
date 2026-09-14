@@ -130,3 +130,7 @@ Tomcat 默认会在文件名中加入日期，例如 `access.2026-09-09.log`，�
 当配置改变时，预期 `200 application/zip`，ZIP 仅包含 `strategy-update-package.json` 与可选 `payload/`。将该文件的 `nextTemplateState` 与同一 RequestedConfig 再次提交，预期 `204 No Content`。
 
 完整验收契约见 [docs/REFACTOR.md](docs/REFACTOR.md)。
+
+## Capability Authoring
+
+新增 Capability 的本地工作流是 `./capability init`、开发 `.workbench/<id>/project`、可选 `./capability status`、再执行 `./capability build`。完整约束、Draft 所有权和高级调试命令见 [docs/Capability_Authoring_Guide.md](docs/Capability_Authoring_Guide.md)。

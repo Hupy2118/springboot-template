@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+MAVEN_POM="$SCRIPT_DIR/template-engine/pom.xml"
+mvn -q -f "$MAVEN_POM" -pl capability-authoring -am -DskipTests package
+CLASSPATH="$SCRIPT_DIR/template-engine/capability-authoring/target/classes:$SCRIPT_DIR/template-engine/engine-core/target/classes"
+CLASSPATH="$CLASSPATH:$HOME/.m2/repository/com/fasterxml/jackson/core/jackson-annotations/2.13.4/jackson-annotations-2.13.4.jar"
+CLASSPATH="$CLASSPATH:$HOME/.m2/repository/com/fasterxml/jackson/core/jackson-core/2.13.4/jackson-core-2.13.4.jar"
+CLASSPATH="$CLASSPATH:$HOME/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.13.4/jackson-databind-2.13.4.jar"
+CLASSPATH="$CLASSPATH:$HOME/.m2/repository/com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2.13.4/jackson-dataformat-yaml-2.13.4.jar"
+CLASSPATH="$CLASSPATH:$HOME/.m2/repository/org/yaml/snakeyaml/1.30/snakeyaml-1.30.jar"
+exec java -cp "$CLASSPATH" com.xcodeagent.template.authoring.CapabilityCli "$@"

@@ -26,4 +26,18 @@ class CapabilityCompilerTest {
         assertTrue(new String(Files.readAllBytes(source.resolve("strategy-registry-v2.yaml")), StandardCharsets.UTF_8).contains("feature.postcondition"));
         assertThrows(RuntimeException.class, () -> compiler.compile(source, project, draft));
     }
+
+    @Test void compileIntoChangesOnlyTheCallerOwnedTree() throws Exception {
+        Path source = temporaryDirectory.resolve("source-stage"), staging = temporaryDirectory.resolve("staging"), project = temporaryDirectory.resolve("project-stage");
+        Files.createDirectories(source.resolve("capabilities")); Files.createDirectories(project);
+        Files.write(source.resolve("strategy-registry-v2.yaml"), "schemaVersion: 2\ntargets: []\nanchors: []\nstrategies: []\nvalidators: []\n".getBytes(StandardCharsets.UTF_8));
+        Files.write(project.resolve("feature.ts"), "export default 1;\n".getBytes(StandardCharsets.UTF_8));
+        CapabilityCompiler.copy(source, staging);
+        CapabilityDraft changes = new CapabilityDraft("feature", Collections.singletonList(new AdditionDraft("feature.feature-ts", "feature.ts", "feature.ts")), Collections.<StrategyDraft>emptyList(), Collections.<UnsupportedChange>emptyList());
+        Map<String,Object> validator = new LinkedHashMap<String,Object>(); validator.put("type", "CAPABILITY_POSTCONDITION"); validator.put("checks", Collections.singletonList(Collections.singletonMap("type", "FILE_EXISTS")));
+        CompileState state = new CapabilityCompiler().compileInto(staging, project, new CapabilityContractDraft(changes, Collections.<String>emptyList(), Collections.<MigrationDraft>emptyList(), Collections.singletonList(new ValidatorDraft("feature.postcondition", validator))));
+        assertTrue(Files.isRegularFile(staging.resolve("capabilities/feature/capability-v2.yaml")));
+        assertTrue(!Files.exists(source.resolve("capabilities/feature")));
+        assertTrue(state.validatorIds().contains("feature.postcondition"));
+    }
 }
