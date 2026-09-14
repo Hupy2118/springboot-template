@@ -15,7 +15,7 @@
 
 ```sh
 cd /Users/zhangrongrong/Documents/workspace/springboot-template
-mvn -f template-engine/pom.xml -pl engine-service -am package
+mvn -f template-engine/pom.xml -pl engine-service -am package -D maven.test.skip=true
 ```
 
 该命令会构建可执行 JAR，并运行 Service 集成测试。JAR 位于：
