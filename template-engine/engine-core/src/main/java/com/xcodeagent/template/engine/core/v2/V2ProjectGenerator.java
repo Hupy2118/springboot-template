@@ -152,8 +152,16 @@ public final class V2ProjectGenerator {
         if (anchorIndex < 0 || count(source, anchor) != 1) throw new TemplateSourceException("ANCHOR_NOT_UNIQUE: " + anchor);
         String position = parameters.get("position") instanceof String ? (String) parameters.get("position") : "before";
         if (!"before".equals(position) && !"after".equals(position)) throw new TemplateSourceException("ANCHOR_POSITION_INVALID");
-        int insertion = "after".equals(position) ? anchorIndex + anchor.length() : anchorIndex;
+        // "before" means before the anchor *line*, not before the first anchor
+        // character.  Inserting at anchorIndex leaves the anchor line's indentation
+        // in front of the managed block and produces a different authoring shape.
+        int insertion = "after".equals(position) ? anchorIndex + anchor.length() : lineStart(source, anchorIndex);
         return source.substring(0, insertion) + content + source.substring(insertion);
+    }
+
+    private static int lineStart(String source, int offset) {
+        int newline = source.lastIndexOf('\n', offset - 1);
+        return newline < 0 ? 0 : newline + 1;
     }
 
     private static int count(String value, String needle) {

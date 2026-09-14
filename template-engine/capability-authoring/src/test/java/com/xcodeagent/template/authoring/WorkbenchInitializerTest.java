@@ -23,7 +23,7 @@ class WorkbenchInitializerTest {
     void createsAnEditableBaselineWithAllTransitiveRequirements() throws Exception {
         Path workbenches = temporaryDirectory.resolve(".workbench");
         Path workbench = new WorkbenchInitializer(templateSource(), workbenches)
-                .initialize("excel-export", Collections.singletonList("authorization"));
+                .initialize("workbench-test", Collections.singletonList("authorization"));
 
         Path baseline = workbench.resolve("baseline");
         Path project = workbench.resolve("project");
@@ -33,7 +33,7 @@ class WorkbenchInitializerTest {
         assertTrue(Files.isRegularFile(baseline.resolve(loginFile)));
         assertArrayEquals(Files.readAllBytes(baseline.resolve(authorizationFile)), Files.readAllBytes(project.resolve(authorizationFile)));
         String authoring = new String(Files.readAllBytes(workbench.resolve("authoring.yaml")), StandardCharsets.UTF_8);
-        assertTrue(authoring.contains("capabilityId: excel-export"));
+        assertTrue(authoring.contains("capabilityId: workbench-test"));
         assertTrue(authoring.contains("  - authorization"));
         assertTrue(authoring.contains("templateRevision: "));
         assertFalse(authoring.contains("baselineDigest"));
@@ -42,11 +42,11 @@ class WorkbenchInitializerTest {
     @Test
     void doesNotOverwriteAnExistingWorkbench() throws Exception {
         WorkbenchInitializer initializer = new WorkbenchInitializer(templateSource(), temporaryDirectory.resolve(".workbench"));
-        Path workbench = initializer.initialize("excel-export", Collections.singletonList("login"));
+        Path workbench = initializer.initialize("workbench-test", Collections.singletonList("login"));
         Files.write(workbench.resolve("authoring.yaml"), "keep-me".getBytes(StandardCharsets.UTF_8));
 
         assertThrows(TemplateSourceException.class,
-                () -> initializer.initialize("excel-export", Collections.singletonList("login")));
+                () -> initializer.initialize("workbench-test", Collections.singletonList("login")));
         assertArrayEquals("keep-me".getBytes(StandardCharsets.UTF_8), Files.readAllBytes(workbench.resolve("authoring.yaml")));
     }
 
@@ -56,8 +56,8 @@ class WorkbenchInitializerTest {
         WorkbenchInitializer initializer = new WorkbenchInitializer(templateSource(), workbenches);
 
         assertThrows(TemplateSourceException.class,
-                () -> initializer.initialize("excel-export", Collections.singletonList("missing-capability")));
-        assertFalse(Files.exists(workbenches.resolve("excel-export")));
+                () -> initializer.initialize("workbench-test", Collections.singletonList("missing-capability")));
+        assertFalse(Files.exists(workbenches.resolve("workbench-test")));
     }
 
     @Test
@@ -65,7 +65,7 @@ class WorkbenchInitializerTest {
         Path workbenches = temporaryDirectory.resolve(".workbench");
 
         Path workbench = CapabilityCli.run(templateSource(), workbenches,
-                new String[] { "init", "excel-export", "--requires", "login,authorization" });
+                new String[] { "init", "workbench-test", "--requires", "login,authorization" });
 
         assertTrue(Files.isRegularFile(workbench.resolve("baseline/frontend/src/pages/Login/index.tsx")));
         assertTrue(Files.isRegularFile(workbench.resolve("baseline/backend/src/main/java/com/cmbchina/backend/auth/adapter/web/MemberController.java")));

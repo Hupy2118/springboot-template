@@ -30,11 +30,9 @@ class CapabilityV2LoaderContractTest {
     void rejectsInvalidDependencyGraphExactParametersUnsupportedGenerateTypeAndTrigger() throws Exception {
         assertRejected("capabilities/authorization/capability-v2.yaml", "- id: login", "- id: missing-capability");
         assertRejected("capabilities/login/capability-v2.yaml", "requires: []", "requires: [login]");
-        assertRejected("strategy-registry-v2.yaml", "parameters: { importStatement: \"import { GlobalContextProvider } from '@/providers'\" }",
-                "parameters: { importStatement: \"import { GlobalContextProvider } from '@/providers'\", unexpected: true }");
-        assertRejected("strategy-registry-v2.yaml",
-                "- { id: frontend.login.import-provider, targetId: frontend.capability-providers, type: ENSURE_IMPORT, order: 100, parameters: { importStatement: \"import { GlobalContextProvider } from '@/providers'\" } }",
-                "- { id: frontend.login.import-provider, targetId: frontend.capability-providers, type: ENSURE_NPM_DEPENDENCY, order: 100, parameters: { name: react, version: 18.0.0 } }");
+        assertRejected("strategy-registry-v2.yaml", "importStatement: \"import { GlobalContextProvider } from '@/providers'\"",
+                "importStatement: \"import { GlobalContextProvider } from '@/providers'\"\n    unexpected: true");
+        assertRejected("strategy-registry-v2.yaml", "type: \"ENSURE_IMPORT\"", "type: \"ENSURE_NPM_DEPENDENCY\"");
         assertRejected("capabilities/authorization/capability-v2.yaml", "executionTrigger: AUTHORIZATION_BOOTSTRAP_DDL", "executionTrigger: UNKNOWN_TRIGGER");
     }
 

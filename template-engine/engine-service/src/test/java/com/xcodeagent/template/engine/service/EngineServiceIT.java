@@ -171,6 +171,10 @@ class EngineServiceIT {
             String content = parameters.path("content").asText();
             int index = source.indexOf(anchor);
             if (index < 0 || index != source.lastIndexOf(anchor)) throw new AssertionError("invalid Golden anchor " + target);
+            if ("before".equals(parameters.path("position").asText())) {
+                int newline = source.lastIndexOf('\n', index - 1);
+                index = newline < 0 ? 0 : newline + 1;
+            }
             files.put(target, source.substring(0, index) + content + source.substring(index));
         }
     }

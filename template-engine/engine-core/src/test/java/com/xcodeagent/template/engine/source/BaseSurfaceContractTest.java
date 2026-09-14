@@ -104,6 +104,19 @@ class BaseSurfaceContractTest {
         assertFalse(webMvc.contains("@org.springframework.beans.factory.annotation.Autowired"));
     }
 
+    @Test
+    void managedInsertionStartsAtTheAnchorLine() throws Exception {
+        Path root = repositoryRoot().resolve("template-source");
+        TemplateRelease release = new CapabilityV2Loader().load(root);
+        Map<String, CapabilityState> login = new LinkedHashMap<String, CapabilityState>();
+        login.put("login", new CapabilityState(true, Collections.emptyMap()));
+        String routes = new V2ProjectGenerator(root, release).generate(
+                new TemplateStateV2(release.revision(), login, login, Collections.emptyMap()))
+                .get("frontend/src/capability-extensions/routes.tsx");
+        assertTrue(routes.contains("[\n/* xcodeagent:login-route:begin */"));
+        assertFalse(routes.contains("[\n  /* xcodeagent:login-route:begin */"));
+    }
+
     private static void assertAnchor(Path base, String relative, String anchor) throws Exception {
         assertEquals(1, count(read(base, relative), anchor), relative + " must contain one stable anchor");
     }
