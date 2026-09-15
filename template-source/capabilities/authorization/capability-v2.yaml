@@ -206,10 +206,6 @@ additions:
     source: backend/src/main/resources/mapper/auth/RoleResourceMapper.xml
     target: backend/src/main/resources/mapper/auth/RoleResourceMapper.xml
     maintainPolicy: { mode: NO_OP }
-  - id: authorization.backend-src-test-java-com-cmbchina-backend-auth-authcontracttest
-    source: backend/src/test/java/com/cmbchina/backend/auth/AuthContractTest.java
-    target: backend/src/test/java/com/cmbchina/backend/auth/AuthContractTest.java
-    maintainPolicy: { mode: NO_OP }
   - id: authorization.backend-src-test-java-com-cmbchina-backend-auth-adapter-web-controllerresponsetest
     source: backend/src/test/java/com/cmbchina/backend/auth/adapter/web/ControllerResponseTest.java
     target: backend/src/test/java/com/cmbchina/backend/auth/adapter/web/ControllerResponseTest.java

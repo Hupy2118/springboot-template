@@ -30,6 +30,7 @@ files:
   - { source: frontend/jest.config.cjs, target: frontend/jest.config.cjs }
   - { source: frontend/package.json, target: frontend/package.json }
   - { source: frontend/pnpm-lock.yaml, target: frontend/pnpm-lock.yaml }
+  - { source: frontend/pnpm-workspace.yaml, target: frontend/pnpm-workspace.yaml }
   - { source: frontend/postcss.config.js, target: frontend/postcss.config.js }
   - { source: frontend/public/favicon.svg, target: frontend/public/favicon.svg }
   - { source: frontend/rsbuild_copy.config.ts, target: frontend/rsbuild_copy.config.ts }
