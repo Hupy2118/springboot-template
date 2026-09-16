@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import type { RouteObject } from 'react-router-dom';
 import type { PageRouteDefinition } from '@/typings/routes';
 
@@ -18,12 +17,4 @@ export const capabilityRootRoutes: RouteObject[] = [
 /** 普通业务 Capability 页面在此注册。 */
 export const capabilityPageRoutes: PageRouteDefinition[] = [
   // xcodeagent:capability-page-routes
-];
-
-/** 用于登录、权限与 Feature Flag 等横切页面包装。 */
-export const capabilityPageWrappers: Array<(
-  element: ReactNode,
-  page: PageRouteDefinition,
-) => ReactNode> = [
-  // xcodeagent:capability-page-wrappers
 ];

@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosError, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
 export type DataType = unknown;
 export type ReqFulfilledType = (config: InternalAxiosRequestConfig) => InternalAxiosRequestConfig;
@@ -93,10 +93,6 @@ class Service {
 
   delete<T>(url: string, config: AxiosRequestConfig = {}): Promise<T> {
     return this.axios.delete(url, config) as unknown as Promise<T>;
-  }
-
-  all(axiosInstances: AxiosInstance[]) {
-    return axios.all(axiosInstances);
   }
 
 }

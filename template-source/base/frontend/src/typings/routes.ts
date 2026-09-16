@@ -1,10 +1,10 @@
-import type { ComponentType } from 'react';
-import type { Route } from '@/typings/workbench';
+import type { ReactNode } from 'react';
 
-export type PageRouteDefinition = Omit<Route, 'children' | 'key'> & {
-  children?: PageRouteDefinition[];
-  pageId?: string;
-  modulePath?: string;
-  component?: ComponentType;
+/** Every page under the main Layout is discovered from its stable pageId. */
+export interface PageRouteDefinition {
+  name: string;
+  pageId: string;
   resourceKey?: string;
-};
+  hideInMenu?: boolean;
+  icon?: ReactNode;
+}

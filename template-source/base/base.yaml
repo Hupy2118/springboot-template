@@ -2,6 +2,8 @@ id: base
 version: 1.0.0
 files:
   - { source: contracts/route-projector.json, target: .xcodeagent/template-contracts/route-projector.json }
+  - { source: contracts/route-projector-input.schema.json, target: .xcodeagent/template-contracts/route-projector-input.schema.json }
+  - { source: contracts/route-projector-output.schema.json, target: .xcodeagent/template-contracts/route-projector-output.schema.json }
   - { source: backend/.env.example, target: backend/.env.example }
   - { source: backend/.gitignore, target: backend/.gitignore }
   - { source: backend/AGENTS.md, target: backend/AGENTS.md }
@@ -41,56 +43,26 @@ files:
   - { source: frontend/scripts/xcodeagent/route-projector.mjs, target: frontend/scripts/xcodeagent/route-projector.mjs }
   - { source: frontend/scripts/xcodeagent/test-route-projector.mjs, target: frontend/scripts/xcodeagent/test-route-projector.mjs }
   - { source: frontend/src/App.tsx, target: frontend/src/App.tsx }
-  - { source: frontend/src/capability-extensions/menus.ts, target: frontend/src/capability-extensions/menus.ts }
+  - { source: frontend/src/capability-extensions/menuTransforms.ts, target: frontend/src/capability-extensions/menuTransforms.ts }
   - { source: frontend/src/capability-extensions/providers.tsx, target: frontend/src/capability-extensions/providers.tsx }
+  - { source: frontend/src/capability-extensions/routeGuards.tsx, target: frontend/src/capability-extensions/routeGuards.tsx }
   - { source: frontend/src/capability-extensions/routes.tsx, target: frontend/src/capability-extensions/routes.tsx }
-  - { source: frontend/src/apis/auth.ts, target: frontend/src/apis/auth.ts }
   - { source: frontend/src/apis/service.ts, target: frontend/src/apis/service.ts }
-  - { source: frontend/src/apis/welcome.ts, target: frontend/src/apis/welcome.ts }
-  - { source: frontend/src/assets/appIconList/icon1.svg, target: frontend/src/assets/appIconList/icon1.svg }
-  - { source: frontend/src/assets/appIconList/icon10.svg, target: frontend/src/assets/appIconList/icon10.svg }
-  - { source: frontend/src/assets/appIconList/icon11.svg, target: frontend/src/assets/appIconList/icon11.svg }
-  - { source: frontend/src/assets/appIconList/icon12.svg, target: frontend/src/assets/appIconList/icon12.svg }
-  - { source: frontend/src/assets/appIconList/icon13.svg, target: frontend/src/assets/appIconList/icon13.svg }
-  - { source: frontend/src/assets/appIconList/icon14.svg, target: frontend/src/assets/appIconList/icon14.svg }
-  - { source: frontend/src/assets/appIconList/icon15.svg, target: frontend/src/assets/appIconList/icon15.svg }
-  - { source: frontend/src/assets/appIconList/icon16.svg, target: frontend/src/assets/appIconList/icon16.svg }
-  - { source: frontend/src/assets/appIconList/icon17.svg, target: frontend/src/assets/appIconList/icon17.svg }
-  - { source: frontend/src/assets/appIconList/icon18.svg, target: frontend/src/assets/appIconList/icon18.svg }
-  - { source: frontend/src/assets/appIconList/icon2.svg, target: frontend/src/assets/appIconList/icon2.svg }
-  - { source: frontend/src/assets/appIconList/icon20.svg, target: frontend/src/assets/appIconList/icon20.svg }
-  - { source: frontend/src/assets/appIconList/icon21.svg, target: frontend/src/assets/appIconList/icon21.svg }
-  - { source: frontend/src/assets/appIconList/icon3.svg, target: frontend/src/assets/appIconList/icon3.svg }
-  - { source: frontend/src/assets/appIconList/icon4.svg, target: frontend/src/assets/appIconList/icon4.svg }
-  - { source: frontend/src/assets/appIconList/icon5.svg, target: frontend/src/assets/appIconList/icon5.svg }
-  - { source: frontend/src/assets/appIconList/icon6.svg, target: frontend/src/assets/appIconList/icon6.svg }
-  - { source: frontend/src/assets/appIconList/icon7.svg, target: frontend/src/assets/appIconList/icon7.svg }
-  - { source: frontend/src/assets/appIconList/icon8.svg, target: frontend/src/assets/appIconList/icon8.svg }
-  - { source: frontend/src/assets/appIconList/icon9.svg, target: frontend/src/assets/appIconList/icon9.svg }
-  - { source: frontend/src/assets/appIconList/index.tsx, target: frontend/src/assets/appIconList/index.tsx }
-  - { source: frontend/src/assets/xpro_app_icon_bg.svg, target: frontend/src/assets/xpro_app_icon_bg.svg }
   - { source: frontend/src/components/ErrorBoundary/index.tsx, target: frontend/src/components/ErrorBoundary/index.tsx }
-  - { source: frontend/src/constants/index.ts, target: frontend/src/constants/index.ts }
-  - { source: frontend/src/constants/layout.ts, target: frontend/src/constants/layout.ts }
   - { source: frontend/src/constants/routes.tsx, target: frontend/src/constants/routes.tsx }
   - { source: frontend/src/index.css, target: frontend/src/index.css }
   - { source: frontend/src/index.tsx, target: frontend/src/index.tsx }
-  - { source: frontend/src/layout/components/AppIcon/index.tsx, target: frontend/src/layout/components/AppIcon/index.tsx }
   - { source: frontend/src/layout/index.tsx, target: frontend/src/layout/index.tsx }
   - { source: frontend/src/pages/Welcome/index.tsx, target: frontend/src/pages/Welcome/index.tsx }
   - { source: frontend/src/react-app-env.d.ts, target: frontend/src/react-app-env.d.ts }
   - { source: frontend/src/routes/index.tsx, target: frontend/src/routes/index.tsx }
-  - { source: frontend/src/routes/capabilityRuntime.tsx, target: frontend/src/routes/capabilityRuntime.tsx }
-  - { source: frontend/src/styles/index.less, target: frontend/src/styles/index.less }
-  - { source: frontend/src/styles/theme.less, target: frontend/src/styles/theme.less }
-  - { source: frontend/src/styles/variable.less, target: frontend/src/styles/variable.less }
-  - { source: frontend/src/typings/index.ts, target: frontend/src/typings/index.ts }
+  - { source: frontend/src/routes/pageRegistry.ts, target: frontend/src/routes/pageRegistry.ts }
+  - { source: frontend/src/routes/routeBuilder.tsx, target: frontend/src/routes/routeBuilder.tsx }
   - { source: frontend/src/typings/routes.ts, target: frontend/src/typings/routes.ts }
-  - { source: frontend/src/typings/workbench.ts, target: frontend/src/typings/workbench.ts }
+  - { source: frontend/src/typings/menu.ts, target: frontend/src/typings/menu.ts }
   - { source: frontend/src/utils/pageIdentity.ts, target: frontend/src/utils/pageIdentity.ts }
-  - { source: frontend/src/utils/pageRoutes.tsx, target: frontend/src/utils/pageRoutes.tsx }
+  - { source: frontend/src/utils/pageIdentity.vectors.json, target: frontend/src/utils/pageIdentity.vectors.json }
   - { source: frontend/src/utils/route.tsx, target: frontend/src/utils/route.tsx }
-  - { source: frontend/src/utils/workbench.tsx, target: frontend/src/utils/workbench.tsx }
   - { source: frontend/tailwind.config.js, target: frontend/tailwind.config.js }
   - { source: frontend/tsconfig.json, target: frontend/tsconfig.json }
   - { source: frontend/tsconfig.test.json, target: frontend/tsconfig.test.json }

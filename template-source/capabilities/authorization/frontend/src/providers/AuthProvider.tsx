@@ -1,6 +1,7 @@
 import { createContext, PropsWithChildren, useContext, useMemo } from 'react';
 import { useRequest } from 'ahooks';
 import { AuthorizationApiError, getMyResources } from '@/apis/authorization';
+import '../authorization.css';
 
 export type AuthState = 'loading' | 'ready' | 'unauthenticated' | 'forbidden' | 'not-ready' | 'error';
 type AuthContextValue = {

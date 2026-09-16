@@ -23,8 +23,7 @@ class RoundTripVerifierTest {
         Path workbench = new WorkbenchInitializer(draftSource, workbenches).initialize("excel-export-test", Collections.<String>emptyList());
         Path routes = workbench.resolve("project/frontend/src/capability-extensions/routes.tsx");
         String edited = new String(Files.readAllBytes(routes), StandardCharsets.UTF_8)
-                .replace("import type { PageRouteDefinition } from '@/typings/routes';", "import type { PageRouteDefinition } from '@/typings/routes';\nimport Home from '@/pages/Home';")
-                .replace("  // xcodeagent:capability-page-routes", "  {\n    pageId: 'home',\n    modulePath: 'home',\n    component: Home,\n  },\n  // xcodeagent:capability-page-routes");
+                .replace("  // xcodeagent:capability-page-routes", "  {\n    name: 'Home',\n    pageId: 'home',\n  },\n  // xcodeagent:capability-page-routes");
         Files.write(routes, edited.getBytes(StandardCharsets.UTF_8));
 
         assertDoesNotThrow(() -> new CapabilityBuildService(draftSource, workbenches).build("excel-export-test"));

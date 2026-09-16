@@ -13,16 +13,7 @@ export default defineConfig({
       '@utils': path.resolve(__dirname, 'src/utils'),
     },
   },
-  css: {
-    preprocessorOptions: {
-      less: {
-        javascriptEnabled: true,
-        math: 'always',
-        additionalData: `@import "${path.resolve(__dirname, 'src/styles/variable.less')}";`,
-      },
-    },
-    postcss: './postcss.config.js',
-  },
+  css: { postcss: './postcss.config.js' },
   server: {
     port: 3000,
     proxy: {

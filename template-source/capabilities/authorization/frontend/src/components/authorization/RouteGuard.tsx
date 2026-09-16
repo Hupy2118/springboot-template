@@ -1,5 +1,5 @@
 import { Alert, Button, Result, Spin } from 'antd';
-import { PropsWithChildren } from 'react';
+import { Outlet } from 'react-router-dom';
 import { type AuthState, useAuth } from '@/providers/AuthProvider';
 import { usePermission } from '@/hooks/usePermission';
 
@@ -12,8 +12,8 @@ export function AuthStateView({ state }: { state: AuthState }) {
   return <Alert type="error" showIcon message="权限状态加载失败" description="暂时无法验证您的访问权限，请稍后重试。" action={<Button onClick={() => refreshPermissions()}>重试</Button>} />;
 }
 
-export function RouteGuard({ resourceKey, children }: PropsWithChildren<{ resourceKey: string }>) {
+export function AuthorizationGuard({ resourceKey }: { resourceKey: string }) {
   const { state } = useAuth();
   const { hasPermission } = usePermission();
-  return hasPermission(resourceKey) ? <>{children}</> : <AuthStateView state={state} />;
+  return hasPermission(resourceKey) ? <Outlet /> : <AuthStateView state={state} />;
 }

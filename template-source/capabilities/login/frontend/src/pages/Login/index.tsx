@@ -5,6 +5,7 @@ import { Alert, Button, Card, Form, Input, Typography } from 'antd';
 import { mockLogin } from '@/apis/login';
 import { USER_INFO_KEY } from '@/login/constants';
 import { GlobalContext } from '@/providers';
+import './login.css';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -33,8 +34,8 @@ export default function Login() {
   };
 
   return (
-    <div className='authorization-login-page'>
-      <Card className='authorization-login-card'>
+    <div className='login-page'>
+      <Card className='login-card'>
         <Typography.Title level={2}>登录</Typography.Title>
         <Typography.Paragraph type='secondary'>
           请输入用户 ID 进入应用。

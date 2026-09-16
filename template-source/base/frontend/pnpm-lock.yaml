@@ -111,18 +111,12 @@ importers:
       jest-environment-jsdom:
         specifier: ^27.0.0
         version: 27.0.0
-      jest-less-loader:
-        specifier: 0.2.0
-        version: 0.2.0(less@4.9.1)
       jest-sonar-reporter:
         specifier: ^2.0.0
         version: 2.0.0
       jest-watch-typeahead:
         specifier: ^2.2.2
         version: 2.2.2(jest@27.0.0)
-      less:
-        specifier: ^4.2.0
-        version: 4.9.1
       postcss:
         specifier: ^8.5.15
         version: 8.5.28
@@ -2447,11 +2441,6 @@ packages:
   jest-leak-detector@27.0.0:
     resolution: {integrity: sha512-hqa76nyWJDw4wXLxrGKLoADb9pMOSfa+Kf8bjDcBWaXJIT0yffheTpJ7+2ruzVdABz4i70oT6cAw6H3VWNbIOQ==}
     engines: {node: ^10.13.0 || ^12.13.0 || ^14.15.0 || >=15.0.0}
-
-  jest-less-loader@0.2.0:
-    resolution: {integrity: sha512-1UVS+j6O42jzhQG6baGNZZUMWtMNk+ZDQ3FYmk7xThfwcbvWbfOqFJ/n3e9gJI4A8yJTUz+5oEgPQkKNae4yCA==}
-    peerDependencies:
-      less: ^4.1.3
 
   jest-matcher-utils@27.0.0:
     resolution: {integrity: sha512-4a/3sH39C2bUa2mJP4WXKWTC69ICGnG1uCvLgcOHnYwf7ESd0DpW/ocACfMpOXGKhEQZ4wkCFOMKdhL1jgAz+A==}
@@ -6871,10 +6860,6 @@ snapshots:
     dependencies:
       jest-get-type: 27.5.1
       pretty-format: 27.0.0
-
-  jest-less-loader@0.2.0(less@4.9.1):
-    dependencies:
-      less: 4.9.1
 
   jest-matcher-utils@27.0.0:
     dependencies:

@@ -2,13 +2,15 @@ schemaVersion: 2
 targets:
   - { id: frontend.capability-providers, path: frontend/src/capability-extensions/providers.tsx }
   - { id: frontend.capability-routes, path: frontend/src/capability-extensions/routes.tsx }
-  - { id: frontend.capability-menus, path: frontend/src/capability-extensions/menus.ts }
+  - { id: frontend.capability-route-guards, path: frontend/src/capability-extensions/routeGuards.tsx }
+  - { id: frontend.capability-menus, path: frontend/src/capability-extensions/menuTransforms.ts }
   - { id: backend.capability-webmvc, path: backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java }
 anchors:
   - { targetId: frontend.capability-providers, anchorKey: capability-providers, anchor: "// xcodeagent:capability-providers", position: before }
   - { targetId: frontend.capability-routes, anchorKey: capability-root-routes, anchor: "// xcodeagent:capability-root-routes", position: before }
   - { targetId: frontend.capability-routes, anchorKey: capability-page-routes, anchor: "// xcodeagent:capability-page-routes", position: before }
-  - { targetId: frontend.capability-routes, anchorKey: capability-page-wrappers, anchor: "// xcodeagent:capability-page-wrappers", position: before }
+  - { targetId: frontend.capability-route-guards, anchorKey: app-route-guards, anchor: "// xcodeagent:app-route-guards", position: before }
+  - { targetId: frontend.capability-route-guards, anchorKey: page-route-guards, anchor: "// xcodeagent:page-route-guards", position: before }
   - { targetId: frontend.capability-menus, anchorKey: capability-menu-transforms, anchor: "// xcodeagent:capability-menu-transforms", position: before }
   - { targetId: backend.capability-webmvc, anchorKey: capability-interceptors, anchor: "// xcodeagent:capability-interceptors", position: before }
 strategies:
@@ -23,19 +25,19 @@ strategies:
     targetId: frontend.capability-routes
     type: TEXT_ANCHOR_INSERT
     order: 130
-    parameters: { anchor: "// xcodeagent:capability-root-routes", position: before, managedMarker: login-route, content: "/* xcodeagent:login-route:begin */\n{ path: '/login', element: <LoginPage />, handle: { capabilityEntry: true } },\n/* xcodeagent:login-route:end */\n" }
+    parameters: { anchor: "// xcodeagent:capability-root-routes", position: before, managedMarker: login-route, content: "/* xcodeagent:login-route:begin */\n{ path: '/login', element: <LoginPage /> },\n/* xcodeagent:login-route:end */\n" }
   - { id: frontend.login.import-logout-route, targetId: frontend.capability-routes, type: ENSURE_IMPORT, order: 140, parameters: { importStatement: "import LogoutPage from '@/pages/Logout'" } }
   - id: frontend.login.register-logout-route
     targetId: frontend.capability-routes
     type: TEXT_ANCHOR_INSERT
     order: 150
     parameters: { anchor: "// xcodeagent:capability-root-routes", position: before, managedMarker: logout-route, content: "/* xcodeagent:logout-route:begin */\n{ path: '/logout', element: <LogoutPage /> },\n/* xcodeagent:logout-route:end */\n" }
-  - { id: frontend.login.import-page-wrapper, targetId: frontend.capability-routes, type: ENSURE_IMPORT, order: 160, parameters: { importStatement: "import { wrapLoginRequired } from '@/components/wrapLoginRequired'" } }
-  - id: frontend.login.register-page-wrapper
-    targetId: frontend.capability-routes
+  - { id: frontend.login.import-app-route-guard, targetId: frontend.capability-route-guards, type: ENSURE_IMPORT, order: 160, parameters: { importStatement: "import { createLoginRouteGuard } from '@/components/loginRouteGuard'" } }
+  - id: frontend.login.register-app-route-guard
+    targetId: frontend.capability-route-guards
     type: TEXT_ANCHOR_INSERT
     order: 170
-    parameters: { anchor: "// xcodeagent:capability-page-wrappers", position: before, managedMarker: login-page-wrapper, content: "/* xcodeagent:login-page-wrapper:begin */\nwrapLoginRequired,\n/* xcodeagent:login-page-wrapper:end */\n" }
+    parameters: { anchor: "// xcodeagent:app-route-guards", position: before, managedMarker: login-app-route-guard, content: "/* xcodeagent:login-app-route-guard:begin */\ncreateLoginRouteGuard,\n/* xcodeagent:login-app-route-guard:end */\n" }
   - id: backend.login.register-interceptor
     targetId: backend.capability-webmvc
     type: TEXT_ANCHOR_INSERT
@@ -47,18 +49,17 @@ strategies:
     type: TEXT_ANCHOR_INSERT
     order: 210
     parameters: { anchor: "// xcodeagent:capability-providers", position: before, managedMarker: authorization-provider, content: "/* xcodeagent:authorization-provider:begin */\nAuthProvider,\n/* xcodeagent:authorization-provider:end */\n" }
-  - { id: frontend.authorization.import-page-route, targetId: frontend.capability-routes, type: ENSURE_IMPORT, order: 220, parameters: { importStatement: "import AuthorizationManagementPage from '@/pages/System/AuthorizationManagementPage'" } }
   - id: frontend.authorization.register-page-route
     targetId: frontend.capability-routes
     type: TEXT_ANCHOR_INSERT
     order: 230
-    parameters: { anchor: "// xcodeagent:capability-page-routes", position: before, managedMarker: authorization-page-route, content: "/* xcodeagent:authorization-page-route:begin */\n{ routeId: 'authorization-management-page', path: 'system/authorization', name: '权限管理', component: AuthorizationManagementPage, resourceKey: 'system_authorization_management' },\n/* xcodeagent:authorization-page-route:end */\n" }
-  - { id: frontend.authorization.import-page-wrapper, targetId: frontend.capability-routes, type: ENSURE_IMPORT, order: 240, parameters: { importStatement: "import { wrapAuthorizationPage } from '@/components/authorization/wrapAuthorizationPage'" } }
-  - id: frontend.authorization.register-page-wrapper
-    targetId: frontend.capability-routes
+    parameters: { anchor: "// xcodeagent:capability-page-routes", position: before, managedMarker: authorization-page-route, content: "/* xcodeagent:authorization-page-route:begin */\n{ name: '权限管理', pageId: 'authorization_management', resourceKey: 'system_authorization_management' },\n/* xcodeagent:authorization-page-route:end */\n" }
+  - { id: frontend.authorization.import-page-route-guard, targetId: frontend.capability-route-guards, type: ENSURE_IMPORT, order: 240, parameters: { importStatement: "import { createAuthorizationRouteGuard } from '@/components/authorization/createAuthorizationRouteGuard'" } }
+  - id: frontend.authorization.register-page-route-guard
+    targetId: frontend.capability-route-guards
     type: TEXT_ANCHOR_INSERT
     order: 250
-    parameters: { anchor: "// xcodeagent:capability-page-wrappers", position: before, managedMarker: authorization-page-wrapper, content: "/* xcodeagent:authorization-page-wrapper:begin */\nwrapAuthorizationPage,\n/* xcodeagent:authorization-page-wrapper:end */\n" }
+    parameters: { anchor: "// xcodeagent:page-route-guards", position: before, managedMarker: authorization-page-route-guard, content: "/* xcodeagent:authorization-page-route-guard:begin */\ncreateAuthorizationRouteGuard,\n/* xcodeagent:authorization-page-route-guard:end */\n" }
   - { id: frontend.authorization.import-menu-transform, targetId: frontend.capability-menus, type: ENSURE_IMPORT, order: 260, parameters: { importStatement: "import { useAuthorizationMenuTransform } from '@/hooks/useAuthorizationMenuTransform'" } }
   - id: frontend.authorization.register-menu-transform
     targetId: frontend.capability-menus
@@ -83,6 +84,7 @@ validators:
       checks:
         - { type: FILE_EXISTS, path: frontend/src/pages/Login/index.tsx }
         - { type: STRUCTURE_CHECK, path: frontend/src/capability-extensions/providers.tsx, containsAll: ["xcodeagent:login-provider:begin"] }
+        - { type: STRUCTURE_CHECK, path: frontend/src/capability-extensions/routeGuards.tsx, containsAll: ["xcodeagent:login-app-route-guard:begin"] }
         - { type: STRUCTURE_CHECK, path: backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java, containsAll: ["xcodeagent:login-interceptor:begin"] }
   - id: authorization.postcondition
     order: 20
@@ -94,8 +96,9 @@ validators:
       workingDirectory: .
       capabilityId: authorization
       checks:
-        - { type: FILE_EXISTS, path: frontend/src/pages/System/AuthorizationManagementPage/index.tsx }
+        - { type: FILE_EXISTS, path: frontend/src/pages/AuthorizationManagement/index.tsx }
         - { type: STRUCTURE_CHECK, path: frontend/src/capability-extensions/providers.tsx, containsAll: ["xcodeagent:authorization-provider:begin"] }
+        - { type: STRUCTURE_CHECK, path: frontend/src/capability-extensions/routeGuards.tsx, containsAll: ["xcodeagent:authorization-page-route-guard:begin"] }
         - { type: STRUCTURE_CHECK, path: backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java, containsAll: ["xcodeagent:authorization-interceptor:begin"] }
   - id: frontend.build
     order: 100

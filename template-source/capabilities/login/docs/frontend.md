@@ -7,7 +7,7 @@
 - `src/apis/login.ts` 调用模拟登录接口。
 - `src/providers/index.tsx` 提供全局登录上下文；引擎将它接入 `src/capability-extensions/providers.tsx` 的受管注册列表。
 - `src/pages/Login/` 与 `src/pages/Logout/` 分别由引擎注册到 `/login` 和 `/logout` 根路由。
-- `wrapLoginRequired` 由受管页面包装链使用，为需要登录的能力页面提供守卫。
+- `RequireLogin` 作为 App Route Guard 保护主业务 `PAGE_ROUTE` 分支；登录、登出等根路由始终位于 Guard 外。
 
 ## 维护边界
 

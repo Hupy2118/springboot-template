@@ -1,17 +1,24 @@
 import { Navigate, useRoutes, type RouteObject } from 'react-router-dom';
 import Layout from '@/layout';
-import { PAGE_ROUTE, PAGE_ROUTES } from '@/constants/routes';
-import { createPageRoutes } from '@/utils/pageRoutes';
+import { PAGE_ROUTE } from '@/constants/routes';
+import { applyAppRouteGuards, createPageRoutes } from '@/routes/routeBuilder';
+import { appPageRoutes } from '@/routes/pageRegistry';
 import { findFirstPagePath } from '@/utils/route';
-import { capabilityPageRoutes, capabilityRootRoutes } from '@/capability-extensions/routes';
-import { capabilityEntryPath, wrapCapabilityPage } from '@/routes/capabilityRuntime';
+import { capabilityRootRoutes } from '@/capability-extensions/routes';
 
-const pages = [...PAGE_ROUTES, ...capabilityPageRoutes];
-const first = findFirstPagePath(pages, PAGE_ROUTE);
+const first = findFirstPagePath(appPageRoutes, PAGE_ROUTE);
+const businessRoute: RouteObject = {
+  path: PAGE_ROUTE,
+  element: <Layout />,
+  children: [
+    { index: true, element: first ? <Navigate to={first} replace /> : <div>暂无页面</div> },
+    ...createPageRoutes(appPageRoutes),
+  ],
+};
 const routeList: RouteObject[] = [{ path: '/', children: [
-  { path: PAGE_ROUTE, element: <Layout />, children: [{ index: true, element: first ? <Navigate to={first} replace /> : <div>暂无页面</div> }, ...createPageRoutes(pages, wrapCapabilityPage)] },
   ...capabilityRootRoutes,
-  { index: true, element: <Navigate to={capabilityEntryPath || PAGE_ROUTE} replace /> },
+  applyAppRouteGuards(businessRoute),
+  { index: true, element: <Navigate to={PAGE_ROUTE} replace /> },
 ] }];
 const Routes = () => useRoutes(routeList);
 export { Routes, routeList };

@@ -6,10 +6,9 @@ requires:
 existingTargets:
   - { strategyId: frontend.authorization.import-provider }
   - { strategyId: frontend.authorization.register-provider }
-  - { strategyId: frontend.authorization.import-page-route }
   - { strategyId: frontend.authorization.register-page-route }
-  - { strategyId: frontend.authorization.import-page-wrapper }
-  - { strategyId: frontend.authorization.register-page-wrapper }
+  - { strategyId: frontend.authorization.import-page-route-guard }
+  - { strategyId: frontend.authorization.register-page-route-guard }
   - { strategyId: frontend.authorization.import-menu-transform }
   - { strategyId: frontend.authorization.register-menu-transform }
   - { strategyId: backend.authorization.register-interceptor }
@@ -254,9 +253,13 @@ additions:
     source: frontend/src/components/authorization/RouteGuard.tsx
     target: frontend/src/components/authorization/RouteGuard.tsx
     maintainPolicy: { mode: NO_OP }
-  - id: authorization.frontend-src-components-authorization-wrapauthorizationpage
-    source: frontend/src/components/authorization/wrapAuthorizationPage.tsx
-    target: frontend/src/components/authorization/wrapAuthorizationPage.tsx
+  - id: authorization.frontend-src-components-authorization-createauthorizationrouteguard
+    source: frontend/src/components/authorization/createAuthorizationRouteGuard.tsx
+    target: frontend/src/components/authorization/createAuthorizationRouteGuard.tsx
+    maintainPolicy: { mode: NO_OP }
+  - id: authorization.frontend-src-authorization-css
+    source: frontend/src/authorization.css
+    target: frontend/src/authorization.css
     maintainPolicy: { mode: NO_OP }
   - id: authorization.frontend-src-constants-resources
     source: frontend/src/constants/resources.ts
@@ -271,8 +274,8 @@ additions:
     target: frontend/src/hooks/usePermission.ts
     maintainPolicy: { mode: NO_OP }
   - id: authorization.role-page
-    source: frontend/src/pages/System/AuthorizationManagementPage/index.tsx
-    target: frontend/src/pages/System/AuthorizationManagementPage/index.tsx
+    source: frontend/src/pages/AuthorizationManagement/index.tsx
+    target: frontend/src/pages/AuthorizationManagement/index.tsx
     maintainPolicy: { mode: NO_OP }
   - id: authorization.auth-provider
     source: frontend/src/providers/AuthProvider.tsx

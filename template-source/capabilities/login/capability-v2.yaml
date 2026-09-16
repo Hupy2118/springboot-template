@@ -9,8 +9,8 @@ existingTargets:
   - { strategyId: frontend.login.register-login-route }
   - { strategyId: frontend.login.import-logout-route }
   - { strategyId: frontend.login.register-logout-route }
-  - { strategyId: frontend.login.import-page-wrapper }
-  - { strategyId: frontend.login.register-page-wrapper }
+  - { strategyId: frontend.login.import-app-route-guard }
+  - { strategyId: frontend.login.register-app-route-guard }
   - { strategyId: backend.login.register-interceptor }
 additions:
   - id: login.backend-src-main-java-com-cmbchina-backend-auth-adapter-web-mocklogincontroller
@@ -45,9 +45,13 @@ additions:
     source: frontend/src/apis/login.ts
     target: frontend/src/apis/login.ts
     maintainPolicy: { mode: NO_OP }
-  - id: login.frontend-src-components-wraploginrequired
-    source: frontend/src/components/wrapLoginRequired.tsx
-    target: frontend/src/components/wrapLoginRequired.tsx
+  - id: login.frontend-src-components-requirelogin
+    source: frontend/src/components/RequireLogin.tsx
+    target: frontend/src/components/RequireLogin.tsx
+    maintainPolicy: { mode: NO_OP }
+  - id: login.frontend-src-components-loginrouteguard
+    source: frontend/src/components/loginRouteGuard.tsx
+    target: frontend/src/components/loginRouteGuard.tsx
     maintainPolicy: { mode: NO_OP }
   - id: login.frontend-src-login-constants
     source: frontend/src/login/constants.ts
@@ -60,6 +64,10 @@ additions:
   - id: login.login-page
     source: frontend/src/pages/Login/index.tsx
     target: frontend/src/pages/Login/index.tsx
+    maintainPolicy: { mode: NO_OP }
+  - id: login.frontend-src-pages-login-css
+    source: frontend/src/pages/Login/login.css
+    target: frontend/src/pages/Login/login.css
     maintainPolicy: { mode: NO_OP }
   - id: login.logout-page
     source: frontend/src/pages/Logout/index.tsx

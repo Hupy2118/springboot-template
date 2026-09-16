@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Route Projector v2 input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol", "pages"],
+  "properties": {
+    "protocol": { "const": "route-projector.v2" },
+    "pages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pageId", "name"],
+        "properties": {
+          "pageId": { "type": "string", "pattern": "^[a-z0-9]+(?:_[a-z0-9]+)*$" },
+          "name": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+          "resourceKey": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" }
+        }
+      }
+    }
+  }
+}

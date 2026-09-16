@@ -12,7 +12,8 @@ Base 的 `App`、主路由和布局只导入下列 Capability Extension Surface�
 
 - `frontend/src/capability-extensions/providers.tsx`：声明 Provider 注册列表。
 - `frontend/src/capability-extensions/routes.tsx`：声明根路由、页面路由与页面包装器。
-- `frontend/src/capability-extensions/menus.ts`：提供菜单后处理。
+- `frontend/src/capability-extensions/menuTransforms.ts`：提供菜单投影后的处理。
+- `frontend/src/capability-extensions/routeGuards.tsx`：提供 App / Page Route Guard 注册面。
 
 这些文件是 Authoring 的唯一前端修改入口：只允许新增 import，以及在已登记 Anchor 前新增内容。Provider Tree、路由入口计算和页面包装执行位于 Base 内部文件，不能由 Capability 修改。Base 的其他共享文件也不得被 Capability 覆盖。
 

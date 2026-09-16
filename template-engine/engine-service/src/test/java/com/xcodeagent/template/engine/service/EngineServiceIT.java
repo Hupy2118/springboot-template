@@ -131,7 +131,7 @@ class EngineServiceIT {
         for (String path : surfacePaths()) applied.put(path, zipText(pristine, path));
         for (JsonNode strategy : updatePackage.path("strategies")) applySurfaceStrategy(applied, strategy);
         for (String path : surfacePaths()) assertEquals(zipText(generated, path), applied.get(path), path);
-        assertTrue(zipText(generated, "frontend/src/capability-extensions/menus.ts").contains("useAuthorizationMenuTransform(current)"));
+        assertTrue(zipText(generated, "frontend/src/capability-extensions/menuTransforms.ts").contains("useAuthorizationMenuTransform(current)"));
         assertTrue(zipText(generated, "backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java")
                 .contains("ResourcePermissionInterceptor.class"));
     }
@@ -147,7 +147,8 @@ class EngineServiceIT {
     }
     private static List<String> surfacePaths() {
         return Arrays.asList("frontend/src/capability-extensions/providers.tsx", "frontend/src/capability-extensions/routes.tsx",
-                "frontend/src/capability-extensions/menus.ts", "backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java");
+                "frontend/src/capability-extensions/routeGuards.tsx", "frontend/src/capability-extensions/menuTransforms.ts",
+                "backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java");
     }
     private static void applySurfaceStrategy(Map<String, String> files, JsonNode strategy) {
         String target = strategy.path("target").asText();

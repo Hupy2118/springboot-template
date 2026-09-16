@@ -92,17 +92,16 @@ class WorkbenchInitializerTest {
         Path project = workbenches.resolve("surface-test/project");
         Path routes = project.resolve("frontend/src/capability-extensions/routes.tsx");
         String routeSource = new String(Files.readAllBytes(routes), StandardCharsets.UTF_8)
-                .replace("import type { RouteObject } from 'react-router-dom';\n", "import type { RouteObject } from 'react-router-dom';\nimport Page from '@/pages/Page';\n")
-                .replace("  // xcodeagent:capability-page-routes", "  { pageId: 'page', modulePath: 'page', component: Page },\n\n  // xcodeagent:capability-page-routes");
+                .replace("  // xcodeagent:capability-page-routes", "  { name: 'Page', pageId: 'page' },\n\n  // xcodeagent:capability-page-routes");
         Files.write(routes, routeSource.getBytes(StandardCharsets.UTF_8));
 
         CapabilityStatusReport ready = new AuthoringWorkflow(source, workbenches).status("surface-test");
 
         assertEquals(CapabilityStatusReport.Status.READY, ready.status());
-        assertEquals(1, ready.importCount());
+        assertEquals(0, ready.importCount());
         assertEquals(1, ready.anchorInsertCount());
 
-        Path runtime = project.resolve("frontend/src/routes/capabilityRuntime.tsx");
+        Path runtime = project.resolve("frontend/src/routes/routeBuilder.tsx");
         Files.write(runtime, "changed\n".getBytes(StandardCharsets.UTF_8));
         CapabilityStatusReport blocked = new AuthoringWorkflow(source, workbenches).status("surface-test");
 

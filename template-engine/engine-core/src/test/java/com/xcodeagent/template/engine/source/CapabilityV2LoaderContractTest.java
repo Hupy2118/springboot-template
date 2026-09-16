@@ -32,7 +32,7 @@ class CapabilityV2LoaderContractTest {
         assertRejected("capabilities/login/capability-v2.yaml", "requires: []", "requires: [login]");
         assertRejected("strategy-registry-v2.yaml", "importStatement: \"import { GlobalContextProvider } from '@/providers'\"",
                 "importStatement: \"import { GlobalContextProvider } from '@/providers'\"\n    unexpected: true");
-        assertRejected("strategy-registry-v2.yaml", "type: \"ENSURE_IMPORT\"", "type: \"ENSURE_NPM_DEPENDENCY\"");
+        assertRejected("strategy-registry-v2.yaml", "type: ENSURE_IMPORT", "type: ENSURE_NPM_DEPENDENCY");
         assertRejected("capabilities/authorization/capability-v2.yaml", "executionTrigger: AUTHORIZATION_BOOTSTRAP_DDL", "executionTrigger: UNKNOWN_TRIGGER");
     }
 

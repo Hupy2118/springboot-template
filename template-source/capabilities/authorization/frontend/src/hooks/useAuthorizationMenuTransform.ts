@@ -1,10 +1,8 @@
 import { useMemo } from 'react';
 import { usePermission } from '@/hooks/usePermission';
-import type { Route } from '@/typings/workbench';
+import type { AppMenuItem } from '@/typings/menu';
 
-type ProtectedRoute = Route & { resourceKey?: string; children?: ProtectedRoute[] };
-
-function filterMenus(items: ProtectedRoute[], hasPermission: (resourceKey: string) => boolean): ProtectedRoute[] {
+function filterMenus(items: AppMenuItem[], hasPermission: (resourceKey: string) => boolean): AppMenuItem[] {
   return items.flatMap((item) => {
     if (item.resourceKey && !hasPermission(item.resourceKey)) return [];
     const children = item.children ? filterMenus(item.children, hasPermission) : undefined;
@@ -12,7 +10,7 @@ function filterMenus(items: ProtectedRoute[], hasPermission: (resourceKey: strin
   });
 }
 
-export function useAuthorizationMenuTransform(menus: Route[]): Route[] {
+export function useAuthorizationMenuTransform(menus: AppMenuItem[]): AppMenuItem[] {
   const { hasPermission } = usePermission();
-  return useMemo(() => filterMenus(menus as ProtectedRoute[], hasPermission), [menus, hasPermission]);
+  return useMemo(() => filterMenus(menus, hasPermission), [menus, hasPermission]);
 }
