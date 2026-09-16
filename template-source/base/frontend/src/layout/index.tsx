@@ -8,6 +8,21 @@ import { useCapabilityMenus } from '@/capability-extensions/menus';
 export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const menus = useCapabilityMenus(createLayoutMenus([...PAGE_ROUTES, ...capabilityPageRoutes], PAGE_ROUTE));
-  return <ProConfigProvider><ProLayout title="测试应用" route={{ path: '/', routes: [{ path: `/${PAGE_ROUTE}`, routes: menus }] }} location={{ pathname: location.pathname }} menuItemRender={(item, dom) => <span onClick={() => item.path && navigate(item.path)}>{dom}</span>}><Outlet /></ProLayout></ProConfigProvider>;
+  const menus = useCapabilityMenus(
+    createLayoutMenus([...PAGE_ROUTES, ...capabilityPageRoutes], PAGE_ROUTE),
+  );
+  return (
+    <ProConfigProvider>
+      <ProLayout
+        title='测试应用'
+        route={{ path: '/', routes: menus }}
+        location={{ pathname: location.pathname }}
+        menuItemRender={(item, dom) => (
+          <span onClick={() => item.path && navigate(item.path)}>{dom}</span>
+        )}
+      >
+        <Outlet />
+      </ProLayout>
+    </ProConfigProvider>
+  );
 }
