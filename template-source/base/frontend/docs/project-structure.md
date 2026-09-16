@@ -30,9 +30,9 @@ src/
 
 ## 页面与路由
 
-- 页面、目录和外链只在 `src/constants/routes.tsx` 的 `XCODEAGENT_BUSINESS_ROUTES_START/END` 标记之间注册。路由需要 `component` 显式引用时，页面 import 只能添加在同文件的 `XCODEAGENT_BUSINESS_ROUTE_IMPORTS_START/END` 标记之间。
+- 共享业务页面路由由 Template Route Projector 统一注册到 `src/constants/routes.tsx` 的业务路由受管区域。Page Agent 只负责生成 `src/pages/<Feature>/` 页面实现，不得直接编辑共享业务路由表。
 - 业务页面必须使用小写 snake_case `pageId`。例如 `asset_list` 对应 `src/pages/AssetList/index.tsx` 和 `/page/asset-list`。
-- 基础业务页面默认由既有页面发现机制按 `pageId` 自动懒加载；也可通过 `component` 显式引用，此时必须在业务路由 import 区导入组件。能力页面由 `src/capability-extensions/routes.tsx` 接入。不得绕开该扩展面手写第二份能力路由或菜单配置。
+- 基础业务页面由既有页面发现机制按 `pageId` 自动懒加载；Route Projector 只注册 `pageId`、名称和可选 `resourceKey`，不生成组件 import 或 `component` 字段。能力页面由 `src/capability-extensions/routes.tsx` 接入。不得绕开该扩展面手写第二份能力路由或菜单配置。
 - 菜单始终先由 `createLayoutMenus` 从基础路由与 `capabilityPageRoutes` 汇总，再交给 `src/capability-extensions/menus.ts` 的 `useCapabilityMenus` 变换链；页面守卫通过同一扩展面登记的包装器链接入。
 
 ## 动态 Capability 文档

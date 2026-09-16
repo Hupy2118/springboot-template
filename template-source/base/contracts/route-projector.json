@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "route-projector-contract.v1",
+  "protocol": "route-projector.v1",
+  "command": [
+    "node",
+    "frontend/scripts/xcodeagent/route-projector.mjs",
+    "apply"
+  ]
+}

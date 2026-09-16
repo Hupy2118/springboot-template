@@ -222,58 +222,101 @@ authorization_manifest
 
 ## 1.4 Route Projector 调用输入
 
-XCodeAgent 调用模板 Projector 时允许临时构造运行时 DTO，但它不是新的事实源，也不落盘。
+Route Projection 不需要同时传入 ProductPlan、TechnicalPlan 和 authorization_manifest。
 
-示例：
+当前路由注册真正需要的业务事实只有：
+
+```text
+pageId
+name
+resourceKey（可选）
+```
+
+因此 XCodeAgent 只从两个权威来源取值：
+
+```text
+ProductPlan.pages
+        │
+        ├─ pageId
+        └─ name
+
+authorization_manifest
+        │
+        └─ pageId → resourceKey
+```
+
+然后在内存中做一次最小合并，形成 Route Projector 的运行时输入：
 
 ```json
 {
   "protocol": "route-projector.v1",
   "pages": [
     {
-      "...": "ProductPlan.pages 中的页面对象"
-    }
-  ],
-  "technicalPages": [
+      "pageId": "portal_home",
+      "name": "门户首页"
+    },
     {
-      "...": "TechnicalPlan.pages 中的页面对象"
+      "pageId": "asset_list",
+      "name": "资产管理",
+      "resourceKey": "PAGE.ASSET_LIST"
     }
-  ],
-  "authorization": {
-    "pageResources": [
-      {
-        "pageId": "asset_list",
-        "resourceKey": "PAGE.ASSET_LIST"
-      }
-    ]
-  }
+  ]
 }
 ```
 
-必须满足：
+其中：
 
-1. 只在 Projector 执行时临时构造；
-2. 不写入 Build DAG；
-3. 不落盘为新的 Planning Artifact；
-4. 不重新定义一套 Page Schema；
-5. 不包含模板实现字段。
+- `pageId`、`name` 来自 `ProductPlan.pages`；
+- `resourceKey` 仅在页面受权限控制时由 `authorization_manifest` 补充；
+- `TechnicalPlan.pages` 不参与 Route Projection；
+- Endpoint / Action binding 与路由注册无关，不传给模板；
+- 该对象只存在于运行时内存 / stdin，不落盘，不成为新的 Planning Artifact。
 
-XCodeAgent 不允许产生：
+XCodeAgent 的组装逻辑保持非常轻量：
+
+```python
+def build_route_projector_input(product_plan, authorization_manifest):
+    resource_map = extract_page_resource_map(authorization_manifest)
+
+    return {
+        "protocol": "route-projector.v1",
+        "pages": [
+            {
+                **{
+                    "pageId": page["pageId"],
+                    "name": page["name"],
+                },
+                **(
+                    {"resourceKey": resource_map[page["pageId"]]}
+                    if page["pageId"] in resource_map
+                    else {}
+                ),
+            }
+            for page in product_plan.get("pages", [])
+        ],
+    }
+```
+
+这里不是重新维护一套页面事实，而只是：
+
+> 在执行 Route Projector 前，把两个已有权威来源裁剪成模板真正需要的最小运行时 DTO。
+
+XCodeAgent 不允许加入：
 
 ```text
 pageKey
 derivedPath
-componentImport
 component
+componentName
+componentPath
+componentImport
 routeElement
 menuObject
 marker
 routesFile
 ```
 
-其中页面组件实现尤其不属于 Route Projector 输入。当前模板会通过 `pageId + import.meta.glob` 在运行时找到对应页面模块。
-
----
+这些都不属于 Route Projector 的业务输入。
 
 ## 1.4.1 页面组件不是 Projector Input
 
@@ -419,12 +462,29 @@ resourceKey（可选）
 “把本次新增页面 append 到 routes.tsx”
 ```
 
-而是：
+事实来源仍然是：
 
 ```text
 当前 ProductPlan.pages
 +
 当前 authorization_manifest
+```
+
+但这两个上游产物只由 XCodeAgent 读取。XCodeAgent 先合成为：
+
+```text
+最小 RouteProjectorInput
+{
+  pages: [
+    { pageId, name, resourceKey? }
+  ]
+}
+```
+
+Template Route Projector 实际只看到这个 DTO：
+
+```text
+最小 RouteProjectorInput
         ↓
 计算当前应该存在的完整路由集合
         ↓
@@ -576,175 +636,187 @@ Route Projection 只有在：
 排序
 canonical JSON
 SHA256
-route projection fingerprint
-额外 snapshot 文件
+独立 route projection fingerprint 文件
+独立 route snapshot 文件
 ```
 
-直接比较两份结构化 Route Facts。
+但允许并要求：
+
+```text
+成功 Build Run 的执行证据
+→ 持久化当次实际生效的最小 routeFacts
+```
+
+这份 `routeFacts` 不是新的规划事实源，而是历史 Build Run 的冻结执行证据，用于下一次 Build 判断是否需要 Route Projection。
 
 ---
 
 ## 1.9 最简单的 Route Facts 比较
 
-新增一个很轻量的：
+Route Facts 与 Route Projector Input 使用同一组最小字段：
 
-```python
-extract_route_facts(...)
+```text
+pageId
+name
+resourceKey（可选）
 ```
 
-它只抽取 Template Route Projector 真正消费的业务字段。
+不再另外定义一套比较结构。
 
-当前 V1 推荐：
+当前版本的 Route Facts 由当前最小 RouteProjectorInput 得到：
 
 ```python
-def extract_route_facts(product_plan, authorization_manifest):
-    page_resources = get_page_resources(authorization_manifest)
-
+def extract_route_facts(route_projector_input):
     return {
-        "pages": {
-            page["pageId"]: {
-                "name": page.get("name"),
-                "resourceKey": page_resources.get(page["pageId"]),
-            }
-            for page in product_plan.get("pages", [])
+        page["pageId"]: {
+            "name": page["name"],
+            "resourceKey": page.get("resourceKey"),
         }
+        for page in route_projector_input.get("pages", [])
     }
 ```
 
-因为使用 dict：
+这样页面数组顺序变化不会触发误判。
+
+上一版本的比较基线不再通过回查旧 ProductPlan / authorization_manifest 重新计算，而是直接读取：
 
 ```text
-页面数组顺序变化
+最近一次成功 Build Run
+        ↓
+execution evidence.routeFacts
 ```
 
-不会触发误判。
-
-如果后续 Template Projector 正式消费：
+因此 Route Projection 是否需要执行，本质上就是比较：
 
 ```text
-path
-module_id
-navigation metadata
+上一成功 Build Run.routeFacts
+vs
+当前 RouteProjectorInput 对应的 Route Facts
 ```
 
-只需把对应字段加入：
-
-```python
-extract_route_facts()
-```
-
-例如：
-
-```python
-{
-    "name": page.get("name"),
-    "path": page.get("path"),
-    "module_id": page.get("module_id"),
-    "resourceKey": ...
-}
-```
-
-原则是：
-
-> Projector 会用到、且变化后会改变最终 Route/Menu 输出的业务字段，才进入 Route Facts。
-
-不要把整个 ProductPlan.pages 拿来比较。
-
-以下变化不应该触发 Route Projection：
+当前 V1 不比较：
 
 ```text
+ProductPlan 其他字段
+TechnicalPlan.pages
+endpoint_dependencies
+action_implementations
 information_items
 actions
 acceptance_criteria
-endpoint_dependencies
-action_implementations
 页面内部 UI
 后端 API
 数据库实现
 ```
 
----
+后续只有当 Template Route Projector 确实开始消费新的路由语义字段时，才扩展这份最小 DTO 和 Route Facts；两者必须同步演进。
 
 ## 1.10 如何决定是否把 Route Projection 加入 DAG
 
-DAG Assembly 直接比较：
+当前版本仍由 XCodeAgent 从：
 
 ```text
-上一成功 Build 对应的 Route Facts
-vs
-当前确认版本的 Route Facts
+Confirmed ProductPlan
++
+authorization_manifest
 ```
 
-伪代码：
+构造最小 RouteProjectorInput：
 
 ```python
-def requires_route_projection(previous_build, current_product_plan, current_auth_manifest):
-    if previous_build is None:
-        return True
+current_input = build_route_projector_input(
+    current_product_plan,
+    current_auth_manifest,
+)
+current_facts = extract_route_facts(current_input)
+```
 
-    previous_facts = extract_route_facts(
-        previous_build.product_plan,
-        previous_build.authorization_manifest,
-    )
+上一版本不再回查旧 ProductPlan / authorization_manifest，而是直接读取：
 
-    current_facts = extract_route_facts(
+```text
+最近一次成功 Build Run
+        ↓
+execution evidence.routeFacts
+```
+
+判断逻辑：
+
+```python
+def requires_route_projection(
+    previous_successful_build,
+    current_product_plan,
+    current_auth_manifest,
+):
+    current_input = build_route_projector_input(
         current_product_plan,
         current_auth_manifest,
     )
+    current_facts = extract_route_facts(current_input)
+
+    if previous_successful_build is None:
+        return True
+
+    previous_facts = previous_successful_build.get("routeFacts")
+    if previous_facts is None:
+        return True
 
     return previous_facts != current_facts
 ```
 
-首次 Build：
+因此：
+
+### 首次 Build
 
 ```text
-previous_build = None
-→ 需要 Route Projection
+没有 previous successful build
+→ 生成 Route Projection
 ```
 
-只修改 API：
+### 老项目升级后的第一次 Build
 
 ```text
-previous Route Facts == current Route Facts
+previous successful build 没有 routeFacts
+→ 生成 Route Projection
+```
+
+不迁移旧 `route_projection.pages`，由模板 Projector 做一次完整 reconcile；本次 Build 成功后开始建立新的 `routeFacts` 基线。
+
+### 只修改 API / 页面内部逻辑
+
+```text
+previous_facts == current_facts
 → 不生成 Route Projection
 ```
 
-新增页面：
+### 新增页面
 
 ```text
-previous Route Facts != current Route Facts
+previous_facts != current_facts
 → 生成 Route Projection
 ```
 
-删除页面：
+### 删除页面
 
 ```text
-previous Route Facts != current Route Facts
+previous_facts != current_facts
 → 生成 Route Projection
 ```
 
-修改菜单名称：
+### 页面名称变化
 
 ```text
 name 变化
 → 生成 Route Projection
 ```
 
-新增 / 删除页面权限：
+### 页面权限变化
 
 ```text
-resourceKey 变化
+resourceKey 新增 / 删除 / 修改
 → 生成 Route Projection
 ```
 
-只修改页面 UI：
-
-```text
-Route Facts 不变
-→ 不生成 Route Projection
-```
-
----
+这样历史比较不依赖已被覆盖的正式规划文件，也不需要解析 `routes.tsx`。
 
 ## 1.11 Route Projection 的执行时机
 
@@ -784,6 +856,61 @@ DAG 中完全没有 platform_route_projection
 因此也不会发生重复路由注册。
 
 ---
+
+## 1.11.1 成功 Build Run 持久化 Route Facts
+
+为了让下一次 Build 有稳定比较基线，每个**成功 Build Run**都必须在自己的执行结果 / 成功证据中保存当次实际生效的最小 Route Facts。
+
+例如：
+
+```json
+{
+  "routeFacts": {
+    "portal_home": {
+      "name": "门户首页",
+      "resourceKey": null
+    },
+    "asset_list": {
+      "name": "资产管理",
+      "resourceKey": "PAGE.ASSET_LIST"
+    }
+  }
+}
+```
+
+这份数据的语义是：
+
+> 该 Build Run 成功完成时，Workspace 已经对应到这组 Route Facts。
+
+它不是新的页面权威来源。
+
+权威来源仍然是：
+
+```text
+ProductPlan.pages
++
+authorization_manifest
+```
+
+必须遵守以下规则：
+
+1. 只在整个 Build Run 成功后写入；
+2. 不能在 DAG 生成时提前写；
+3. 不能在 `platform_route_projection` Task 单独成功时就写；
+4. 即使本次没有生成 Route Projection 节点，只要 Build Run 成功，也写入当前 Route Facts；
+5. 失败 Build Run 不成为下一次比较基线；
+6. 不修改 Build Run 的只读 Task Plan 副本；
+7. Route Facts 应进入 Build Run 的执行结果 / 成功证据层。
+
+之所以“没有 Route Projection 节点的成功 Build”也要保存，是为了保证：
+
+```text
+每个成功 Build Run
+→ 都有完整 routeFacts
+→ 下一次只需读取最近一次成功 Build
+```
+
+不需要继续向历史记录回溯“最近一次执行过 Route Projection 的 Build”。
 
 ## 1.12 Build DAG 不再保存 route_projection.pages
 
@@ -984,11 +1111,9 @@ template-source/base/frontend/scripts/xcodeagent/route-projector.mjs
 职责：
 
 ```text
-stdin 读取 RouteProjectorInput
+stdin 读取最小 RouteProjectorInput
         ↓
-读取 ProductPlan pages 语义
-        ↓
-读取 pageId/resourceKey
+读取 pageId / name / resourceKey（可选）
         ↓
 确认 Page Task 已生成对应页面入口
         ↓
@@ -996,6 +1121,8 @@ stdin 读取 RouteProjectorInput
         ↓
 更新受管区域
 ```
+
+这里的 Route Projector **不读取 ProductPlan、TechnicalPlan 或 authorization_manifest 原始结构**；上游事实已经由 XCodeAgent 合成为最小 DTO 后再通过 stdin 传入模板。
 
 注意：
 
@@ -1015,42 +1142,56 @@ Route Projector 不创建页面实现
 
 ---
 
-## 2.3 Projector 输入校验
+## 2.3 Projector 输入处理
 
-虽然当前阶段不单独提供 validate 动作，但 `apply` 自身仍必须对输入做基本 fail-fast 校验。
+Template Route Projector 不再理解 ProductPlan、TechnicalPlan 或 authorization_manifest 的原始结构，只消费 XCodeAgent 已经组装好的最小运行时输入：
 
-至少检查：
+```json
+{
+  "protocol": "route-projector.v1",
+  "pages": [
+    {
+      "pageId": "portal_home",
+      "name": "门户首页"
+    },
+    {
+      "pageId": "asset_list",
+      "name": "资产管理",
+      "resourceKey": "PAGE.ASSET_LIST"
+    }
+  ]
+}
+```
 
-### ProductPlan.pages
+模板侧不再重复做跨文档一致性校验，例如：
 
-- 必须为数组；
-- `pageId` 非空；
-- `pageId` 唯一；
-- `pageId` 满足当前模板页面身份规则。
+```text
+TechnicalPlan.pageId 是否存在于 ProductPlan
+authorization pageId 是否存在于 ProductPlan
+Endpoint / Action reference 是否匹配
+```
 
-### TechnicalPlan.pages
+这些属于 XCodeAgent 上游规划与权限编译阶段的职责。
 
-- TechnicalPlan 中引用的 `pageId` 必须存在于 ProductPlan；
-- Endpoint / Action references 不用于生成 Route。
+Route Projector 只保留两类最基本检查：
 
-### authorization.pageResources
+```text
+1. 输入字段可读取：pageId / name / resourceKey（可选）
+2. 当前模板可消费：pageId 能按模板规则解析，并且对应页面入口已由 Page Task 生成
+```
 
-- `pageId` 必须存在于 ProductPlan；
-- `resourceKey` 非空；
-- 同一 `pageId` 只能有一个页面资源；
-- 没有权限资源的页面默认正常访问。
+因此原则是：
+
+> 不重复验证上游业务事实，只验证当前模板能否消费这份最小 DTO。
 
 失败直接使：
 
 ```text
 platform_route_projection
+→ failed
 ```
 
-Task 失败。
-
 无需额外增加前置校验节点。
-
----
 
 ## 2.4 标准页面使用当前模板 Page Identity
 
@@ -1146,11 +1287,22 @@ Projector 不允许 append：
 正确：
 
 ```text
-当前完整 ProductPlan.pages
+事实来源：
+ProductPlan.pages + authorization_manifest
+        ↓
+由 XCodeAgent 合成为最小 RouteProjectorInput
+        ↓
+Template Projector 只消费该 DTO
         ↓
 生成当前完整 expected business routes
         ↓
 替换模板受管区域
+```
+
+因此 Projector 本身并不知道 ProductPlan 或 authorization_manifest 的原始结构，它只处理：
+
+```text
+pageId / name / resourceKey（可选）
 ```
 
 例如上一次：
@@ -1496,26 +1648,44 @@ platform_route_projection
 build_route_projector_input(...)
 ```
 
-输入来源：
+输入来源只保留：
 
 ```text
 Confirmed ProductPlan
-Confirmed TechnicalPlan
 authorization_manifest
 ```
 
-其中：
+不读取：
 
 ```text
-pages = ProductPlan.pages
-technicalPages = TechnicalPlan.pages
+TechnicalPlan.pages
 ```
 
-权限只提取：
+输出固定为：
+
+```json
+{
+  "protocol": "route-projector.v1",
+  "pages": [
+    {
+      "pageId": "portal_home",
+      "name": "门户首页"
+    },
+    {
+      "pageId": "asset_list",
+      "name": "资产管理",
+      "resourceKey": "PAGE.ASSET_LIST"
+    }
+  ]
+}
+```
+
+字段来源：
 
 ```text
-pageId
-resourceKey
+pageId      ← ProductPlan.pages
+name        ← ProductPlan.pages
+resourceKey ← authorization_manifest（可选）
 ```
 
 该对象只存在于内存 / stdin。
@@ -1528,88 +1698,78 @@ write route_projection.json
 写入 Build DAG pages
 ```
 
----
-
 ## 3.5 新增 extract_route_facts()
 
-这是决定 DAG 中是否生成 Route Projection 节点的唯一比较入口。
-
-建议：
+`extract_route_facts()` 只接受已经组装好的最小 RouteProjectorInput：
 
 ```python
-def extract_route_facts(product_plan, authorization_manifest):
-    page_resources = extract_page_resource_map(authorization_manifest)
-
+def extract_route_facts(route_projector_input):
     return {
-        "pages": {
-            page["pageId"]: {
-                "name": page.get("name"),
-                "resourceKey": page_resources.get(page["pageId"]),
-            }
-            for page in product_plan.get("pages", [])
+        page["pageId"]: {
+            "name": page["name"],
+            "resourceKey": page.get("resourceKey"),
         }
+        for page in route_projector_input.get("pages", [])
     }
 ```
 
-V1 不做：
+当前 Route Facts 的字段集合固定与 Route Projector Input 对齐：
 
 ```text
-排序
-JSON 序列化
-SHA256
-fingerprint
-snapshot
+pageId
+name
+resourceKey（可选）
 ```
 
-直接比较 Python dict。
-
-以后如果 Template Projector 开始消费：
+不读取：
 
 ```text
-path
-module_id
+TechnicalPlan.pages
+endpoint_dependencies
+action_implementations
+页面源码
 ```
 
-就在这里加字段。
+## 3.6 从最近一次成功 Build Run 读取 Route Facts
 
-该函数的字段集合必须和 Route Projector 实际消费的业务语义保持一致。
-
----
-
-## 3.6 找到“上一次成功 Build”对应的规划输入
-
-DAG Assembly 需要拿到：
+不再要求 XCodeAgent 从上一 Build 反查：
 
 ```text
-previous successful build ProductPlan
-previous successful build authorization_manifest
+旧 ProductPlan
+旧 authorization_manifest
 ```
 
-当前版本拿：
+而是直接从最近一次成功 Build Run 的执行结果 / 成功证据读取：
 
 ```text
-current confirmed ProductPlan
-current authorization_manifest
+routeFacts
 ```
 
-不新增：
+推荐增加：
+
+```python
+load_latest_successful_build_route_facts(...)
+```
+
+返回：
+
+```python
+dict[str, dict[str, str | None]] | None
+```
+
+找不到成功 Build 或历史 Build 尚未包含 `routeFacts` 时返回：
 
 ```text
-last-route-projection.json
-route-fingerprint.json
-route-snapshot.json
+None
 ```
 
-优先复用现有 Build Run / Planning Run / confirmed artifact 绑定能力定位上一成功版本。
-
-如果没有 previous successful build：
+调用方将其视为：
 
 ```text
-首次 Build
-→ requires_route_projection = True
+需要执行 Route Projection
 ```
 
----
+兼容旧项目时不迁移旧 `route_projection.pages`。
 
 ## 3.7 DAG Assembly 直接比较 Route Facts
 
@@ -1622,21 +1782,21 @@ requires_route_projection(...)
 例如：
 
 ```python
-def requires_route_projection(previous_build, current_product_plan, current_auth_manifest):
-    if previous_build is None:
-        return True
-
-    previous_facts = extract_route_facts(
-        previous_build.product_plan,
-        previous_build.authorization_manifest,
-    )
-
-    current_facts = extract_route_facts(
+def requires_route_projection(
+    previous_route_facts,
+    current_product_plan,
+    current_auth_manifest,
+):
+    current_input = build_route_projector_input(
         current_product_plan,
         current_auth_manifest,
     )
+    current_facts = extract_route_facts(current_input)
 
-    return previous_facts != current_facts
+    if previous_route_facts is None:
+        return True
+
+    return previous_route_facts != current_facts
 ```
 
 DAG Assembly：
@@ -1644,7 +1804,13 @@ DAG Assembly：
 ```python
 tasks = build_normal_tasks(...)
 
-if requires_route_projection(...):
+previous_route_facts = load_latest_successful_build_route_facts(...)
+
+if requires_route_projection(
+    previous_route_facts,
+    current_product_plan,
+    current_auth_manifest,
+):
     tasks.append(
         {
             "task_id": "platform_route_projection",
@@ -1657,8 +1823,6 @@ if requires_route_projection(...):
 ```
 
 Route Projection 节点不是模型生成，而是 DAG Assembly 确定性追加。
-
----
 
 ## 3.8 删除 route_projection.pages 生产逻辑
 
@@ -1723,7 +1887,6 @@ def execute_platform_action(task, context):
         return apply_template_route_projection(
             workspace=context.workspace,
             product_plan=context.confirmed_product_plan,
-            technical_plan=context.confirmed_technical_plan,
             authorization_manifest=context.authorization_manifest,
         )
 
@@ -1866,7 +2029,6 @@ Route Projection 节点执行时必须读取当前 Build Run 绑定的确认输�
 
 ```text
 Confirmed ProductPlan
-Confirmed TechnicalPlan
 Confirmed authorization_manifest
 Frozen Template Revision / Workspace
 ```
@@ -1878,11 +2040,51 @@ DAG 判断用 confirmed
 apply 时却读取已经被后续流程改写的 mutable planning state
 ```
 
-本次不需要额外创建 Route Snapshot。
+本次不新增独立 Route Snapshot 文件。
 
-继续复用现有 Build Run 与 Planning Artifact 绑定即可。
+成功 Build Run 自身需要保存当次 `routeFacts` 作为执行证据，供下一次 Build 直接比较。
 
 ---
+
+## 3.13.1 成功 Build Run 回写 Route Facts
+
+在 Build Run 最终判定成功时：
+
+```python
+current_input = build_route_projector_input(
+    confirmed_product_plan,
+    authorization_manifest,
+)
+current_facts = extract_route_facts(current_input)
+
+persist_build_run_success_evidence(
+    build_run_id=build_run_id,
+    route_facts=current_facts,
+)
+```
+
+这里必须写入 Build Run 的执行结果 / 成功证据层。
+
+不要修改：
+
+```text
+plans/build-runs/<build_run_id>.json
+```
+
+如果该文件当前承担“只读 Task Plan 副本”职责，应保持只读语义。
+
+建议沿用现有 Build Summary / Build Result / Execution Evidence 的持久化机制扩展字段：
+
+```json
+{
+  "status": "completed",
+  "routeFacts": {
+    "...": {}
+  }
+}
+```
+
+失败 Build Run 不写新的成功基线。
 
 ## 3.14 XCodeAgent 测试调整
 
@@ -1904,7 +2106,8 @@ routes.tsx exact expected text
 重点验证：
 
 ```text
-首次 Build → True
+没有历史成功 Build → True
+历史成功 Build 没有 routeFacts → True
 页面新增 → True
 页面删除 → True
 页面 name 变化 → True
@@ -2130,8 +2333,8 @@ Build DAG.platform_route_projection
 3. XCodeAgent 中不存在 `PAGE_ROUTES` TSX renderer。
 4. XCodeAgent 不再生成 Component import，也不生成或传递 `component` 字段。
 5. Build DAG 不再保存 `route_projection.pages`。
-6. 页面清单只由现有 ProductPlan / TechnicalPlan 正式产物维护。
-7. Route Projector Input 仅为运行时 DTO。
+6. Route Projection 的页面身份只读取 ProductPlan.pages；TechnicalPlan.pages 不参与 Route Projection。
+7. Route Projector Input 仅包含 `pageId / name / resourceKey（可选）`，并且只作为运行时 DTO。
 8. Route Projection 作为 `platform_action` 在 Build DAG 中可见。
 9. Route Projection 节点由 DAG Assembly 确定性生成，不由 LLM 生成。
 10. 首次 Build 会生成 Route Projection 节点。
@@ -2141,7 +2344,7 @@ Build DAG.platform_route_projection
 14. 页面 `resourceKey` 变化会生成 Route Projection 节点。
 15. 只修改 API、页面内部 UI 或 endpoint binding 时不会生成 Route Projection 节点。
 16. Route Facts 判断直接比较结构化 dict，不使用排序、canonical JSON 或 SHA256。
-17. 不新增 route fingerprint / snapshot 文件。
+17. 不新增独立 route fingerprint / snapshot 文件；成功 Build Run 必须保存最小 `routeFacts` 作为冻结执行证据。
 18. Route Projector 对完整当前页面事实做 reconcile，不做 append。
 19. Route Projector 重复执行必须幂等。
 20. 删除页面后 Projector 能从模板受管路由区域删除对应页面。
@@ -2150,6 +2353,10 @@ Build DAG.platform_route_projection
 23. Projector 产生的 Workspace Change 继续记录为平台动作，不混入 Agent Task Change Set。
 24. Descriptor 缺失时失败，不回退旧 XCodeAgent renderer。
 25. Template Revision 改变路由实现时，只修改 Template Projector，不修改 XCodeAgent Route renderer。
+26. 失败 Build Run 不得覆盖上一成功 Build 的 `routeFacts` 基线。
+27. 成功 Build Run 即使未执行 Route Projection，也必须保存当前 `routeFacts`。
+28. 旧 Build Run 缺少 `routeFacts` 时，下次 Build 强制执行一次 Route Projection，不迁移旧 `route_projection.pages`。
+29. Build Run 的只读 Task Plan 副本保持只读，不承担成功执行证据回写。
 26. 当前模板的页面 Component 解析继续完全依赖 `import.meta.glob`，Route Projector 不注入组件实现。
 27. Route Projector 只在执行时检查页面入口是否已由 Page Task 生成，不把组件路径写入协议。
 
@@ -2159,17 +2366,17 @@ Build DAG.platform_route_projection
 
 ```text
 1. 不新增第二份持久化页面清单。
-2. 不新增 route fingerprint、SHA256 或 route snapshot。
+2. 不新增独立 route fingerprint、SHA256 或 route snapshot 文件；允许成功 Build Run 持久化最小 `routeFacts` 执行证据。
 3. 不从 Task 自然语言描述猜测是否需要 Route Projection。
-4. 只比较上一成功 Build 与当前版本的 Route Facts。
-5. Route Facts 只包含 Template Projector 真正消费且会影响 Route/Menu 输出的业务字段。
+4. 只比较上一成功 Build Run 执行证据中的 `routeFacts` 与当前版本的 Route Facts。
+5. Route Facts 与 Route Projector Input 使用同一组最小字段：`pageId / name / resourceKey（可选）`。
 6. Route Projection 节点由 DAG Assembly 确定性追加。
 7. 不让 LLM 生成 route_projection platform task。
 8. 不把旧 route_projection renderer 搬到另一个 XCodeAgent Python 文件。
 9. 不把旧 renderer 简单搬成 XCodeAgent YAML 模板。
 10. Template Projector 必须确定性执行，禁止调用 LLM。
 11. XCodeAgent 不解析 routes.tsx 来重新理解模板业务路由结构。
-12. Template Projector 不修改 ProductPlan / TechnicalPlan。
+12. Template Projector 不读取或修改 TechnicalPlan，也不修改 ProductPlan。
 13. Template Projector 不生成业务页面 placeholder。
 14. Descriptor 缺失必须失败，不允许 silent fallback。
 15. Template Projector 必须做全量 reconcile，不允许 append-only。
@@ -2204,9 +2411,11 @@ Build DAG.platform_route_projection
         ┌──────────────────────────────┐
         │         XCodeAgent           │
         │                              │
+        │ build current route input    │
         │ extract current route facts  │
         │            │                 │
-        │ compare previous successful  │
+        │ read latest successful       │
+        │ Build Run.routeFacts         │
         │            │                 │
         │       changed ?              │
         └────────────┬─────────────────┘
@@ -2242,6 +2451,6 @@ Build DAG.platform_route_projection
 
 最终职责一句话：
 
-> **XCodeAgent 通过“上一成功版本与当前版本的 Route Facts 直接比较”决定这次是否需要 Route Projection，并把该动作显式放入 Build DAG；Template Route Projector 只根据当前完整页面事实幂等地注册 `pageId / name / resourceKey`，页面 Component 始终由模板现有 `import.meta.glob` Runtime 动态发现。**
+> **XCodeAgent 用“最近一次成功 Build Run 冻结的 `routeFacts`”与“当前 ProductPlan + authorization_manifest 合成出的最小 Route Facts”直接比较，决定这次是否需要 Route Projection，并把该动作显式放入 Build DAG；Template Route Projector 只消费最小 DTO 幂等注册 `pageId / name / resourceKey`，页面 Component 始终由模板现有 `import.meta.glob` Runtime 动态发现。**
 
 这样既解决当前 `route_projection` 时机隐藏、DAG 不可见的问题，也避免每次 Build 都重复执行路由注册，同时不引入 hash、额外快照、前后校验节点或新的页面事实结构。

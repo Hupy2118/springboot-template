@@ -1,6 +1,7 @@
 id: base
 version: 1.0.0
 files:
+  - { source: contracts/route-projector.json, target: .xcodeagent/template-contracts/route-projector.json }
   - { source: backend/.env.example, target: backend/.env.example }
   - { source: backend/.gitignore, target: backend/.gitignore }
   - { source: backend/AGENTS.md, target: backend/AGENTS.md }
@@ -37,6 +38,8 @@ files:
   - { source: frontend/scripts/sourcePathLoader.cjs, target: frontend/scripts/sourcePathLoader.cjs }
   - { source: frontend/scripts/sourcePathPlugin.mjs, target: frontend/scripts/sourcePathPlugin.mjs }
   - { source: frontend/scripts/test-source-path-plugin.mjs, target: frontend/scripts/test-source-path-plugin.mjs }
+  - { source: frontend/scripts/xcodeagent/route-projector.mjs, target: frontend/scripts/xcodeagent/route-projector.mjs }
+  - { source: frontend/scripts/xcodeagent/test-route-projector.mjs, target: frontend/scripts/xcodeagent/test-route-projector.mjs }
   - { source: frontend/src/App.tsx, target: frontend/src/App.tsx }
   - { source: frontend/src/capability-extensions/menus.ts, target: frontend/src/capability-extensions/menus.ts }
   - { source: frontend/src/capability-extensions/providers.tsx, target: frontend/src/capability-extensions/providers.tsx }
