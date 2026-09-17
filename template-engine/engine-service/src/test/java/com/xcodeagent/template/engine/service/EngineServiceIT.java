@@ -67,6 +67,12 @@ class EngineServiceIT {
         assertTrue(zipText(generated, "backend/docs/auth/sql/ddl.sql").contains("CREATE TABLE `role`"));
         assertTrue(!hasZipEntry(generated, "backend/docs/auth/sql/initialization.sql"));
         assertTrue(!hasZipPrefix(generated, "frontend/node_modules/"));
+        assertEquals(readTemplateContract("route-projector.json"),
+                zipText(generated, ".xcodeagent/template-contracts/route-projector.json"));
+        assertEquals(readTemplateContract("route-projector-input.schema.json"),
+                zipText(generated, ".xcodeagent/template-contracts/route-projector-input.schema.json"));
+        assertEquals(readTemplateContract("route-projector-output.schema.json"),
+                zipText(generated, ".xcodeagent/template-contracts/route-projector-output.schema.json"));
 
         String update = "{\"protocolVersion\":\"2\",\"currentTemplateState\":" + generatedState + ",\"requestedConfig\":" + requestedAuthorization + ",\"mode\":\"RECONCILE\"}";
         byte[] changed = mvc.perform(post("/v1/update").contentType(MediaType.APPLICATION_JSON).content(update))
@@ -138,6 +144,9 @@ class EngineServiceIT {
 
     private static JsonNode zipJson(byte[] zip, String path) throws Exception {
         return JSON.readTree(zipBytes(zip, path));
+    }
+    private static String readTemplateContract(String file) throws Exception {
+        return new String(Files.readAllBytes(repositoryRoot().resolve("template-source/base/contracts").resolve(file)), StandardCharsets.UTF_8);
     }
     private static byte[] generate(MockMvc mvc, String requested) throws Exception {
         return mvc.perform(post("/v1/generate")

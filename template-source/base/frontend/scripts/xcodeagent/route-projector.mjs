@@ -9,6 +9,7 @@ const ROUTES_RELATIVE_PATH = 'frontend/src/constants/routes.tsx';
 const ROUTES_START = '  // XCODEAGENT_BUSINESS_ROUTES_START';
 const ROUTES_END = '  // XCODEAGENT_BUSINESS_ROUTES_END';
 const WINDOWS_RENAME_RETRY_CODES = new Set(['EACCES', 'EBUSY', 'EPERM']);
+const PAGE_IDENTITY_VECTORS = JSON.parse(readFileSync(new URL('../../src/utils/pageIdentity.vectors.json', import.meta.url), 'utf8'));
 
 function fail(message) { throw new Error(`Route Projector: ${message}`); }
 
@@ -18,6 +19,30 @@ export function pageDirectoryFromId(pageId) {
   }
   return pageId.split('_').map((segment) => segment[0].toUpperCase() + segment.slice(1)).join('');
 }
+
+function pageRouteSegmentFromId(pageId) {
+  pageDirectoryFromId(pageId);
+  return pageId.replace(/_/g, '-');
+}
+
+function verifyPageIdentityVectors() {
+  for (const vector of PAGE_IDENTITY_VECTORS.valid) {
+    if (pageDirectoryFromId(vector.pageId) !== vector.pageDirectory
+        || pageRouteSegmentFromId(vector.pageId) !== vector.routeSegment) {
+      fail(`pageId 映射向量不一致：${vector.pageId}。`);
+    }
+  }
+  for (const invalid of PAGE_IDENTITY_VECTORS.invalid) {
+    try {
+      pageDirectoryFromId(invalid);
+      fail(`非法 pageId 映射向量未被拒绝：${invalid}。`);
+    } catch (error) {
+      if (error && error.message.includes('映射向量未被拒绝')) throw error;
+    }
+  }
+}
+
+verifyPageIdentityVectors();
 
 function isPlainObject(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
 
