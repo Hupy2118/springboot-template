@@ -1,0 +1,26 @@
+server:
+  address: 127.0.0.1
+
+gateway:
+  security:
+    mode: local
+    internal-identity-secret: ${XCODE_USER_INFO_SECRET:local-development-secret-at-least-32-bytes}
+    service-token: ${XCODE_GATEWAY_SERVICE_TOKEN:local-development-service-token}
+    public-paths:
+      - /health
+      - /actuator/health/**
+      - /_xcode/auth/mock/login
+  agent:
+    enabled: true
+    policy-mode: local
+    allowed-agent-ids:
+      - demo-agent
+    frozen-agent-ids: []
+  cors:
+    allowed-origins:
+      - http://127.0.0.1:5173
+      - http://localhost:5173
+
+management:
+  server:
+    address: 127.0.0.1

@@ -1,0 +1,22 @@
+server:
+  port: ${BACKEND_PORT:8081}
+
+xcode:
+  internal-identity:
+    application-id: ${XCODE_APPLICATION_ID:generated-application}
+    issuer: ${XCODE_USER_INFO_ISSUER:xcode-generated-gateway}
+    audience: ${XCODE_USER_INFO_AUDIENCE:application-internal-services}
+    secret: ${XCODE_USER_INFO_SECRET}
+    service-token: ${XCODE_GATEWAY_SERVICE_TOKEN}
+    protected-prefix: /internal/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true

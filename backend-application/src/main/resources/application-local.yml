@@ -1,0 +1,4 @@
+xcode:
+  internal-identity:
+    secret: ${XCODE_USER_INFO_SECRET:local-development-secret-at-least-32-bytes}
+    service-token: ${XCODE_GATEWAY_SERVICE_TOKEN:local-development-service-token}
