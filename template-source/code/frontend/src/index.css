@@ -1,0 +1,9 @@
+@import "tailwindcss" important;
+@layer antd, antd-pro;
+
+/* 注入tailwind主题色 */
+@theme {
+  --color-primary: #2c68ff;
+  --color-primary-1: #2c68ff0A;
+  --color-primary-2: #2c68ff14;
+}
