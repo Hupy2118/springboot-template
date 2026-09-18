@@ -81,6 +81,10 @@ additions:
     source: backend/src/main/java/com/cmbchina/backend/auth/bootstrap/AuthorizationBootstrapCommand.java
     target: backend/src/main/java/com/cmbchina/backend/auth/bootstrap/AuthorizationBootstrapCommand.java
     maintainPolicy: { mode: NO_OP }
+  - id: authorization.backend-scripts-bootstrap-authorization-sh
+    source: backend/scripts/bootstrap-authorization.sh
+    target: backend/scripts/bootstrap-authorization.sh
+    maintainPolicy: { mode: NO_OP }
   - id: authorization.backend-src-main-java-com-cmbchina-backend-auth-common-annotation-requireanyresource
     source: backend/src/main/java/com/cmbchina/backend/auth/common/annotation/RequireAnyResource.java
     target: backend/src/main/java/com/cmbchina/backend/auth/common/annotation/RequireAnyResource.java
