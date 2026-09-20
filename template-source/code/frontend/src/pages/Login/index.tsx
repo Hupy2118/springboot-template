@@ -4,8 +4,9 @@ import qs from 'qs';
 import { CURRENT_URL, USER_INFO_KEY } from '@/constants';
 import { PAGE_ROUTE } from '@/constants/routes';
 import { loginApi } from '@/apis/login';
-import { GlobalContext } from '@/providers/GlobalContextProvider';
+import { GlobalContext } from '@/providers/index';
 
+// @xcodeagent-extension login
 export default function Login() {
   const prevUrl = window.localStorage.getItem(CURRENT_URL);
   const { code } = qs.parse(window.location.href.split('?')[1]);

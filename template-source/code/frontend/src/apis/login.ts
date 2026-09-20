@@ -1,7 +1,11 @@
 import service from './service';
 
 export default function loginApi(code: string) {
-  return service.get(`/api/sso/login?code=${code}`);
+  return Promise.resolve({
+  userId:'001',
+  userName:"haha"
+});
+  // return service.get(`/api/sso/login?code=${code}`);
 }
 
 function logoutApi() {

@@ -6,6 +6,7 @@ import { YST } from '@/constants/yst';
 import { logoutApi } from '@/apis/login';
 import { GlobalContext } from '@/providers/index';
 
+// @xcodeagent-extension login
 export default function Logout() {
   const prevUrl = window.localStorage.getItem(CURRENT_URL);
 

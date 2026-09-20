@@ -1,22 +1,23 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import qs from 'qs';
 import { CURRENT_URL, USER_INFO_KEY } from '@/constants';
 import { YST } from '@/constants/yst';
 import { AuthnSourceEnum, IAuthInfo, IUserInfo } from '@/typings/index';
 
-type useLoginGuardProps = {
+type useGuardProps = {
   userInfo: IUserInfo | null;
   setAuthInfo: React.Dispatch<React.SetStateAction<IAuthInfo | null>>;
 }
 
-export default function useLoginGuard({ userInfo, setAuthInfo }: useLoginGuardProps) {
+// @xcodeagent-extension login
+export default function useGuard({ userInfo, setAuthInfo }: useGuardProps) {
   const userInfoFromSessionStr = sessionStorage.getItem(USER_INFO_KEY);
   const isLoginPage = useMemo(() => {
     return window.location.pathname === '/login'
   }, []);
 
-
-  const handleLogin = useCallback(() => {
+  
+    const handleLogin = useCallback(() => {
     // 保存当前url到localStorage中
     const currentUrl = window.location.pathname + window.location.search;
     window.localStorage.setItem(CURRENT_URL, currentUrl);
@@ -48,13 +49,12 @@ export default function useLoginGuard({ userInfo, setAuthInfo }: useLoginGuardPr
       );
     };
   }, [YST]);
-
-
+  
   useEffect(() => {
     try {
       const userInfoFromSession = userInfoFromSessionStr ? JSON.parse(userInfoFromSessionStr) : null;
-      // 若没有用户信息，保存现在的地址，并跳转到登录页
-      if (YST?.CLIENT_ID && !isLoginPage && !userInfo && !userInfoFromSession) {
+                  // 若没有用户信息，保存现在的地址，并跳转到登录页
+      if (!import.meta.env.DEV && YST?.CLIENT_ID && !isLoginPage && !userInfo && !userInfoFromSession) {
         handleLogin();
       }
       setAuthInfo(() => ({
@@ -65,10 +65,8 @@ export default function useLoginGuard({ userInfo, setAuthInfo }: useLoginGuardPr
         authnSource: AuthnSourceEnum.YHT,
       }));
       listenYHTLogout();
-
-    } catch (error) {
+          } catch (error) {
       console.error(error)
     }
-  }, [userInfo, setAuthInfo, userInfoFromSessionStr, YST, handleLogin, isLoginPage]);
-
-}
+      }, [userInfo, setAuthInfo, userInfoFromSessionStr, YST, handleLogin, isLoginPage]);
+  }

@@ -1,34 +1,64 @@
-import type { AppMenuItem } from '@/typings/menu';
-import type { PageRouteDefinition } from '@/typings/routes';
-import { pageRouteSegmentFromId } from '@/utils/pageIdentity';
-const trim = (path: string) => path.replace(/^\/+|\/+$/g, '');
-const internal = (root: string, segments: string[]) =>
-  `/${[trim(root), ...segments].join('/')}`;
+import type { Route } from '@/typings/workbench';
+import type { ResolvedPageRoute } from '@/utils/pageRouteTree';
 
-/** Resolves the sole Route path convention for pages under the main Layout. */
-export function resolvePagePath(page: PageRouteDefinition, root?: string): string {
-  const segment = pageRouteSegmentFromId(page.pageId);
-  return root === undefined ? segment : internal(root, [segment]);
+export type AuthorizedNavigation = {
+  menuRoutes: Route[];
+  firstAccessiblePath?: string;
+};
+
+function isPermitted(
+  item: ResolvedPageRoute,
+  hasPermission: (resourceKey: string) => boolean,
+) {
+  return item.requiredResourceKeys.every(hasPermission);
 }
 
-export function createLayoutMenus(
-  items: PageRouteDefinition[],
-  root: string,
-): AppMenuItem[] {
-  return items.map((item) => ({
-    key: item.pageId,
-    name: item.name,
-    icon: item.icon,
-    hideInMenu: item.hideInMenu,
-    resourceKey: item.resourceKey,
-    path: resolvePagePath(item, root),
-  }));
-}
-export function findFirstPagePath(
-  items: PageRouteDefinition[],
-  root: string,
-): string | undefined {
-  for (const item of items) {
-    return resolvePagePath(item, root);
-  }
+/**
+ * 在同一次授权遍历中生成可见菜单及 /page 默认入口。
+ * 目录资源键已在标准化树中继承到全部后代，因此无权限目录会拦截整个子树。
+ */
+export function createAuthorizedNavigation(
+  hasPermission: (resourceKey: string) => boolean,
+  items: ResolvedPageRoute[],
+): AuthorizedNavigation {
+  let firstAccessiblePath: string | undefined;
+
+  const walk = (nodes: ResolvedPageRoute[]): Route[] => nodes.flatMap<Route>((item): Route[] => {
+    if (!item.visible || !isPermitted(item, hasPermission)) return [];
+
+    if (item.kind === 'directory') {
+      const children = walk(item.children);
+      if (children.length === 0) return [];
+      return [{
+        key: item.menuKey,
+        name: item.definition.label,
+        icon: item.definition.icon,
+        path: undefined,
+        children,
+      }];
+    }
+
+    if (item.kind === 'external') {
+      return [{
+        key: item.menuKey,
+        name: item.definition.label,
+        icon: item.definition.icon,
+        path: item.definition.path,
+        isUrl: true,
+        target: item.definition.target,
+        children: undefined,
+      }];
+    }
+
+    if (!firstAccessiblePath) firstAccessiblePath = item.internalPath;
+    return [{
+      key: item.menuKey,
+      name: item.definition.label,
+      icon: item.definition.icon,
+      path: item.internalPath,
+      children: undefined,
+    }];
+  });
+
+  return { menuRoutes: walk(items), firstAccessiblePath };
 }

@@ -1,54 +1,39 @@
-import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
-
-export type DataType = unknown;
+import axios, { AxiosInstance, AxiosError, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import { AUTHORIZATION_KEY } from '@/constants';
+export type DataType = string | number | Object;
 export type ReqFulfilledType = (config: InternalAxiosRequestConfig) => InternalAxiosRequestConfig;
 export type ResFulfilledType = (response: AxiosResponse) => AxiosResponse['data'];
 export type ResRejectedType = (error: AxiosError<{ message: string }>) => Promise<never>;
 
-/** 后端统一响应格式。Service 成功时只向业务代码返回 body。 */
-export interface ResponseEnvelope<T> {
-  returnCode: string;
-  errorMsg: string | null;
-  body: T;
-}
-
-export class ServiceResponseError extends Error {
-  constructor(public readonly returnCode: string, message?: string | null) {
-    super(message || '服务请求失败');
-    this.name = 'ServiceResponseError';
-  }
-}
-
-const isResponseEnvelope = (value: unknown): value is ResponseEnvelope<unknown> => (
-  typeof value === 'object'
-  && value !== null
-  && 'returnCode' in value
-  && typeof value.returnCode === 'string'
-  && 'errorMsg' in value
-  && 'body' in value
-);
-
 // 请求体处理
 const defaultReqFulfilled: ReqFulfilledType = (config) => {
-  return config;
+  try {
+    // 每次请求前接口携带最新的Authorization字段到请求头
+    const latestAuthorization = sessionStorage.getItem(AUTHORIZATION_KEY);
+    if(latestAuthorization) {
+      config.headers[AUTHORIZATION_KEY] = latestAuthorization;
+    }
+    return config;
+  } catch {
+    return config;
+  }
 };
 // 响应体处理
 const defaultResFulfilled: ResFulfilledType = (response) => {
-  const envelope = response.data;
-  if (!isResponseEnvelope(envelope)) {
-    throw new ServiceResponseError('INVALID_RESPONSE', '服务响应格式无效');
+  // 取出最新的Authorization，存储到SessionStorage
+  if(response.headers?.[AUTHORIZATION_KEY]) {
+    sessionStorage.setItem(AUTHORIZATION_KEY, response.headers?.authorization);
   }
-  if (envelope.returnCode !== 'SUC0000') {
-    throw new ServiceResponseError(envelope.returnCode, envelope.errorMsg);
-  }
-  return envelope.body;
+  return response.data;
 };
 
 // 响应错误处理
 const defaultResRejected: ResRejectedType = async (error) => {
-  const envelope = error.response?.data;
-  if (isResponseEnvelope(envelope)) {
-    return Promise.reject(new ServiceResponseError(envelope.returnCode, envelope.errorMsg));
+  const errResponseBody: any = error.response?.data;
+  // 处理全局401报错，自动跳转登录地址
+  if(errResponseBody && errResponseBody?.errorCode === 'SSO0401' && errResponseBody?.type === 'redirect') {
+    // todo 替换为真正的跳转方法
+    console.log('接下来要跳转的登录地址: ', errResponseBody?.loginUri)
   }
   return Promise.reject(error);
 };
@@ -95,6 +80,13 @@ class Service {
     return this.axios.delete(url, config) as unknown as Promise<T>;
   }
 
+  all(axiosInstances: AxiosInstance[]) {
+    return axios.all(axiosInstances);
+  }
+
+  setAuthorization(token: string) {
+    this.axios.defaults.headers.Authorization = token;
+  }
 }
 const service = new Service({});
 

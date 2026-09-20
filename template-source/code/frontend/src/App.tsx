@@ -1,30 +1,39 @@
+import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import { StyleProvider } from '@ant-design/cssinjs';
-import type { PropsWithChildren } from 'react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import GlobalContextProvider from '@/providers';
 import { Routes } from '@/routes';
-import { capabilityProviders } from '@/capability-extensions/providers';
-
-function CapabilityProviders({ children }: PropsWithChildren) {
-  return capabilityProviders.reduceRight(
-    (current, Provider) => <Provider>{current}</Provider>,
-    children,
-  );
-}
-
-export default function App() {
+import { AuthProvider } from '@/providers/AuthProvider';
+/**
+ * 应用入口文件
+ */
+const App: React.FC = () => {
   return (
+    // <React.StrictMode>
     <BrowserRouter>
       <ErrorBoundary>
-        <StyleProvider layer>
-          <CapabilityProviders>
-            <ConfigProvider>
-              <Routes />
-            </ConfigProvider>
-          </CapabilityProviders>
-        </StyleProvider>
+        <GlobalContextProvider>
+          <AuthProvider>
+            <StyleProvider layer>
+              <ConfigProvider
+                theme={{
+                  token: {
+                    // 统一设置antd组件的主题色
+                    colorPrimary: '#2c68ff',
+                  },
+                }}
+              >
+                <Routes />
+              </ConfigProvider>
+            </StyleProvider>
+          </AuthProvider>
+        </GlobalContextProvider>
       </ErrorBoundary>
     </BrowserRouter>
+    // </React.StrictMode>
   );
-}
+};
+
+export default App;
