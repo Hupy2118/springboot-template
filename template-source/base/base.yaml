@@ -67,3 +67,7 @@ files:
   - { source: frontend/tsconfig.json, target: frontend/tsconfig.json }
   - { source: frontend/tsconfig.test.json, target: frontend/tsconfig.test.json }
   - { source: frontend/vite.config.ts, target: frontend/vite.config.ts }
+  - { source: frontend/devtools/elementInspector.ts, target: frontend/devtools/elementInspector.ts }
+  - { source: frontend/tests/__mocks__/fileMock.cjs, target: frontend/tests/__mocks__/fileMock.cjs }
+  - { source: frontend/tests/__mocks__/styleMock.cjs, target: frontend/tests/__mocks__/styleMock.cjs }
+  - { source: frontend/tests/setupTests.ts, target: frontend/tests/setupTests.ts }
