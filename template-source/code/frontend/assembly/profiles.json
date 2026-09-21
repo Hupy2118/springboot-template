@@ -1,6 +1,18 @@
 {
-  "base": [],
-  "login": ["login"],
-  "authorization": ["authorization"],
-  "full": ["login", "authorization"]
+  "base": {
+    "extensions": [],
+    "writeOwner": "base"
+  },
+  "login": {
+    "extensions": ["login"],
+    "writeOwner": "login"
+  },
+  "authorization": {
+    "extensions": ["authorization"],
+    "writeOwner": "authorization"
+  },
+  "full": {
+    "extensions": ["login", "authorization"],
+    "writeOwner": null
+  }
 }

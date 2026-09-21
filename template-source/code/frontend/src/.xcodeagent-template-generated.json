@@ -1,9 +1,6 @@
 {
   "generated": true,
-  "profile": "full",
-  "extensions": [
-    "login",
-    "authorization"
-  ],
+  "profile": "base",
+  "extensions": [],
   "assemblySchemaVersion": 1
 }

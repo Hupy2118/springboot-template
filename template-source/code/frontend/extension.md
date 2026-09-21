@@ -1,222 +1,8 @@
-# 前端模板开发链路断点修复方案
+# Base 模板可持续维护修复方案
 
 ## 1. 改造目标
 
-当前 `template-source/code/frontend` 已具备：
-
-```text
-base/src
-+
-extensions/*
-+
-assembly
-↓
-src
-```
-
-的正向 Assembly 能力，但开发者在 `pnpm dev:<profile>` 后实际修改的是根目录 `src/**`，这些修改不会自动持久化回：
-
-```text
-base/src/**
-extensions/<id>/src/**
-```
-
-导致：
-
-```text
-src 修改
-→ 当前开发环境有效
-→ 下一次 Assembly 被覆盖
-→ 修改无法复用
-```
-
-本次改造只解决 `template-source/code/frontend` 内部开发闭环，不涉及 Template Engine 正式发布链路。
-
-目标是形成：
-
-```text
-Authoring Source
-↓
-Assembly
-↓
-src
-↓
-开发者修改
-↓
-自动同步回 Authoring Source
-↓
-下次 Assembly 可完整恢复
-```
-
----
-
-# 2. 核心设计
-
-不同 Profile 采用不同的同步策略。
-
-## 2.1 Base：Mirror Sync
-
-执行：
-
-```bash
-pnpm dev:base
-```
-
-后，根目录 `src/**` 可以视为 Base 的完整开发工作区。
-
-规则：
-
-```text
-src 中所有非 Assembly Managed 文件
-↓
-直接同步到
-base/src/**
-```
-
-包括：
-
-* 修改文件；
-* 新增文件；
-* 删除文件。
-
-因此 Base 开发形成：
-
-```text
-base/src
-↓
-Assembly
-↓
-src
-↓
-开发
-↓
-Mirror Sync
-↓
-base/src
-```
-
-开发者无需直接维护 `base/src`。
-
----
-
-## 2.2 Login / Authorization：Source-aware Delta Sync
-
-组合 Profile 不能整体覆盖 Extension，因为：
-
-```text
-dev:login
-=
-Base + Login
-
-dev:authorization
-=
-Base + Login + Authorization
-```
-
-因此已有文件必须根据原始 Source 归属进行同步。
-
-例如：
-
-```text
-src/layout/index.tsx
-↓
-base/src/layout/index.tsx
-```
-
-```text
-src/pages/Login/index.tsx
-↓
-extensions/login/src/pages/Login/index.tsx
-```
-
-```text
-src/pages/AuthorizationManagement/index.tsx
-↓
-extensions/authorization/src/pages/AuthorizationManagement/index.tsx
-```
-
-已有文件的 Owner 不需要额外维护 Ownership Manifest，可直接根据 Source Tree 判断。
-
-Assembly 已禁止 Base 与 Extension 文件路径碰撞，因此已有文件的 Owner 是唯一的。
-
----
-
-# 3. 新增文件归属规则
-
-新增文件不存在原始 Owner，需要根据当前 Profile 指定默认写入目标。
-
-调整：
-
-```text
-assembly/profiles.json
-```
-
-建议从：
-
-```json
-{
-  "base": [],
-  "login": ["login"],
-  "authorization": ["authorization"],
-  "full": ["login", "authorization"]
-}
-```
-
-调整为：
-
-```json
-{
-  "base": {
-    "extensions": [],
-    "writeOwner": "base"
-  },
-  "login": {
-    "extensions": ["login"],
-    "writeOwner": "login"
-  },
-  "authorization": {
-    "extensions": ["authorization"],
-    "writeOwner": "authorization"
-  },
-  "full": {
-    "extensions": ["login", "authorization"],
-    "writeOwner": null
-  }
-}
-```
-
-规则：
-
-```text
-dev:base
-新增文件 → base/src
-```
-
-```text
-dev:login
-新增文件 → extensions/login/src
-```
-
-```text
-dev:authorization
-新增文件 → extensions/authorization/src
-```
-
-`dev:full` 暂不自动判断新增文件归属。
-
-新增文件时直接报：
-
-```text
-NEW_FILE_OWNER_REQUIRED
-```
-
-`full` 定位为集成验证 Profile，而不是具体 Extension 的主要开发入口。
-
----
-
-# 4. Assembly Managed 文件保护
-
-以下文件由 Compiler 生成：
+当前 `pnpm dev:base` 生成的 `src` 中，有部分运行时代码由 Assembly 直接生成，例如：
 
 ```text
 providers/AppProviders.tsx
@@ -226,66 +12,293 @@ bootstrap/appInitializers.ts
 observability/errorReporter.ts
 ```
 
-这些文件不得从 `src` 反向同步。
+这些文件被视为 Assembly Managed Files，导致开发者即使在 `src` 中修复，也无法通过 `sync:base` 持久化到 `base/src`。
 
-开发者修改这些文件时，应报：
-
-```text
-ASSEMBLY_MANAGED_FILE
-```
-
-并提示通过：
+需要调整为：
 
 ```text
-extension.yaml
-assembly Contract
-Compiler
+Base
+= 可持续维护的完整基础应用源码
+
+Extension
+= 独立能力源码
+
+Assembly
+= 只负责 Extension 组合
+
+Generated
+= 只保存组合结果
 ```
 
-进行修改。
+最终保证：
 
-防止插件化架构重新退化为直接修改生成代码。
+```text
+pnpm dev:base
+→ 修改完整 src
+→ pnpm sync:base
+→ 更新 base/src
+→ 下一次 dev:base 继续基于最新 Base 开发
+```
 
 ---
 
-# 5. 新增 Workspace Sync 组件
+# 2. 核心改造原则
+
+Assembly 不再生成完整应用逻辑文件，只生成 Extension Contribution Registry。
+
+判断标准：
+
+> 没有任何 Extension 时仍然有意义的代码，应属于 Base，而不是 Assembly Generated。
+
+因此以下文件应正式进入 `base/src`：
+
+```text
+base/src/providers/AppProviders.tsx
+base/src/routes/rootRoutes.tsx
+base/src/routes/systemPageRoutes.ts
+base/src/bootstrap/appInitializers.ts
+base/src/observability/errorReporter.ts
+```
+
+这些文件后续都允许：
+
+```text
+dev:base
+→ 修改 src
+→ sync:base
+→ 覆盖 base/src
+```
+
+---
+
+# 3. 调整 Assembly 输出
+
+当前 `assemble.mjs` 中：
+
+```text
+appProviders()
+rootRoutes()
+systemPageRoutes()
+initializers()
+errorReporters()
+```
+
+会生成完整运行时代码。
+
+需要调整为只生成 Extension Registry，例如：
+
+```text
+src/generated/extensions/providers.ts
+src/generated/extensions/rootRoutes.tsx
+src/generated/extensions/systemPageRoutes.ts
+src/generated/extensions/initializers.ts
+src/generated/extensions/errorReporters.ts
+```
+
+建议对应函数调整为：
+
+```text
+generateProviderRegistry()
+generateRootRouteRegistry()
+generatePageRouteRegistry()
+generateInitializerRegistry()
+generateErrorReporterRegistry()
+```
+
+它们只负责描述：
+
+```text
+当前 Profile 中有哪些 Extension Contribution
+```
+
+不再负责定义应用最终行为。
+
+---
+
+# 4. Base 文件改造
+
+## 4.1 AppProviders
+
+新增正式 Base 文件：
+
+```text
+base/src/providers/AppProviders.tsx
+```
+
+由 Base 自己控制 Provider 组合逻辑。
+
+示例：
+
+```tsx
+import type { PropsWithChildren } from 'react';
+import { IdentityProvider } from '@/platform/identity/IdentityContext';
+import { extensionProviders } from '@/generated/extensions/providers';
+
+export function AppProviders({ children }: PropsWithChildren) {
+  const content = extensionProviders.reduceRight(
+    (current, Provider) => <Provider>{current}</Provider>,
+    children,
+  );
+
+  return <IdentityProvider>{content}</IdentityProvider>;
+}
+```
+
+Assembly 只生成：
+
+```text
+generated/extensions/providers.ts
+```
+
+Base Profile：
+
+```ts
+export const extensionProviders = [];
+```
+
+Login / Authorization Profile 则生成对应 Provider 列表。
+
+---
+
+## 4.2 Root Routes
 
 新增：
 
 ```text
-assembly/workspace-sync.mjs
+base/src/routes/rootRoutes.tsx
 ```
 
-职责：
+由 Base 负责最终路由组合逻辑。
+
+Assembly 只生成：
+
+```text
+generated/extensions/rootRoutes.tsx
+```
+
+保存 Extension 提供的 Root Route。
+
+---
+
+## 4.3 System Page Routes
+
+新增：
+
+```text
+base/src/routes/systemPageRoutes.ts
+```
+
+Base 负责最终页面路由组合。
+
+Assembly 只生成：
+
+```text
+generated/extensions/systemPageRoutes.ts
+```
+
+---
+
+## 4.4 Initializers
+
+新增：
+
+```text
+base/src/bootstrap/appInitializers.ts
+```
+
+Base 决定：
+
+```text
+初始化顺序
+异常处理
+Base 初始化逻辑
+Extension 初始化调用方式
+```
+
+Assembly 只生成：
+
+```text
+generated/extensions/initializers.ts
+```
+
+---
+
+## 4.5 Error Reporter
+
+新增：
+
+```text
+base/src/observability/errorReporter.ts
+```
+
+Base 负责：
+
+```text
+错误处理策略
+Reporter 隔离
+fallback
+调用顺序
+```
+
+Assembly 只生成：
+
+```text
+generated/extensions/errorReporters.ts
+```
+
+---
+
+# 5. 调整 Assembly Managed Files
+
+当前这 5 个文件：
+
+```text
+providers/AppProviders.tsx
+routes/rootRoutes.tsx
+routes/systemPageRoutes.ts
+bootstrap/appInitializers.ts
+observability/errorReporter.ts
+```
+
+从 `ASSEMBLY_MANAGED_FILES` 中移除。
+
+新的 Assembly Managed Files 只包括：
+
+```text
+generated/extensions/providers.ts
+generated/extensions/rootRoutes.tsx
+generated/extensions/systemPageRoutes.ts
+generated/extensions/initializers.ts
+generated/extensions/errorReporters.ts
+```
+
+Workspace Metadata：
+
+```text
+.xcodeagent-template-generated.json
+```
+
+单独作为 Workspace Metadata 管理，不写入 Base。
+
+---
+
+# 6. 修改 sync
+
+`pnpm sync:base` 应采用完整 Mirror Sync。
+
+同步范围：
 
 ```text
 src/**
+-
+generated/extensions/**
+-
+.xcodeagent-template-generated.json
 ↓
-判断文件类型和 Owner
-↓
-同步 Authoring Source
+base/src/**
 ```
 
-核心逻辑：
-
-```text
-如果是 Assembly Managed File
-→ 禁止同步
-
-否则如果 profile = base
-→ 同步到 base/src
-
-否则如果 Source 中已存在该文件
-→ 回写原 Owner
-
-否则如果当前 Profile 有 writeOwner
-→ 写入 writeOwner
-
-否则
-→ NEW_FILE_OWNER_REQUIRED
-```
-
-建议同时支持：
+支持：
 
 ```text
 CREATE
@@ -293,132 +306,116 @@ UPDATE
 DELETE
 ```
 
+因此开发者修改：
+
+```text
+src/providers/AppProviders.tsx
+```
+
+执行：
+
+```bash
+pnpm sync:base
+```
+
+后必须更新：
+
+```text
+base/src/providers/AppProviders.tsx
+```
+
+其他 Base 文件同理。
+
 ---
 
-# 6. 修改 dev.mjs
+# 7. 修改 assemble.mjs
 
-当前：
+Assembly 流程调整为：
 
 ```text
-watch base/src
-watch extensions
-watch assembly
-↓
-重新 Assembly
+1. copy base/src → src
+
+2. copy selected extensions → src
+
+3. 读取 extension.yaml contributions
+
+4. 生成 generated/extensions/**
+
+5. 写入 .xcodeagent-template-generated.json
 ```
 
-改造后增加：
+不得再覆盖：
 
 ```text
-watch src/**
-↓
-workspace-sync
-↓
-持久化 Source
+src/providers/AppProviders.tsx
+src/routes/rootRoutes.tsx
+src/routes/systemPageRoutes.ts
+src/bootstrap/appInitializers.ts
+src/observability/errorReporter.ts
 ```
 
-完整流程：
+---
 
-```text
-pnpm dev:<profile>
-↓
-Assembly 当前 Profile
-↓
-生成 src
-↓
-启动 Vite
-↓
-监听 src
-↓
-开发者修改
-↓
-workspace-sync
-↓
-写回 Source
+# 8. Base Profile 行为
+
+执行：
+
+```bash
+pnpm dev:base
 ```
 
-同时需要避免：
+应得到：
 
 ```text
+base/src
++
+空 Extension Registry
+↓
 src
-→ Source
-→ Source Watch
-→ Assembly
-→ src
-→ Source
 ```
 
-循环触发。
-
-推荐规则：
-
-### 普通源码开发
-
-以：
+例如：
 
 ```text
-src → Source
+generated/extensions/providers.ts
 ```
 
-为主。
+内容为空列表。
 
-### Manifest / Assembly 结构变化
-
-以下目录变化时才重新 Assembly：
+开发者可以正常修改：
 
 ```text
-extensions/*/extension.yaml
-assembly/**
+src/providers/AppProviders.tsx
+src/routes/rootRoutes.tsx
+src/bootstrap/appInitializers.ts
+...
 ```
 
-必要时也可以保留 Source Watch，但 Assembly 写 `src` 时必须增加同步抑制标记，防止触发反向同步。
+然后：
 
-第一阶段建议优先采用更简单的：
-
-```text
-普通源码：src → Source
-结构配置：Source → Assembly → src
+```bash
+pnpm sync:base
 ```
+
+完整更新 Base。
 
 ---
 
-# 7. Base Profile 特殊优化
+# 9. Login / Authorization 行为
 
-Base 不需要做复杂 Owner 判断。
-
-增加：
+Login：
 
 ```text
-syncBaseWorkspace()
+Base
++
+Login Source
++
+Login Contribution Registry
+↓
+src
 ```
 
-规则：
-
-```text
-src/**
--
-Assembly Managed Files
-=
-base/src/**
-```
-
-采用镜像方式同步：
-
-```text
-新增 → 新增
-修改 → 覆盖
-删除 → 删除
-```
-
-这样 `dev:base` 的开发体验就是一个普通 React 工程。
-
----
-
-# 8. Extension Profile 同步规则
-
-以 `dev:authorization` 为例。
-
-当前组合：
+Authorization：
 
 ```text
 Base
@@ -426,556 +423,56 @@ Base
 Login
 +
 Authorization
-```
-
-### 修改 Base 文件
-
-```text
-src/layout/index.tsx
-↓
-base/src/layout/index.tsx
-```
-
-### 修改 Login 文件
-
-```text
-src/pages/Login/index.tsx
-↓
-extensions/login/src/pages/Login/index.tsx
-```
-
-### 修改 Authorization 文件
-
-```text
-src/hooks/usePermission.ts
-↓
-extensions/authorization/src/hooks/usePermission.ts
-```
-
-### 新增文件
-
-```text
-src/components/PermissionTree.tsx
-↓
-extensions/authorization/src/components/PermissionTree.tsx
-```
-
-因为：
-
-```text
-writeOwner = authorization
-```
-
----
-
-# 9. 删除规则
-
-删除操作与修改保持相同 Owner 规则。
-
-例如：
-
-```text
-dev:login
-```
-
-删除：
-
-```text
-src/pages/Login/index.tsx
-```
-
-同步删除：
-
-```text
-extensions/login/src/pages/Login/index.tsx
-```
-
-删除：
-
-```text
-src/utils/a.ts
-```
-
-如果原 Owner 是 Base，则删除：
-
-```text
-base/src/utils/a.ts
-```
-
-同步日志应明确输出：
-
-```text
-DELETE base/src/utils/a.ts
-via profile login
-```
-
-方便开发者通过 Git Diff 回检影响。
-
----
-
-# 10. Rename 边界
-
-第一阶段不实现跨 Owner Rename Detection。
-
-例如：
-
-```text
-base/src/utils/a.ts
-```
-
-在 `dev:login` 中被改名为：
-
-```text
-src/utils/b.ts
-```
-
-系统按：
-
-```text
-DELETE base/utils/a.ts
 +
-CREATE login/utils/b.ts
-```
-
-处理。
-
-即：
-
-> Rename 第一阶段按 DELETE + CREATE 处理。
-
-如果需要改变文件 Owner，由开发者显式调整维护源码。
-
-暂不为此引入复杂 Rename 推断。
-
----
-
-# 11. 修改 build-profile.mjs
-
-`build:<profile>` 不再只是：
-
-```text
-Assembly
-→ tsc
-→ vite build
-```
-
-应增加 Workspace 持久化和重建验证。
-
-推荐流程：
-
-```text
-① workspace-sync
+对应 Contribution Registry
 ↓
-确保 src 修改已经进入 Source
-
-② 保存当前 Profile
-
-③ 从 Source 重新 Assembly 到临时目录
-
-④ 比较：
-当前 src
-vs
-重新 Assembly 输出
-
-⑤ 不一致
-→ WORKSPACE_SOURCE_DRIFT
-
-⑥ 一致
-→ tsc
-
-⑦ vite build
-
-⑧ 恢复原 Profile
+src
 ```
 
-不要再固定：
+已有 Base 文件仍然属于 Base。
 
-```text
-build 后恢复 full
-```
-
-例如：
-
-```text
-进入前：base
-执行 build:base
-结束后：base
-```
-
-避免 Build 打断开发状态。
+Extension Registry 始终由 Assembly 生成，不允许反向同步。
 
 ---
 
-# 12. 建议新增命令
+# 10. 需要修改的文件
 
-`package.json` 增加：
-
-```json
-{
-  "scripts": {
-    "sync:workspace": "node assembly/workspace-sync.mjs",
-    "sync:base": "node assembly/workspace-sync.mjs --profile=base"
-  }
-}
-```
-
-正常开发无需人工执行。
-
-用途主要是：
+主要修改范围：
 
 ```text
-调试
-CI
-异常恢复
+template-source/code/frontend/
+
+base/src/
+  providers/AppProviders.tsx
+  routes/rootRoutes.tsx
+  routes/systemPageRoutes.ts
+  bootstrap/appInitializers.ts
+  observability/errorReporter.ts
+
+assembly/
+  assemble.mjs
+  assembly-contract.mjs
+  workspace-sync.mjs
+  verify-generated.mjs
 ```
 
-正常链路：
+如存在相关测试，同时修改：
 
 ```text
-dev 自动 Sync
-build 自动 Sync
+assembly/test-assemble.mjs
 ```
 
 ---
 
-# 13. 实施步骤
+# 11. 验收标准
 
-## Step 1：调整 Profile Contract
-
-修改：
-
-```text
-assembly/profiles.json
-assembly/profiles.mjs
-```
-
-支持：
-
-```text
-extensions
-writeOwner
-```
-
-验收：
-
-```text
-base.writeOwner = base
-login.writeOwner = login
-authorization.writeOwner = authorization
-full.writeOwner = null
-```
-
----
-
-## Step 2：抽取 Assembly Managed Files
-
-当前 `assemble.mjs` 内已有：
-
-```text
-assemblyFiles
-```
-
-抽取为共享模块，例如：
-
-```text
-assembly/assembly-contract.mjs
-```
-
-由：
-
-```text
-assemble.mjs
-workspace-sync.mjs
-```
-
-共同引用。
-
-禁止维护两套文件列表。
-
----
-
-## Step 3：实现 Base Mirror Sync
-
-新增：
-
-```text
-assembly/workspace-sync.mjs
-```
-
-优先仅支持：
-
-```text
-profile=base
-```
-
-完成：
-
-```text
-CREATE
-UPDATE
-DELETE
-```
-
-同步。
-
-验收：
-
-```text
-src/layout/index.tsx
-→ base/src/layout/index.tsx
-```
-
-以及新增、删除文件均一致。
-
----
-
-## Step 4：接入 dev:base
-
-修改：
-
-```text
-assembly/dev.mjs
-```
-
-实现：
-
-```text
-启动时 Assembly Base
-↓
-监听 src
-↓
-自动 Sync Base
-```
-
-验收：
-
-修改：
-
-```text
-src/layout/index.tsx
-```
-
-不执行任何额外命令，检查：
-
-```text
-base/src/layout/index.tsx
-```
-
-已经同步。
-
----
-
-## Step 5：修复 build:base
-
-修改：
-
-```text
-assembly/build-profile.mjs
-```
-
-流程改成：
-
-```text
-sync
-→ re-assemble
-→ compare
-→ build
-```
-
-Build 完成后仍保持 Base Profile。
-
----
-
-## Step 6：扩展 Existing File Owner 判断
-
-支持：
-
-```text
-dev:login
-dev:authorization
-```
-
-通过 Source Tree 判断原始 Owner。
-
-规则：
-
-```text
-base 存在 → base
-
-selected extension 存在
-→ 对应 extension
-```
-
-若出现多个 Owner：
-
-```text
-SOURCE_OWNER_CONFLICT
-```
-
-应直接失败。
-
-理论上现有 `FILE_COLLISION` 已保证不会正常出现。
-
----
-
-## Step 7：实现 writeOwner
-
-支持组合 Profile 中新增文件。
-
-```text
-login
-→ login
-
-authorization
-→ authorization
-```
-
-Full 新增文件失败：
-
-```text
-NEW_FILE_OWNER_REQUIRED
-```
-
----
-
-## Step 8：完善测试
-
-增加 Workspace Sync 测试：
-
-```text
-Base Update
-Base Create
-Base Delete
-
-Login 修改 Base 文件
-Login 修改 Login 文件
-Login 新增文件
-
-Authorization 修改 Base
-Authorization 修改 Login
-Authorization 修改 Authorization
-Authorization 新增文件
-
-Assembly Managed File 修改失败
-
-Full 新增文件失败
-```
-
----
-
-# 14. 最终验收标准
-
-必须至少通过以下场景。
-
-### Base 持久化
+## Base 可修改
 
 执行：
 
 ```bash
 pnpm dev:base
 ```
-
-修改：
-
-```text
-src/layout/index.tsx
-```
-
-要求：
-
-```text
-base/src/layout/index.tsx
-```
-
-自动同步。
-
----
-
-### Base 新增
-
-新增：
-
-```text
-src/components/Test/index.tsx
-```
-
-要求自动创建：
-
-```text
-base/src/components/Test/index.tsx
-```
-
----
-
-### Base 删除
-
-删除：
-
-```text
-src/components/Test/index.tsx
-```
-
-要求同步删除 Base Source。
-
----
-
-### Extension Existing File
-
-执行：
-
-```bash
-pnpm dev:login
-```
-
-修改：
-
-```text
-src/pages/Login/index.tsx
-```
-
-要求更新：
-
-```text
-extensions/login/src/pages/Login/index.tsx
-```
-
-修改：
-
-```text
-src/layout/index.tsx
-```
-
-要求更新：
-
-```text
-base/src/layout/index.tsx
-```
-
----
-
-### Extension New File
-
-执行：
-
-```bash
-pnpm dev:authorization
-```
-
-新增：
-
-```text
-src/components/PermissionTree.tsx
-```
-
-要求创建：
-
-```text
-extensions/authorization/src/components/PermissionTree.tsx
-```
-
----
-
-### Generated File
 
 修改：
 
@@ -983,103 +480,140 @@ extensions/authorization/src/components/PermissionTree.tsx
 src/providers/AppProviders.tsx
 ```
 
-必须拒绝：
-
-```text
-ASSEMBLY_MANAGED_FILE
-```
-
----
-
-### 可恢复性
-
-这是最关键验收。
-
-完成开发后：
+执行：
 
 ```bash
-rm -rf src
-pnpm assemble -- --profile=base
+pnpm sync:base
 ```
 
-重新生成的 `src` 必须完整包含刚才所有修改。
-
-即：
+要求：
 
 ```text
-开发 src
-↓
-持久化 Source
-↓
-删除 src
-↓
-重新 Assembly
-↓
-代码完全恢复
+base/src/providers/AppProviders.tsx
 ```
 
-只有这个场景通过，模板开发链路才真正闭环。
+内容完全更新。
 
 ---
 
-# 15. 最终开发模型
+## Base 可恢复
 
-完成改造后，对模板开发者暴露的流程统一为：
+执行：
 
 ```bash
 pnpm dev:base
 ```
 
-开发 Base。
+应重新得到刚才修改后的：
+
+```text
+src/providers/AppProviders.tsx
+```
+
+不得被 Assembly 恢复成旧版本。
+
+---
+
+## Assembly 不覆盖 Base
+
+Assembly 后：
+
+```text
+src/providers/AppProviders.tsx
+```
+
+必须来自：
+
+```text
+base/src/providers/AppProviders.tsx
+```
+
+而不是 `assemble.mjs` 动态生成。
+
+---
+
+## Extension Registry 正常生成
+
+Base：
+
+```text
+extensionProviders = []
+```
+
+Login：
+
+```text
+extensionProviders = [LoginProvider]
+```
+
+Authorization：
+
+```text
+extensionProviders = [LoginProvider, AuthorizationProvider]
+```
+
+其他 Route、Initializer、Reporter Registry 同理。
+
+---
+
+## sync 排除生成目录
+
+执行：
 
 ```bash
-pnpm dev:login
+pnpm sync:base
 ```
 
-开发 Login。
+不得在：
+
+```text
+base/src/generated/extensions/**
+```
+
+中保存 Assembly 生成结果。
+
+也不得写入：
+
+```text
+base/src/.xcodeagent-template-generated.json
+```
+
+---
+
+## Build 验证
+
+以下命令全部通过：
 
 ```bash
-pnpm dev:authorization
+pnpm build:base
+pnpm build:login
+pnpm build:authorization
+pnpm build:full
+pnpm test:assembly
 ```
 
-开发 Authorization。
+---
 
-开发者统一只修改：
+# 12. 最终开发模型
+
+改造完成后，Base 开发流程固定为：
 
 ```text
-frontend/src/**
+pnpm dev:base
+↓
+修改完整 src
+↓
+pnpm sync:base
+↓
+更新完整 base/src
+↓
+pnpm build:base
+↓
+提交
 ```
 
-底层平台负责：
+核心约束：
 
-```text
-Base
-→ Mirror Sync
+> Assembly 只生成 Extension 组合信息，不生成或覆盖 Base 的可维护应用逻辑。
 
-Extension
-→ Source-aware Delta Sync
-
-New File
-→ Profile writeOwner
-
-Generated File
-→ 禁止直接修改
-```
-
-最终实现：
-
-```text
-上一版 Source
-↓
-dev:<profile>
-↓
-src 正常开发
-↓
-自动持久化
-↓
-build 验证
-↓
-下一次继续基于最新版本开发
-```
-
-本阶段不修改 Template Engine，不处理正式发布链路，只确保 `template-source/code/frontend` 内部开发生命周期完整闭环。
+这样后续即使 `AppProviders`、Route、Initializer、ErrorReporter 等最初设计存在问题，也可以通过正常 Base 开发流程持续修改和演进。

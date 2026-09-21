@@ -1,6 +1,5 @@
 import React from 'react';
 
-import ICON1Svg from './icon1.svg?react';
 import ICON10Svg from './icon10.svg?react';
 import ICON11Svg from './icon11.svg?react';
 import ICON12Svg from './icon12.svg?react';
@@ -25,9 +24,6 @@ type Props = {
   className?: string;
   style?: React.CSSProperties;
 };
-export const ICON1 = (props: Props) => (
-  <ICON1Svg className={props.className} style={props.style} />
-);
 
 export const ICON10 = (props: Props) => (
   <ICON10Svg className={props.className} style={props.style} />

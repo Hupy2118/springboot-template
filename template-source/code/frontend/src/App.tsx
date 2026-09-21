@@ -3,7 +3,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import { StyleProvider } from '@ant-design/cssinjs';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { Routes } from '@/routes';
+import { Routes } from '@/routes/index';
 import { AppProviders } from '@/providers/AppProviders';
 /**
  * 应用入口文件

@@ -3,17 +3,12 @@ import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promi
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { extensionsForProfile } from './profiles.mjs';
+import { ASSEMBLY_MANAGED_FILES } from './assembly-contract.mjs';
+import { assertWorkspaceClean, writeWorkspaceState } from './workspace-state.mjs';
 
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sourceRoot = path.join(frontendRoot, 'base', 'src');
 const extensionRoot = path.join(frontendRoot, 'extensions');
-const assemblyFiles = new Set([
-  'providers/AppProviders.tsx',
-  'routes/rootRoutes.tsx',
-  'routes/systemPageRoutes.ts',
-  'bootstrap/appInitializers.ts',
-  'observability/errorReporter.ts',
-]);
 
 class AssemblyError extends Error {
   constructor(code, message) {
@@ -174,41 +169,39 @@ function imports(contributions, prefix) {
   });
 }
 
-function appProviders(providers) {
+function generateProviderRegistry(providers) {
   const entries = imports(providers, 'Provider');
-  let children = '{children}';
-  for (const entry of [...entries].reverse()) children = `<${entry.local}>${children}</${entry.local}>`;
-  return `import type { PropsWithChildren } from 'react';\nimport { IdentityProvider } from '@/platform/identity/IdentityContext';\n${entries.map((entry) => entry.line).join('\n')}\n\nexport function AppProviders({ children }: PropsWithChildren) {\n  return <IdentityProvider>${children}</IdentityProvider>;\n}\n`;
+  return `import type { ComponentType, PropsWithChildren } from 'react';\n${entries.map((entry) => entry.line).join('\n')}\n\nexport const extensionProviders: ComponentType<PropsWithChildren>[] = [${entries.map((entry) => entry.local).join(', ')}];\n`;
 }
 
-function rootRoutes(routes) {
+function generateRootRouteRegistry(routes) {
   const paths = new Set();
   for (const route of routes) {
     if (paths.has(route.path)) throw new AssemblyError('DUPLICATE_ROUTE', route.path);
     paths.add(route.path);
   }
   const entries = imports(routes, 'RootRoute');
-  return `import type { RouteObject } from 'react-router-dom';\n${entries.map((entry) => entry.line).join('\n')}\n\nexport const rootRoutes: RouteObject[] = [${routes.map((route, index) => `\n  { path: '${route.path}', element: <${entries[index].local} /> },`).join('')}\n];\n`;
+  return `import type { RouteObject } from 'react-router-dom';\n${entries.map((entry) => entry.line).join('\n')}\n\nexport const extensionRootRoutes: RouteObject[] = [${routes.map((route, index) => `\n  { path: '${route.path}', element: <${entries[index].local} /> },`).join('')}\n];\n`;
 }
 
-function systemPageRoutes(routes) {
+function generatePageRouteRegistry(routes) {
   const paths = new Set();
   for (const route of routes) {
     if (paths.has(route.path)) throw new AssemblyError('DUPLICATE_ROUTE', route.path);
     paths.add(route.path);
   }
   const body = routes.map((route) => `  { path: '${route.path}', label: ${JSON.stringify(route.label)}${route.icon ? `, icon: '${route.icon}'` : ''}${route.resourceKey ? `, resourceKey: '${route.resourceKey}'` : ''} },`).join('\n');
-  return `import type { PageRouteDefinition } from '@/typings/routes';\n\nexport const SYSTEM_PAGE_ROUTES: PageRouteDefinition[] = [\n${body}\n];\n`;
+  return `import type { PageRouteDefinition } from '@/typings/routes';\n\nexport const extensionSystemPageRoutes: PageRouteDefinition[] = [\n${body}\n];\n`;
 }
 
-function initializers(items) {
+function generateInitializerRegistry(items) {
   const entries = imports(items, 'Initializer');
-  return `${entries.map((entry) => entry.line).join('\n')}\n\nexport async function runAppInitializers() {\n${entries.map((entry) => `  await ${entry.local}();`).join('\n') || '  return Promise.resolve();'}\n}\n`;
+  return `${entries.map((entry) => entry.line).join('\n')}\n\nexport const extensionInitializers: Array<() => void | Promise<void>> = [${entries.map((entry) => entry.local).join(', ')}];\n`;
 }
 
-function errorReporters(items) {
+function generateErrorReporterRegistry(items) {
   const entries = imports(items, 'ErrorReporter');
-  return `${entries.map((entry) => entry.line).join('\n')}\n\nexport function reportError(error: Error, info?: unknown) {\n${entries.map((entry) => `  try { ${entry.local}(error, info); } catch { /* reporters are isolated */ }`).join('\n') || '  void error;\n  void info;'}\n}\n`;
+  return `${entries.map((entry) => entry.line).join('\n')}\n\nexport const extensionErrorReporters: Array<(error: Error, info?: unknown) => void> = [${entries.map((entry) => entry.local).join(', ')}];\n`;
 }
 
 async function assemble() {
@@ -224,6 +217,8 @@ async function assemble() {
   const selected = selectExtensions(await manifests(), requested, disabled);
   await verifyContributionSources(selected);
   const destination = outputDirectory();
+  const primaryOutput = destination === path.join(frontendRoot, 'src');
+  if (primaryOutput && argument('--force', '') !== 'true') await assertWorkspaceClean();
   await rm(destination, { recursive: true, force: true });
   await mkdir(destination, { recursive: true });
   await cp(sourceRoot, destination, { recursive: true });
@@ -231,7 +226,7 @@ async function assemble() {
   for (const extension of selected) {
     const extensionSource = path.join(extension.directory, 'src');
     for (const file of await filesRecursively(extensionSource)) {
-      if (assemblyFiles.has(file) || owners.has(file)) throw new AssemblyError('FILE_COLLISION', `${owners.get(file) || 'assembly'} and ${extension.id}: src/${file}`);
+      if (ASSEMBLY_MANAGED_FILES.has(file) || owners.has(file)) throw new AssemblyError('FILE_COLLISION', `${owners.get(file) || 'assembly'} and ${extension.id}: src/${file}`);
       owners.set(file, extension.id);
     }
     await cp(extensionSource, destination, { recursive: true });
@@ -242,11 +237,11 @@ async function assemble() {
   const initializerContributions = contributionList(selected, 'initializers');
   const reporterContributions = contributionList(selected, 'errorReporters');
   const generated = new Map([
-    ['providers/AppProviders.tsx', appProviders(providers)],
-    ['routes/rootRoutes.tsx', rootRoutes(rootRouteContributions)],
-    ['routes/systemPageRoutes.ts', systemPageRoutes(pageRouteContributions)],
-    ['bootstrap/appInitializers.ts', initializers(initializerContributions)],
-    ['observability/errorReporter.ts', errorReporters(reporterContributions)],
+    ['generated/extensions/providers.ts', generateProviderRegistry(providers)],
+    ['generated/extensions/rootRoutes.tsx', generateRootRouteRegistry(rootRouteContributions)],
+    ['generated/extensions/systemPageRoutes.ts', generatePageRouteRegistry(pageRouteContributions)],
+    ['generated/extensions/initializers.ts', generateInitializerRegistry(initializerContributions)],
+    ['generated/extensions/errorReporters.ts', generateErrorReporterRegistry(reporterContributions)],
   ]);
   for (const [relative, content] of generated) {
     const target = path.join(destination, relative);
@@ -259,6 +254,7 @@ async function assemble() {
     extensions: selected.map((extension) => extension.id),
     assemblySchemaVersion: 1,
   }, null, 2)}\n`);
+  if (primaryOutput && profile) await writeWorkspaceState(profile);
   process.stdout.write(`Assembled ${selected.map((extension) => extension.id).join(', ') || 'base-only'} into ${path.relative(frontendRoot, destination)}\n`);
 }
 

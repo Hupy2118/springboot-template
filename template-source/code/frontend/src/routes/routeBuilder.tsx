@@ -4,7 +4,5 @@ import { createPageRoutes } from '@/utils/pageRoutes';
 import type { ResolvedPageRoute } from '@/utils/pageRouteTree';
 
 export function createAccessibleRoutes(items: ResolvedPageRoute[]): RouteObject[] {
-  return createPageRoutes(items, (element, item) => (
-    <AccessBoundary resourceKeys={item.requiredResourceKeys}>{element}</AccessBoundary>
-  ));
+  return createPageRoutes(items, (element, item) => <AccessBoundary resourceKeys={item.requiredResourceKeys}>{element}</AccessBoundary>);
 }

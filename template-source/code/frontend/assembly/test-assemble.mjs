@@ -17,24 +17,25 @@ async function assemble(extensions) {
 
 try {
   await assemble('');
-  let providers = await readFile(path.join(output, 'providers', 'AppProviders.tsx'), 'utf8');
-  let rootRoutes = await readFile(path.join(output, 'routes', 'rootRoutes.tsx'), 'utf8');
-  let pageRoutes = await readFile(path.join(output, 'routes', 'systemPageRoutes.ts'), 'utf8');
-  assert.match(providers, /<IdentityProvider>\{children\}<\/IdentityProvider>/);
-  assert.match(rootRoutes, /rootRoutes: RouteObject\[\] = \[\n\];/);
-  assert.match(pageRoutes, /SYSTEM_PAGE_ROUTES: PageRouteDefinition\[\] = \[\n\s*\];/);
+  let providers = await readFile(path.join(output, 'generated', 'extensions', 'providers.ts'), 'utf8');
+  let rootRoutes = await readFile(path.join(output, 'generated', 'extensions', 'rootRoutes.tsx'), 'utf8');
+  let pageRoutes = await readFile(path.join(output, 'generated', 'extensions', 'systemPageRoutes.ts'), 'utf8');
+  assert.match(providers, /extensionProviders: ComponentType<PropsWithChildren>\[\] = \[\];/);
+  assert.match(rootRoutes, /extensionRootRoutes: RouteObject\[\] = \[\n\];/);
+  assert.match(pageRoutes, /extensionSystemPageRoutes: PageRouteDefinition\[\] = \[\n\s*\];/);
+  assert.match(await readFile(path.join(output, 'providers', 'AppProviders.tsx'), 'utf8'), /extensionProviders/);
 
   await assemble('login');
-  providers = await readFile(path.join(output, 'providers', 'AppProviders.tsx'), 'utf8');
-  rootRoutes = await readFile(path.join(output, 'routes', 'rootRoutes.tsx'), 'utf8');
-  assert.match(providers, /<IdentityProvider><Provider0>\{children\}<\/Provider0><\/IdentityProvider>/);
+  providers = await readFile(path.join(output, 'generated', 'extensions', 'providers.ts'), 'utf8');
+  rootRoutes = await readFile(path.join(output, 'generated', 'extensions', 'rootRoutes.tsx'), 'utf8');
+  assert.match(providers, /extensionProviders: ComponentType<PropsWithChildren>\[\] = \[Provider0\];/);
   assert.match(rootRoutes, /path: '\/login'/);
   assert.match(rootRoutes, /path: '\/logout'/);
 
   await assemble('login,authorization');
-  providers = await readFile(path.join(output, 'providers', 'AppProviders.tsx'), 'utf8');
-  pageRoutes = await readFile(path.join(output, 'routes', 'systemPageRoutes.ts'), 'utf8');
-  assert.match(providers, /<IdentityProvider><Provider0><Provider1>\{children\}<\/Provider1><\/Provider0><\/IdentityProvider>/);
+  providers = await readFile(path.join(output, 'generated', 'extensions', 'providers.ts'), 'utf8');
+  pageRoutes = await readFile(path.join(output, 'generated', 'extensions', 'systemPageRoutes.ts'), 'utf8');
+  assert.match(providers, /extensionProviders: ComponentType<PropsWithChildren>\[\] = \[Provider0, Provider1\];/);
   assert.match(pageRoutes, /path: 'authorization_management'/);
 
   await assert.rejects(
