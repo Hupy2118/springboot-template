@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "vite --port 3000",
     "build": "tsc -b && vite build",
+    "assemble": "node assembly/assemble.mjs",
+    "test:assembly": "node assembly/test-assemble.mjs",
     "preview": "vite preview",
     "test": "jest --config jest.config.cjs --runInBand",
     "test:source-path": "node scripts/test-source-path-plugin.mjs",

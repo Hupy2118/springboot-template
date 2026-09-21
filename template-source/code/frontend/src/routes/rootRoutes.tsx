@@ -1,9 +1,8 @@
 import type { RouteObject } from 'react-router-dom';
-import Login from '@/pages/Login';
-import Logout from '@/pages/Logout';
+import RootRoute0 from '@/pages/Login/index';
+import RootRoute1 from '@/pages/Logout/index';
 
-/** 不属于 /page 页面树的应用根路由。 */
 export const rootRoutes: RouteObject[] = [
-  { path: '/login', element: <Login /> },
-  { path: '/logout', element: <Logout /> },
+  { path: '/login', element: <RootRoute0 /> },
+  { path: '/logout', element: <RootRoute1 /> },
 ];

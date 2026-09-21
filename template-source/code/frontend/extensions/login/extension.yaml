@@ -1,0 +1,16 @@
+{
+  "id": "login",
+  "requires": [],
+  "contributes": {
+    "providers": [
+      { "id": "login.provider", "source": "src/providers/LoginProvider.tsx", "export": "LoginProvider" }
+    ],
+    "rootRoutes": [
+      { "id": "login.login", "path": "/login", "source": "src/pages/Login/index.tsx", "export": "default" },
+      { "id": "login.logout", "path": "/logout", "source": "src/pages/Logout/index.tsx", "export": "default" }
+    ],
+    "pageRoutes": [],
+    "initializers": [],
+    "errorReporters": []
+  }
+}

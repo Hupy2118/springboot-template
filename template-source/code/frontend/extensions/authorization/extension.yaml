@@ -1,0 +1,15 @@
+{
+  "id": "authorization",
+  "requires": ["login"],
+  "contributes": {
+    "providers": [
+      { "id": "authorization.provider", "source": "src/providers/AuthorizationProvider.tsx", "export": "AuthorizationProvider" }
+    ],
+    "rootRoutes": [],
+    "pageRoutes": [
+      { "id": "authorization.management", "path": "authorization_management", "label": "权限管理", "icon": "SafetyCertificateOutlined", "resourceKey": "system_authorization_management" }
+    ],
+    "initializers": [],
+    "errorReporters": []
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Frontend template extension manifest V1",
+  "type": "object",
+  "required": ["id", "requires", "contributes"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "requires": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "contributes": {
+      "type": "object",
+      "required": ["providers", "rootRoutes", "pageRoutes", "initializers", "errorReporters"],
+      "properties": {
+        "providers": { "$ref": "#/$defs/sourceContributions" },
+        "rootRoutes": { "$ref": "#/$defs/rootRoutes" },
+        "pageRoutes": { "$ref": "#/$defs/pageRoutes" },
+        "initializers": { "$ref": "#/$defs/sourceContributions" },
+        "errorReporters": { "$ref": "#/$defs/sourceContributions" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "sourceContribution": { "type": "object", "required": ["id", "source", "export"], "properties": { "id": { "type": "string" }, "source": { "type": "string", "pattern": "^src/" }, "export": { "type": "string" } }, "additionalProperties": false },
+    "sourceContributions": { "type": "array", "items": { "$ref": "#/$defs/sourceContribution" } },
+    "rootRoutes": { "type": "array", "items": { "allOf": [{ "$ref": "#/$defs/sourceContribution" }, { "type": "object", "required": ["path"], "properties": { "path": { "type": "string", "pattern": "^/" } } }] } },
+    "pageRoutes": { "type": "array", "items": { "type": "object", "required": ["id", "path", "label"], "properties": { "id": { "type": "string" }, "path": { "type": "string", "pattern": "^[a-z0-9]+(?:_[a-z0-9]+)*$" }, "label": { "type": "string" }, "icon": { "type": "string" }, "resourceKey": { "type": "string" } }, "additionalProperties": false } }
+  }
+}
