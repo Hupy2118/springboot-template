@@ -2,6 +2,7 @@
 import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { extensionsForProfile } from './profiles.mjs';
 
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sourceRoot = path.join(frontendRoot, 'base', 'src');
@@ -211,8 +212,10 @@ function errorReporters(items) {
 }
 
 async function assemble() {
-  const requestedValue = argument('--extensions', 'login,authorization');
-  const requested = requestedValue ? requestedValue.split(',').filter(Boolean) : [];
+  const requestedValue = argument('--extensions', undefined);
+  const profile = requestedValue === undefined ? argument('--profile', 'full') : undefined;
+  const requestedFromProfile = profile ? await extensionsForProfile(profile) : undefined;
+  const requested = requestedFromProfile || (requestedValue ? requestedValue.split(',').filter(Boolean) : []);
   const disabledValue = argument('--disabled', '');
   const disabled = new Set(disabledValue ? disabledValue.split(',').filter(Boolean) : []);
   if (requested.some((id) => disabled.has(id))) {
@@ -250,6 +253,12 @@ async function assemble() {
     await mkdir(path.dirname(target), { recursive: true });
     await writeFile(target, content);
   }
+  await writeFile(path.join(destination, '.xcodeagent-template-generated.json'), `${JSON.stringify({
+    generated: true,
+    profile: profile || 'custom',
+    extensions: selected.map((extension) => extension.id),
+    assemblySchemaVersion: 1,
+  }, null, 2)}\n`);
   process.stdout.write(`Assembled ${selected.map((extension) => extension.id).join(', ') || 'base-only'} into ${path.relative(frontendRoot, destination)}\n`);
 }
 

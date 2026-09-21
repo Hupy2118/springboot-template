@@ -1,0 +1,9 @@
+{
+  "generated": true,
+  "profile": "full",
+  "extensions": [
+    "login",
+    "authorization"
+  ],
+  "assemblySchemaVersion": 1
+}

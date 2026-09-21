@@ -1,0 +1,6 @@
+{
+  "base": [],
+  "login": ["login"],
+  "authorization": ["authorization"],
+  "full": ["login", "authorization"]
+}
