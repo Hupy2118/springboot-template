@@ -2,29 +2,11 @@ import { cloneElement, type ReactElement } from 'react';
 import { usePermission } from '@/hooks/usePermission';
 
 export type PermissionMode = 'hidden' | 'disabled';
+type DisableableProps = { disabled?: boolean; 'aria-disabled'?: boolean };
 
-type DisableableProps = {
-  disabled?: boolean;
-  'aria-disabled'?: boolean;
-};
-
-type PermissionProps = {
-  resourceKey: string;
-  mode?: PermissionMode;
-  children: ReactElement<DisableableProps>;
-};
-
-// @xcodeagent-extension authorization
-/** 统一控制具备 disabled 属性的操作控件。 */
-export function Permission({ resourceKey, mode = 'hidden', children }: PermissionProps) {
+export function Permission({ resourceKey, mode = 'hidden', children }: { resourceKey: string; mode?: PermissionMode; children: ReactElement<DisableableProps> }) {
   const { hasPermission } = usePermission();
-  const permitted = hasPermission(resourceKey);
-
-  if (permitted) return children;
+  if (hasPermission(resourceKey)) return children;
   if (mode === 'hidden') return null;
-
-  return cloneElement(children, {
-    disabled: true,
-    'aria-disabled': true,
-  });
+  return cloneElement(children, { disabled: true, 'aria-disabled': true });
 }

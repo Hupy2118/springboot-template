@@ -1,6 +1,5 @@
-import { YstConfigType } from '@/typings/yst';
+import type { YstConfigType } from '@/typings/yst';
 
-// @xcodeagent-extension login
 export const YST: YstConfigType =
   process.env.WORKS_ENV === 'local'
     ? {
@@ -48,4 +47,3 @@ export const YST: YstConfigType =
           };
 
 export default YST;
-

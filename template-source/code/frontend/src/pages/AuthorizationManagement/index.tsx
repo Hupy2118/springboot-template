@@ -39,7 +39,6 @@ import { usePermission } from '@/hooks/usePermission';
 const errorMessage = (error: unknown) =>
   (error as { message?: string })?.message || '请求失败，请稍后重试。';
 
-// @xcodeagent-extension authorization
 export default function AuthorizationManagementPage() {
   const { hasPermission, hasAnyPermission } = usePermission();
   const [roleModal, setRoleModal] = useState<Role | null | undefined>();

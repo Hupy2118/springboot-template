@@ -1,4 +1,3 @@
-// @xcodeagent-extension authorization
 /** 后端资源键契约的集中声明。 */
 export const RESOURCES = {
   SYSTEM: {

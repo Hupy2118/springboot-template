@@ -1,4 +1,5 @@
 import React, { PropsWithChildren } from 'react';
+import { reportError } from '@/observability/errorReporter';
 
 export interface ErrorBoundaryState {
   hasError: boolean;
@@ -13,10 +14,10 @@ export class ErrorBoundary extends React.Component<PropsWithChildren, ErrorBound
     this.state = { hasError: false };
   }
 
-  componentDidCatch(error: Error) {
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
     this.setState({ hasError: true });
-    // TODO: 接入行内埋点库时替换为 cmbTrackLib.NgNotify_Error(error)
     console.error('[ErrorBoundary]', error);
+    reportError(error, info);
   }
 
   render() {

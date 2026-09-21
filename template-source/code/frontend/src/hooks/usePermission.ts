@@ -1,25 +1,12 @@
 import { useCallback } from 'react';
-import { useAuth } from '@/providers/AuthProvider';
+import { useAccess } from '@/platform/access/useAccess';
 
-type ResourceKeys = readonly string[];
-
-// @xcodeagent-extension authorization
-/** 提供业务层的权限判断能力。 */
 export function usePermission() {
-  const { permissions, state } = useAuth();
-
-  const hasPermission = useCallback(
-    (resourceKey: string) => state === 'ready' && permissions.has(resourceKey),
-    [permissions, state],
-  );
-  const hasAnyPermission = useCallback(
-    (resourceKeys: ResourceKeys) => resourceKeys.some(hasPermission),
-    [hasPermission],
-  );
-  const hasAllPermissions = useCallback(
-    (resourceKeys: ResourceKeys) => resourceKeys.length > 0 && resourceKeys.every(hasPermission),
-    [hasPermission],
-  );
-
-  return { hasPermission, hasAnyPermission, hasAllPermissions };
+  const { state, hasPermission, hasAllPermissions } = useAccess();
+  const hasAnyPermission = useCallback((resourceKeys: readonly string[]) => resourceKeys.some(hasPermission), [hasPermission]);
+  return {
+    hasPermission: (resourceKey: string) => state === 'ready' && hasPermission(resourceKey),
+    hasAnyPermission: (resourceKeys: readonly string[]) => state === 'ready' && hasAnyPermission(resourceKeys),
+    hasAllPermissions: (resourceKeys: readonly string[]) => state === 'ready' && hasAllPermissions(resourceKeys),
+  };
 }

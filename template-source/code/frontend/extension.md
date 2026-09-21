@@ -2522,3 +2522,232 @@ Access
 
 不得通过 Capability ID 判断、直接读取另一个 Extension 的内部状态，或以
 `requires` 替代运行时 Contract。
+
+
+# 53. 问题修复
+
+可以，建议把这次修复定义为：
+
+> **保留上一次已经完成的 Login / Authorization 解耦成果，但将“运行时 Extension”修正为“模板编译期 Extension”，最终 `template-source/code/frontend/src` 恢复为普通、整洁的 React 工程，不暴露 Extension 概念。**
+
+本次先只修复前端模板源码，不涉及后续 Extension Compiler、Authoring Tool 等工具实现。
+
+### 修复实施步骤
+
+1. **取消最终工程中的 Runtime Extension 机制**
+   删除或停止使用当前新增的：
+
+   ```text
+   src/extensions/**
+   src/extension-runtime/**
+   extension.tsx
+   import.meta.glob(...)
+   FrontendExtension / defineExtension
+   Extension Registry / Runtime Ordering
+   ```
+
+   其中 Login / Authorization 业务代码不要删除，只做后续迁移。`ordering.ts` 中依赖排序等思想保留为后续模板工具能力，不再属于生成应用。
+
+2. **将 Login 代码恢复到正常应用目录**
+   把当前：
+
+   ```text
+   extensions/login/api.ts
+   extensions/login/LoginPage.tsx
+   extensions/login/LogoutPage.tsx
+   extensions/login/LoginProvider.tsx
+   extensions/login/useGuard.ts
+   ...
+   ```
+
+   调整为普通工程结构，例如：
+
+   ```text
+   src/apis/login.ts
+   src/pages/Login/index.tsx
+   src/pages/Logout/index.tsx
+   src/providers/LoginProvider.tsx
+   src/hooks/useGuard.ts
+   ```
+
+   `LoginContext`、配置和类型同样放回 `context/constants/typings` 等正常目录。保留上次改造中 Login 与 Base 解耦后的职责划分，不再恢复到 `GlobalContext` 强耦合模式。
+
+3. **将 Authorization 代码恢复到正常应用目录**
+   把当前：
+
+   ```text
+   extensions/authorization/**
+   ```
+
+   迁回：
+
+   ```text
+   src/apis/authorization.ts
+   src/pages/AuthorizationManagement/**
+   src/providers/AuthorizationProvider.tsx
+   src/components/Authorization/Permission.tsx
+   src/hooks/usePermission.ts
+   src/constants/resources.ts
+   src/typings/authorization.ts
+   src/typings/generated/**
+   ```
+
+   保留已经形成的 `Access Contract`，AuthorizationProvider 继续通过 Access Contract 提供权限能力，不让 Layout/Routes 重新直接依赖 Authorization 实现。
+
+4. **保留 Identity / Access 作为正式 Base Contract**
+   上次改造中新增的：
+
+   ```text
+   src/platform/identity/**
+   src/platform/access/**
+   ```
+
+   建议保留。它们不是 Extension 内部概念，而是最终应用合理的平台抽象。依赖继续保持：
+
+   ```text
+   LoginProvider
+       ↓
+   Identity Contract
+
+   AuthorizationProvider
+       ↓
+   Access Contract
+   ```
+
+   `Layout` 只消费 `useIdentity()`、`useAccess()`，不重新读取 Login/Authorization 私有状态。
+
+5. **把 Provider Runtime 注册改成普通静态聚合文件**
+   新增或调整：
+
+   ```text
+   src/providers/AppProviders.tsx
+   ```
+
+   当前 Login + Authorization 完整模板中直接静态组合：
+
+   ```tsx
+   <LoginProvider>
+     <AuthorizationProvider>
+       {children}
+     </AuthorizationProvider>
+   </LoginProvider>
+   ```
+
+   `App.tsx` 只依赖：
+
+   ```tsx
+   <AppProviders>
+     <Routes />
+   </AppProviders>
+   ```
+
+   同时锁定 Provider 顺序：被依赖者在外层，例如 `authorization requires login`，所以 LoginProvider 在 AuthorizationProvider 外层。未来这里由模板 Compiler 根据 Contribution 生成，本次先形成正确的静态结果。
+
+6. **把 Route Runtime 注册改成普通静态聚合**
+   不再从 `extension.tsx` 动态收集 `/login`、`/logout`。新增类似：
+
+   ```text
+   src/routes/rootRoutes.tsx
+   ```
+
+   静态维护当前模板已有：
+
+   ```text
+   /login
+   /logout
+   ```
+
+   `routes/index.tsx` 只组合 `rootRoutes + page routes`。同时修正根路由：
+
+   ```text
+   / → /page → PageEntryRedirect
+   ```
+
+   不再固定 `/ → /login`，确保未来 Base-only 场景成立。
+
+7. **将 Authorization 页面并入统一 Page Registry**
+   `AuthorizationManagement` 重新作为普通页面放到：
+
+   ```text
+   src/pages/AuthorizationManagement/
+   ```
+
+   通过统一：
+
+   ```text
+   src/routes/pageRegistry.ts
+   ```
+
+   与业务页面一起进入路由树。`PageRouteDefinition.resourceKey` 继续作为通用 Access Contract。路由构建规则保持：
+
+   ```text
+   state != ready
+       → AccessStateView
+
+   state == ready
+       → 判断 resourceKey
+       → allowed / forbidden
+   ```
+
+   不恢复 Authorization 专属 `RouteGuard Patch`。
+
+8. **Initializer / ErrorReporter 暂时收敛为普通应用接口**
+   如果上次已经增加 Runtime Extension Point，不再以 `extension.initializers/errorReporters` 暴露。可以保留普通文件，例如：
+
+   ```text
+   src/bootstrap/appInitializers.ts
+   src/observability/errorReporter.ts
+   ```
+
+   当前没有 Tracking 时提供空实现。未来 Tracking Extension 发布时，由 Compiler 静态生成这里的调用关系。
+
+9. **清理 Extension 痕迹并完成回归**
+   清理源码中的：
+
+   ```text
+   @xcodeagent-extension
+   FrontendExtension
+   defineExtension
+   extension.tsx
+   ExtensionRegistry
+   import.meta.glob extensions
+   ```
+
+   最终 `src` 应呈现普通工程结构。执行 `pnpm build`，并回归 Login、Logout、AuthorizationManagement、菜单权限、页面直接访问权限、Permission 组件以及根页面跳转。
+
+### 修复后的目标状态
+
+模板维护层未来仍然可以是：
+
+```text
+Base
++
+Login Extension
++
+Authorization Extension
++
+Extension Contribution
+```
+
+但当前完整前端模板应该表现为：
+
+```text
+src/
+├── App.tsx
+├── apis/
+├── pages/
+├── providers/
+│   └── AppProviders.tsx
+├── hooks/
+├── components/
+├── routes/
+│   ├── index.tsx
+│   ├── rootRoutes.tsx
+│   └── pageRegistry.ts
+├── platform/
+│   ├── identity/
+│   └── access/
+└── ...
+```
+
+这次修复的核心不是推翻上一次改造，而是**保留“Login / Authorization 不再 Patch Base”的解耦结果，把 `Extension Runtime` 从用户工程中拿掉，并改成静态 Assembly。后续再由模板工具负责生成这些 Assembly 文件。**

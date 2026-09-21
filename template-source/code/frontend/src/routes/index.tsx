@@ -1,17 +1,17 @@
 import { Navigate, RouteObject, useRoutes } from 'react-router-dom';
 import Layout from '@/layout';
-import Login from '@/pages/Login';
-import Logout from '@/pages/Logout';
-import { AuthStateView } from '@/components/Authorization/RouteGuard';
-import { PAGE_ROUTE, PAGE_ROUTE_TREE } from '@/constants/routes';
+import { AccessStateView } from '@/platform/access/AccessStateView';
+import { PAGE_ROUTE } from '@/constants/routes';
 import { usePageMenus } from '@/hooks/usePageMenus';
-import { createProtectedRoutes } from '@/utils/protectedRoutes';
+import { createAccessibleRoutes } from './routeBuilder';
+import { APP_PAGE_ROUTE_TREE } from './pageRegistry';
+import { rootRoutes } from './rootRoutes';
 
 function PageEntryRedirect() {
   const { state, firstAccessiblePath } = usePageMenus();
 
   if (firstAccessiblePath) return <Navigate to={firstAccessiblePath} replace />;
-  if (state !== 'ready') return <AuthStateView state={state} />;
+  if (state !== 'ready') return <AccessStateView state={state} />;
 
   return <div className='authorization-state'>暂无可访问页面</div>;
 }
@@ -28,13 +28,11 @@ const routeList: RouteObject[] = [
         element: <Layout />,
         children: [
           { index: true, element: <PageEntryRedirect /> },
-          ...createProtectedRoutes(PAGE_ROUTE_TREE),
+          ...createAccessibleRoutes(APP_PAGE_ROUTE_TREE),
         ],
       },
-      // @xcodeagent-extension login
-      { path: '/login', element: <Login /> },
-      { path: '/logout', element: <Logout /> },
-      { index: true, element: <Navigate to='/login' replace /> },
+      ...rootRoutes,
+      { index: true, element: <Navigate to={`/${PAGE_ROUTE}`} replace /> },
       { path: '*', element: <div>未找到页面</div> },
     ],
   },

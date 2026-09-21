@@ -1,16 +1,14 @@
-import React, { useContext, useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'; // 引入路由
 import type { ProSettings } from '@ant-design/pro-components';
 import { ProLayout, ProConfigProvider } from '@ant-design/pro-components';
 import { Spin } from 'antd';
-import { USER_INFO_KEY } from '@/constants';
 import { PAGE_ROUTE } from '@/constants/routes';
 import { LayoutTypeEnum } from '@typings/workbench';
-import type { IUserInfo } from '@/typings';
-import { GlobalContext } from '@/providers';
 import { openNewPage, renderIcon } from '@utils/workbench';
 import AppIcon from './components/AppIcon';
-import { AuthStateView } from '@/components/Authorization/RouteGuard';
+import { AccessStateView } from '@/platform/access/AccessStateView';
+import { useIdentity } from '@/platform/identity/useIdentity';
 import { usePageMenus } from '@/hooks/usePageMenus';
 
 const HEADER_FOOTER_SETTING: Partial<ProSettings> = {
@@ -38,7 +36,7 @@ export default () => {
     };
   }, []);
 
-  const { userInfo: contextUserInfo } = useContext(GlobalContext);
+  const { identity } = useIdentity();
   const { state, menuRoutes } = usePageMenus();
   const routes = useMemo(() => {
     return {
@@ -64,16 +62,6 @@ export default () => {
     }
   }, []);
 
-  const userInfoFromSessionStr = sessionStorage.getItem(USER_INFO_KEY);
-  let storedUserInfo: IUserInfo | null = null;
-
-  try {
-    if (userInfoFromSessionStr) {
-      storedUserInfo = JSON.parse(userInfoFromSessionStr);
-    }
-  } catch {}
-  const userInfo = contextUserInfo || storedUserInfo;
-
   return (
     <ProConfigProvider>
       <ProLayout
@@ -92,12 +80,12 @@ export default () => {
           pathname: location.pathname,
         }}
         avatarProps={
-          userInfo
+          identity
             ? {
-                src: userInfo?.avatar ?? '',
-                title: userInfo?.userName ?? '用户',
+                src: identity.avatar ?? '',
+                title: identity.userName,
                 size: 'small',
-                children: (userInfo?.userName ?? '用户').slice(0, 1),
+                children: identity.userName.slice(0, 1),
                 style: { background: 'var(--color-primary)' },
               }
             : undefined
@@ -125,7 +113,7 @@ export default () => {
               <Spin tip='正在加载权限…' />
             </div>
           ) : (
-            <AuthStateView state={state} />
+            <AccessStateView state={state} />
           );
         }}
         {...settings}
