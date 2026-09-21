@@ -45,8 +45,14 @@ files:
   - { source: frontend/src/apis/service.ts, target: frontend/src/apis/service.ts }
   - { source: frontend/src/components/ErrorBoundary/index.tsx, target: frontend/src/components/ErrorBoundary/index.tsx }
   - { source: frontend/src/constants/routes.tsx, target: frontend/src/constants/routes.tsx }
+  - { source: frontend/src/devtools/elementInspector.ts, target: frontend/src/devtools/elementInspector.ts }
   - { source: frontend/src/index.css, target: frontend/src/index.css }
   - { source: frontend/src/index.tsx, target: frontend/src/index.tsx }
+  - { source: frontend/src/generated/extensions/providers.ts, target: frontend/src/generated/extensions/providers.ts }
+  - { source: frontend/src/generated/extensions/rootRoutes.tsx, target: frontend/src/generated/extensions/rootRoutes.tsx }
+  - { source: frontend/src/generated/extensions/systemPageRoutes.ts, target: frontend/src/generated/extensions/systemPageRoutes.ts }
+  - { source: frontend/src/generated/extensions/initializers.ts, target: frontend/src/generated/extensions/initializers.ts }
+  - { source: frontend/src/generated/extensions/errorReporters.ts, target: frontend/src/generated/extensions/errorReporters.ts }
   - { source: frontend/src/layout/index.tsx, target: frontend/src/layout/index.tsx }
   - { source: frontend/src/react-app-env.d.ts, target: frontend/src/react-app-env.d.ts }
   - { source: frontend/src/routes/index.tsx, target: frontend/src/routes/index.tsx }

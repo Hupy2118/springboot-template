@@ -11,3 +11,4 @@ dist/
 .quality
 .xcodeagent-template-workspace.json
 .workspace-status-*
+.build-workspace-*

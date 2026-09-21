@@ -1,288 +1,60 @@
 # 前端模板开发指引
 
-本文用于说明如何开发、更新和发布 `template-source/code/frontend` 下的 Base、Login、Authorization 模板。
+`base/src` 和 `extensions/<id>/src` 是唯一源码。根目录 `src` 是 Assembly 生成的开发 Workspace，也是发布前的最终 materialization；它不是独立的 Source Owner。
 
-## 1. 基本原则
+## Base
 
-开发模板时统一遵循以下流程：
+Base 与 Extension 使用同一套 Workspace 开发流程：
 
-```text id="4esvd9"
-选择开发对象
-↓
-启动开发环境
-↓
-修改 src/**
-↓
-同步模板源码
-↓
-构建验证
-↓
-提交发布
-```
-
-开发过程中只需要修改：
-
-```text id="39jgrt"
-template-source/code/frontend/src/**
-```
-
-不要直接修改：
-
-```text id="8k4euc"
-base/src/**
-extensions/*/src/**
-```
-
-模板源码由同步命令自动更新。
-
----
-
-## 2. 开发 Base
-
-启动：
-
-```bash id="iyfpqc"
+```bash
 pnpm dev:base
-```
-
-然后正常修改：
-
-```text id="43pwb4"
-src/**
-```
-
-开发确认后同步：
-
-```bash id="dzc3wa"
-pnpm sync:base
-```
-
-验证：
-
-```bash id="xx0sc8"
-pnpm build:base
-```
-
-完整流程：
-
-```bash id="w26p92"
-pnpm dev:base
-
 # 修改 src/**
-
 pnpm sync:base
 pnpm build:base
 ```
 
-Base 是公共模板，修改后建议同时验证：
+`base/src/**` 是持久化源码，但正常开发不直接修改它。`sync:base` 使用统一的 Workspace Sync：已有文件、新文件和删除文件都归 Base；`providers/AppProviders.tsx`、路由、Initializer 与 Error Reporter 等宿主文件也可正常回写。Assembly 生成的 `src/generated/extensions/*` 和 marker 永远不会写入 `base/src`。
 
-```bash id="ndy6qx"
-pnpm build:login
-pnpm build:authorization
-pnpm build:full
-```
+## Extension
 
----
+Login 和 Authorization 在完整应用 Workspace 中开发：
 
-## 3. 开发 Login
-
-启动：
-
-```bash id="dhsdrt"
+```bash
 pnpm dev:login
-```
-
-修改：
-
-```text id="9c957g"
-src/**
-```
-
-开发确认后：
-
-```bash id="1v1xkg"
-pnpm sync:login
-pnpm build:login
-```
-
-完整流程：
-
-```bash id="ms5fz4"
-pnpm dev:login
-
 # 修改 src/**
-
 pnpm sync:login
-pnpm build:login
+pnpm verify:update:login
 ```
 
-由于 Authorization 依赖 Login，Login 修改后建议继续验证：
-
-```bash id="p0fu2f"
-pnpm build:authorization
-pnpm build:full
-```
-
----
-
-## 4. 开发 Authorization
-
-启动：
-
-```bash id="b7n0dz"
+```bash
 pnpm dev:authorization
-```
-
-修改：
-
-```text id="1gc2cw"
-src/**
-```
-
-开发确认后：
-
-```bash id="69rf8g"
-pnpm sync:authorization
-pnpm build:authorization
-```
-
-完整流程：
-
-```bash id="a0kkbg"
-pnpm dev:authorization
-
 # 修改 src/**
-
 pnpm sync:authorization
-pnpm build:authorization
-pnpm build:full
+pnpm verify:update:authorization
 ```
 
----
+同步按当前 Source Tree 的路径归属处理：已有 Base、Login、Authorization 文件分别回写原 owner；新文件写入当前 profile 的 Extension（`login` 或 `authorization`）；删除的文件从原 owner 删除。同一路径出现在多个 Source Root 会以 `SOURCE_OWNER_CONFLICT` 失败，不存在覆盖优先级。
 
-## 5. Full 模式
+Authorization 自动包含 Login 依赖，因此修改已有 Login 文件仍会回写 Login。Extension Workspace 中修改或删除 Base 文件是允许的，但必须完成下游组合构建验证。
 
-Full 用于完整模板联调：
+Provider、Root Route、Page Route、Initializer、Error Reporter 和依赖关系属于 Extension Contract，直接修改 `extensions/<id>/extension.yaml`，随后重新运行 dev 或 build。绝不能直接修改 `src/generated/extensions/*` 或 `.xcodeagent-template-generated.json`；它们由 Assembly 管理且 Sync 会忽略。
 
-```bash id="ax7046"
-pnpm dev:full
-```
+## Full 与 Workspace 管理
 
-主要用于检查：
+`pnpm dev:full` 和 `pnpm build:full` 用于 Base + Login + Authorization 集成验证。Full 没有 `editTarget`，不可 Sync，也不构成新的源码边界。
 
-```text id="9r392u"
-Base
-Login
-Authorization
-```
+`pnpm build:<profile>` 会临时备份当前 `src` 及 `.xcodeagent-template-workspace.json`、组装目标 Profile 并构建，最后原样恢复备份。因此可以在任何开发 Workspace 中运行构建，未同步修改也不会被覆盖。
 
-组合后的整体运行效果。
+若明确放弃未同步 Workspace 修改，可使用 `pnpm reset:<profile>`；`materialize:base` 与 `materialize:full` 是面向预览/发布的等价快捷命令。
 
-不建议在 Full 模式下开发新的模板文件。
+## 发布前
 
----
+完成相应验证后，显式生成发布 Workspace：
 
-## 6. 放弃本次修改
-
-如果当前 `src` 中的修改不需要保留，可以执行：
-
-```bash id="ox0132"
-pnpm reset:base
-```
-
-或者：
-
-```bash id="kbbauf"
-pnpm reset:login
-pnpm reset:authorization
-```
-
-`reset` 会重新根据模板源码生成 `src`，未同步的修改会被丢弃。
-
----
-
-## 7. 修改 Extension 配置
-
-如果只是修改普通页面、组件、Hook、API 等代码：
-
-```text id="qb6xqw"
-直接修改 src/**
-```
-
-如果需要调整：
-
-```text id="bcwbop"
-Provider
-路由
-初始化逻辑
-Extension 依赖
-```
-
-则修改对应：
-
-```text id="w1y84v"
-extensions/<extension>/extension.yaml
-```
-
-不要直接修改 Assembly 自动生成文件。
-
----
-
-## 8. 发布前检查
-
-完成开发后执行对应构建。
-
-### Base
-
-```bash id="bj06ge"
-pnpm build:base
-pnpm build:login
-pnpm build:authorization
-pnpm build:full
-```
-
-### Login
-
-```bash id="56y2bz"
-pnpm build:login
-pnpm build:authorization
-pnpm build:full
-```
-
-### Authorization
-
-```bash id="r6ifvp"
-pnpm build:authorization
-pnpm build:full
-```
-
-然后检查：
-
-```bash id="3hd60a"
-git status
-git diff
+```bash
+pnpm materialize:full
+pnpm verify:assembly
 git diff --check
 ```
 
-确认修改符合预期后提交代码。
-
----
-
-## 9. 常用命令
-
-| 操作   | Base              | Login              | Authorization              |
-| ---- | ----------------- | ------------------ | -------------------------- |
-| 开发   | `pnpm dev:base`   | `pnpm dev:login`   | `pnpm dev:authorization`   |
-| 更新模板 | `pnpm sync:base`  | `pnpm sync:login`  | `pnpm sync:authorization`  |
-| 构建验证 | `pnpm build:base` | `pnpm build:login` | `pnpm build:authorization` |
-| 放弃修改 | `pnpm reset:base` | `pnpm reset:login` | `pnpm reset:authorization` |
-
-日常开发只需要记住：
-
-```text id="fcx3cx"
-dev
-→ 修改 src
-→ sync
-→ build
-→ commit
-```
+`base.yaml` 当前仍枚举发布文件。新增 `src` 文件时，先确认 `base.yaml` 已覆盖该文件；Assembly 成功并不自动证明它会进入外层模板发布包。

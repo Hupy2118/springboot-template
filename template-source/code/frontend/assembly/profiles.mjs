@@ -7,7 +7,7 @@ export const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.
 export async function profileConfig(profile) {
   const profiles = JSON.parse(await readFile(path.join(frontendRoot, 'assembly', 'profiles.json'), 'utf8'));
   const config = profiles[profile];
-  if (!config || !Array.isArray(config.extensions) || !Object.prototype.hasOwnProperty.call(config, 'writeOwner')) {
+  if (!config || !Array.isArray(config.extensions) || !Object.prototype.hasOwnProperty.call(config, 'editTarget')) {
     throw new Error(`UNKNOWN_PROFILE: ${profile}`);
   }
   return config;

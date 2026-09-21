@@ -5,7 +5,7 @@ import { PAGE_ROUTE } from '@/constants/routes';
 import { usePageMenus } from '@/hooks/usePageMenus';
 import { createAccessibleRoutes } from './routeBuilder';
 import { APP_PAGE_ROUTE_TREE } from './pageRegistry';
-import { RootRoutes } from './rootRoutes';
+import { ROOT_ROUTES } from './rootRoutes';
 
 function PageEntryRedirect() {
   const { state, firstAccessiblePath } = usePageMenus();
@@ -16,7 +16,7 @@ function PageEntryRedirect() {
 
 const routeList: RouteObject[] = [{
   path: '/',
-  children: [{ path: PAGE_ROUTE, element: <Layout />, children: [{ index: true, element: <PageEntryRedirect /> }, ...createAccessibleRoutes(APP_PAGE_ROUTE_TREE)] }, ...RootRoutes, { index: true, element: <Navigate to={`/${PAGE_ROUTE}`} replace /> }, { path: '*', element: <div>未找到页面</div> }],
+  children: [{ path: PAGE_ROUTE, element: <Layout />, children: [{ index: true, element: <PageEntryRedirect /> }, ...createAccessibleRoutes(APP_PAGE_ROUTE_TREE)] }, ...ROOT_ROUTES, { index: true, element: <Navigate to={`/${PAGE_ROUTE}`} replace /> }, { path: '*', element: <div>未找到页面</div> }],
 }];
 
 const Routes = () => useRoutes(routeList);

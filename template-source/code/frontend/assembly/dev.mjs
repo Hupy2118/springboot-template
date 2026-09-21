@@ -44,7 +44,9 @@ async function assembleSafely() {
 
 await assembleSafely();
 
-process.stdout.write(`Workspace sync is explicit: run pnpm sync:${profile} when you want to persist src changes.\n`);
+if (profile === 'base') process.stdout.write('Workspace is editable. Run pnpm sync:base to persist changes to base/src.\n');
+else if (profile === 'full') process.stdout.write('Full workspace is for integration verification. Do not use it as a source editing workspace.\n');
+else process.stdout.write(`Workspace is editable. Run pnpm sync:${profile} to persist changes.\n`);
 
 const vite = spawn('pnpm', ['exec', 'vite', '--port', '3000'], { cwd: frontendRoot, stdio: 'inherit' });
 vite.on('exit', (code) => process.exitCode = code ?? 0);
