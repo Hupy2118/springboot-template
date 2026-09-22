@@ -1,0 +1,7 @@
+id: login
+requires: []
+contributes:
+  # The legacy source references EnableAuthClient, but this repository does not
+  # contain its dependency.  Keep the extension point explicit without inventing
+  # a business annotation or a dependency contract.
+  applicationAnnotations: []

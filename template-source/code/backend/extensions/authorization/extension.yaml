@@ -1,0 +1,5 @@
+id: authorization
+requires:
+  - login
+contributes:
+  applicationAnnotations: []

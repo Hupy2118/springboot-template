@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cmbchina.backend.auth.infrastructure.mapper.RoleResourceMapper">
+
+    <select id="findResourceKeysByRoleId" resultType="string">
+        SELECT rr.`resource_key`
+        FROM `role_resource` rr
+        JOIN `role` r ON r.`role_id` = rr.`role_id` AND r.`is_deleted` = 0
+        WHERE rr.`role_id` = #{roleId}
+        ORDER BY rr.`resource_key`
+    </select>
+
+    <select id="findEffectiveResourceKeys" resultType="string">
+        SELECT DISTINCT rr.`resource_key`
+        FROM `role_member` rm
+        JOIN `role` r ON r.`role_id` = rm.`role_id` AND r.`enable` = 1 AND r.`is_deleted` = 0
+        JOIN `role_resource` rr ON rr.`role_id` = r.`role_id`
+        JOIN `resource` res ON res.`key` = rr.`resource_key`
+        WHERE rm.`member_id` = #{memberId}
+        ORDER BY rr.`resource_key`
+    </select>
+
+    <delete id="deleteBatch">
+        DELETE FROM `role_resource`
+        WHERE `role_id` = #{roleId}
+        AND `resource_key` IN
+        <foreach collection="resourceKeys" item="resourceKey" separator="," open="(" close=")">
+            #{resourceKey}
+        </foreach>
+    </delete>
+
+    <insert id="insertBatch">
+        INSERT INTO `role_resource` (`role_id`, `resource_key`, `created_at`, `created_by`) VALUES
+        <foreach collection="items" item="item" separator=",">
+            (#{item.roleId}, #{item.resourceKey}, COALESCE(#{item.createdAt}, CURRENT_TIMESTAMP), #{item.createdBy})
+        </foreach>
+    </insert>
+
+    <select id="countActiveManagers" resultType="long">
+        SELECT COUNT(DISTINCT rm.`member_id`)
+        FROM `role_member` rm
+        JOIN `role` r ON r.`role_id` = rm.`role_id` AND r.`enable` = 1 AND r.`is_deleted` = 0
+        JOIN `role_resource` rr ON rr.`role_id` = r.`role_id`
+        WHERE rr.`resource_key` = #{resourceKey}
+    </select>
+
+</mapper>

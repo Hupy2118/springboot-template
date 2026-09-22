@@ -1,0 +1,16 @@
+base:
+  extensions: []
+  editTarget: base
+login:
+  extensions:
+    - login
+  editTarget: login
+authorization:
+  extensions:
+    - authorization
+  editTarget: authorization
+full:
+  extensions:
+    - login
+    - authorization
+  editTarget: null

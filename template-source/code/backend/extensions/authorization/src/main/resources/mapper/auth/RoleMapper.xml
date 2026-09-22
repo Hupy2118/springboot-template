@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cmbchina.backend.auth.infrastructure.mapper.RoleMapper">
+    <select id="findMaxGeneratedRoleNumber" resultType="java.lang.Integer">
+        <!-- 包含软删除角色，确保 ROLE 编号永不复用。 -->
+        SELECT MAX(CAST(SUBSTRING(`role_id`, 5, 3) AS UNSIGNED)) FROM `role`
+        WHERE `role_id` REGEXP '^ROLE[0-9]{3}$'
+    </select>
+</mapper>
+
