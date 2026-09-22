@@ -104,10 +104,14 @@ Authorization 在 `extension.yaml` 中声明 `requires: [login]`，因此其 Pro
 - 新文件：写入当前 Profile 的 `editTarget`。
 - 删除文件：从原 Owner 中删除。
 
-`Application.java` 是例外：Sync 会先移除 Assembly 注入的
-`applicationAnnotations` 与对应 import，再将剩余内容回写 Base。因此，不要在
-workspace 中通过修改注解反向维护 manifest；Contribution 的唯一真相是 Extension
-自己的 `extension.yaml`。
+`Application.java` 和 `pom.xml` 是例外：Sync 会先移除 Assembly 注入的
+`applicationAnnotations`（及对应 import）与 `mavenDependencies`，再将剩余内容
+回写 Base。仅由这些投影产生的差异会显示为 `Generated-only Differences`，不会污染
+Base。若直接删除或修改生成的注解、import、Maven 坐标、版本或 scope，Sync 会拒绝并报
+`GENERATED_CONTRIBUTION_MODIFIED`。
+
+不要在 workspace 中通过修改注解或依赖反向维护 manifest；Contribution 的唯一真相是
+Extension 自己的 `extension.yaml`。
 
 ## 如何维护 Base
 
@@ -157,6 +161,23 @@ Login 的 `UserWebMvcInterceptor` 必须由
 `contributes.applicationAnnotations` 增加合法且已由项目依赖提供的全限定类名。不要
 声明文件路径、行号、文本 Anchor 或自行创造不存在的业务注解。Assembly 会在
 workspace 的 `Application.java` 投影 import 和注解，Base 源文件保持不变。
+
+若该注解或 Login 源码需要专属 Maven 依赖，在同一个 manifest 的
+`contributes.mavenDependencies` 中声明 `groupId`、`artifactId`，并按需声明
+`version`、`scope`：
+
+```yaml
+contributes:
+  applicationAnnotations:
+    - annotationClass: com.cmb.bee.auth.client.config.EnableAuthClient
+  mavenDependencies:
+    - groupId: ZA21
+      artifactId: bee-starter-auth
+```
+
+Assembly 只向 workspace 的 `pom.xml` 投影这些依赖，不修改 `base/pom.xml`。同一
+`groupId:artifactId` 的不同 version 或 scope 会导致 `MAVEN_DEPENDENCY_CONFLICT`；
+不要在 workspace POM 中手工改写已经由 manifest 管理的依赖。
 
 ## 如何维护 Authorization
 

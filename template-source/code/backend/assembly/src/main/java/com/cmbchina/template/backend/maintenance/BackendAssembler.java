@@ -17,14 +17,16 @@ public final class BackendAssembler {
         List<ExtensionManifestLoader.Manifest> manifests = new ExtensionManifestLoader(root.resolve("extensions")).resolve(profile.requested);
         WorkspaceState state = new WorkspaceState(); state.profile = profile.name; state.editTarget = profile.editTarget;
         copyTree(root.resolve("base"), workspace, "base", state);
-        List<String> annotations = new ArrayList<String>();
+        List<String> annotations = new ArrayList<String>(); List<MavenDependency> dependencies = new ArrayList<MavenDependency>();
         for (ExtensionManifestLoader.Manifest manifest : manifests) {
-            state.extensions.add(manifest.id); annotations.addAll(manifest.annotations);
+            state.extensions.add(manifest.id); annotations.addAll(manifest.annotations); dependencies.addAll(manifest.dependencies);
             for (String directory : Arrays.asList("src", "docs", "migrations")) if (Files.exists(manifest.root.resolve(directory)))
                 copyTree(manifest.root.resolve(directory), workspace.resolve(directory), manifest.id, state);
         }
         state.applicationAnnotations = new ArrayList<String>(new LinkedHashSet<String>(annotations));
+        state.mavenDependencies = new ArrayList<MavenDependency>(new LinkedHashSet<MavenDependency>(dependencies));
         ApplicationAnnotationCompiler.apply(workspace.resolve("src/main/java/com/cmbchina/backend/Application.java"), state.applicationAnnotations);
+        PomDependencyCompiler.apply(workspace.resolve("pom.xml"), state.mavenDependencies);
         state.write(workspace); AssemblyContract.verify(workspace); return state;
     }
     private void copyTree(final Path from, final Path to, final String owner, final WorkspaceState state) {

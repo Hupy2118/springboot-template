@@ -11,6 +11,7 @@ public final class WorkspaceState {
     public String editTarget;
     public Map<String, String> owners = new TreeMap<String, String>();
     public List<String> applicationAnnotations = new ArrayList<String>();
+    public List<MavenDependency> mavenDependencies = new ArrayList<MavenDependency>();
     public static Path file(Path workspace) { return workspace.resolve(".xcodeagent/backend-workspace-state.json"); }
     public void write(Path workspace) {
         try { Files.createDirectories(file(workspace).getParent()); new ObjectMapper().writerWithDefaultPrettyPrinter().writeValue(file(workspace).toFile(), this); }

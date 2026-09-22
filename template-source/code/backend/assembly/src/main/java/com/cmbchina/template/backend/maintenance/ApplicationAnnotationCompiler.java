@@ -20,6 +20,17 @@ public final class ApplicationAnnotationCompiler {
             Files.write(application, source.getBytes(StandardCharsets.UTF_8));
         } catch (IOException e) { throw new TemplateException("APPLICATION_ANNOTATION_COMPILATION_FAILED", e.getMessage()); }
     }
+    public static void assertContributionsIntact(Path application, Collection<String> classes) {
+        try {
+            String source = new String(Files.readAllBytes(application), StandardCharsets.UTF_8);
+            for (String fqcn : new LinkedHashSet<String>(classes)) {
+                String simple = fqcn.substring(fqcn.lastIndexOf('.') + 1);
+                if (count(source, "import " + fqcn + ";") != 1 || count(source, "@" + simple) != 1)
+                    throw new TemplateException("GENERATED_CONTRIBUTION_MODIFIED", "application annotation " + fqcn);
+            }
+        } catch (IOException e) { throw new TemplateException("APPLICATION_ANNOTATION_COMPILATION_FAILED", e.getMessage()); }
+    }
+    private static int count(String value, String token) { return (value.length() - value.replace(token, "").length()) / token.length(); }
     private static String insertImport(String source, String line) {
         int last = source.lastIndexOf("import ");
         if (last < 0) { int packageEnd = source.indexOf(';'); return source.substring(0, packageEnd + 1) + "\n\n" + line + source.substring(packageEnd + 1); }

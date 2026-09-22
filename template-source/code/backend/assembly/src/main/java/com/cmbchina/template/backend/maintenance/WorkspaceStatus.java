@@ -21,6 +21,7 @@ public final class WorkspaceStatus {
                 String owner=state.owners.get(key); if(owner==null) { report.created.add(key); return FileVisitResult.CONTINUE; }
                 Path source=source(root, owner, key); if(!Files.exists(source)) { report.modified.add(key); return FileVisitResult.CONTINUE; }
                 if(key.endsWith("Application.java") && normalizedApplication(file, state).equals(read(source))) { if(!read(file).equals(read(source))) report.generated.add(key); }
+                else if(key.equals("pom.xml") && normalizedPom(file, state).equals(PomDependencyCompiler.normalizedPom(source, Collections.<MavenDependency>emptyList()))) { if(!read(file).equals(read(source))) report.generated.add(key); }
                 else if(!read(file).equals(read(source))) report.modified.add(key); return FileVisitResult.CONTINUE;
             }
         }); } catch(IOException e) { throw new TemplateException("WORKSPACE_STATUS_FAILED", e.getMessage()); }
@@ -30,5 +31,6 @@ public final class WorkspaceStatus {
     public static String normalizedApplication(Path workspaceFile, WorkspaceState state) {
         String value=read(workspaceFile); for(String fqcn:state.applicationAnnotations) { String simple=fqcn.substring(fqcn.lastIndexOf('.')+1); value=value.replace("import " + fqcn + ";\n", ""); value=value.replace("@" + simple + "\n", ""); } return value;
     }
+    public static String normalizedPom(Path workspaceFile, WorkspaceState state) { return PomDependencyCompiler.normalizedPom(workspaceFile, state.mavenDependencies); }
     static String read(Path file) { try { return new String(Files.readAllBytes(file), StandardCharsets.UTF_8); } catch(IOException e) { throw new TemplateException("WORKSPACE_READ_FAILED", e.getMessage()); } }
 }

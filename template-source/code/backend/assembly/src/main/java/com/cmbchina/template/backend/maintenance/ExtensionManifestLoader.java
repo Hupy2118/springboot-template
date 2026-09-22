@@ -9,8 +9,8 @@ import java.util.regex.Pattern;
 public final class ExtensionManifestLoader {
     private static final Pattern FQCN = Pattern.compile("[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)+");
     public static final class Manifest {
-        public final String id; public final List<String> requires; public final List<String> annotations; public final Path root;
-        Manifest(String id, List<String> requires, List<String> annotations, Path root) { this.id=id; this.requires=requires; this.annotations=annotations; this.root=root; }
+        public final String id; public final List<String> requires; public final List<String> annotations; public final List<MavenDependency> dependencies; public final Path root;
+        Manifest(String id, List<String> requires, List<String> annotations, List<MavenDependency> dependencies, Path root) { this.id=id; this.requires=requires; this.annotations=annotations; this.dependencies=dependencies; this.root=root; }
     }
     private final Map<String, Manifest> manifests = new LinkedHashMap<String, Manifest>();
     public ExtensionManifestLoader(Path extensions) {
@@ -29,7 +29,7 @@ public final class ExtensionManifestLoader {
         String id = raw.get("id") == null ? "" : String.valueOf(raw.get("id"));
         if (id.isEmpty() || manifests.containsKey(id)) throw new TemplateException("INVALID_EXTENSION_DEFINITION", "invalid or duplicate id " + id);
         List<String> requires = strings(raw.get("requires"));
-        List<String> annotations = new ArrayList<String>();
+        List<String> annotations = new ArrayList<String>(); List<MavenDependency> dependencies = new ArrayList<MavenDependency>();
         Object contributes = raw.get("contributes");
         if (contributes instanceof Map) {
             Object values = ((Map<String,Object>) contributes).get("applicationAnnotations");
@@ -38,14 +38,31 @@ public final class ExtensionManifestLoader {
                     throw new TemplateException("INVALID_EXTENSION_DEFINITION", "invalid annotation in " + id);
                 annotations.add(String.valueOf(((Map<String,Object>) value).get("annotationClass")));
             }
+            Object mavenValues = ((Map<String,Object>) contributes).get("mavenDependencies");
+            if (mavenValues instanceof List) for (Object value : (List<Object>) mavenValues) {
+                if (!(value instanceof Map)) throw new TemplateException("INVALID_EXTENSION_DEFINITION", "invalid maven dependency in " + id);
+                Map<String,Object> dependency = (Map<String,Object>) value;
+                String groupId = string(dependency.get("groupId")); String artifactId = string(dependency.get("artifactId"));
+                String version = optional(dependency.get("version")); String scope = optional(dependency.get("scope"));
+                if (!groupId.matches("[A-Za-z0-9_.-]+") || !artifactId.matches("[A-Za-z0-9_.-]+") || (scope != null && !scope.matches("compile|provided|runtime|test|system")))
+                    throw new TemplateException("INVALID_EXTENSION_DEFINITION", "invalid maven dependency in " + id);
+                dependencies.add(new MavenDependency(groupId, artifactId, version, scope));
+            }
         }
-        manifests.put(id, new Manifest(id, requires, annotations, root));
+        manifests.put(id, new Manifest(id, requires, annotations, dependencies, root));
     }
+    private String string(Object value) { String result=optional(value); if(result==null || result.length()==0) throw new TemplateException("INVALID_EXTENSION_DEFINITION", "missing dependency coordinate"); return result; }
+    private String optional(Object value) { return value == null ? null : String.valueOf(value).trim(); }
     @SuppressWarnings("unchecked") private List<String> strings(Object raw) { List<String> result=new ArrayList<String>(); if(raw instanceof List) for(Object x:(List<Object>)raw) result.add(String.valueOf(x)); return result; }
     public List<Manifest> resolve(List<String> requested) {
         LinkedHashSet<String> closure = new LinkedHashSet<String>(); for(String id: requested) visit(id, closure, new HashSet<String>());
         List<Manifest> resolved = new ArrayList<Manifest>();
         for (String id : closure) resolved.add(manifests.get(id));
+        Map<String, MavenDependency> byCoordinate = new HashMap<String, MavenDependency>();
+        for (Manifest manifest : resolved) for (MavenDependency dependency : manifest.dependencies) {
+            MavenDependency existing = byCoordinate.put(dependency.coordinate(), dependency);
+            if (existing != null && !existing.equals(dependency)) throw new TemplateException("MAVEN_DEPENDENCY_CONFLICT", dependency.coordinate());
+        }
         return resolved;
     }
     private void visit(String id, LinkedHashSet<String> closure, Set<String> active) {
