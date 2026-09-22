@@ -5,9 +5,9 @@ import path from 'node:path';
 import { syncWorkspace } from './workspace-sync.mjs';
 
 const root = await mkdtemp(path.join(tmpdir(), 'template-workspace-sync-'));
-const workspace = path.join(root, 'src');
+const workspace = path.join(root, 'workspace');
 const owners = {
-  base: path.join(root, 'base', 'src'),
+  base: path.join(root, 'base'),
   login: path.join(root, 'extensions', 'login', 'src'),
   authorization: path.join(root, 'extensions', 'authorization', 'src'),
 };
@@ -16,34 +16,39 @@ async function reset() { await rm(root, { recursive: true, force: true }); await
 
 try {
   // Base uses the same unified sync path: existing, new, deleted, and host files all belong to Base.
-  await write(owners.base, 'layout/index.tsx', 'old base');
-  await write(owners.base, 'providers/AppProviders.tsx', 'old host');
-  await write(owners.base, 'utils/obsolete.ts', 'delete me');
-  await write(workspace, 'layout/index.tsx', 'new base');
-  await write(workspace, 'providers/AppProviders.tsx', 'new host');
-  await write(workspace, 'components/New/index.tsx', 'new component');
-  await write(workspace, 'generated/extensions/providers.ts', 'must be ignored');
+  await write(owners.base, 'src/layout/index.tsx', 'old base');
+  await write(owners.base, 'src/providers/AppProviders.tsx', 'old host');
+  await write(owners.base, 'src/utils/obsolete.ts', 'delete me');
+  await write(workspace, 'src/layout/index.tsx', 'new base');
+  await write(workspace, 'src/providers/AppProviders.tsx', 'new host');
+  await write(workspace, 'src/components/New/index.tsx', 'new component');
+  await write(workspace, 'vite.config.ts', 'new runtime config');
+  await write(workspace, 'src/generated/extensions/providers.ts', 'must be ignored');
+  await write(workspace, '.devagentstudio-template-workspace.json', 'must be ignored');
   const baseChanges = await syncWorkspace('base', { workspaceRoot: workspace, ownerRoots: owners, skipStateCheck: true });
   assert.deepEqual(baseChanges, [
     'CREATE base/src/components/New/index.tsx',
     'UPDATE base/src/layout/index.tsx',
     'UPDATE base/src/providers/AppProviders.tsx',
     'DELETE base/src/utils/obsolete.ts',
+    'CREATE base/vite.config.ts',
   ]);
-  assert.equal(await readFile(path.join(owners.base, 'providers/AppProviders.tsx'), 'utf8'), 'new host');
-  await assert.rejects(readFile(path.join(owners.base, 'generated/extensions/providers.ts')));
+  assert.equal(await readFile(path.join(owners.base, 'src/providers/AppProviders.tsx'), 'utf8'), 'new host');
+  assert.equal(await readFile(path.join(owners.base, 'vite.config.ts'), 'utf8'), 'new runtime config');
+  await assert.rejects(readFile(path.join(owners.base, 'src/generated/extensions/providers.ts')));
+  await assert.rejects(readFile(path.join(owners.base, '.devagentstudio-template-workspace.json')));
   assert.equal((await syncWorkspace('base', { workspaceRoot: workspace, ownerRoots: owners, skipStateCheck: true })).length, 0);
 
   await reset();
   // Login: existing Base and Login files retain their owners; a new file uses login editTarget.
-  await write(owners.base, 'layout/index.tsx', 'old base');
-  await write(owners.base, 'utils/removed.ts', 'delete me');
+  await write(owners.base, 'src/layout/index.tsx', 'old base');
+  await write(owners.base, 'src/utils/removed.ts', 'delete me');
   await write(owners.login, 'pages/Login/index.tsx', 'old login');
   await write(owners.login, 'utils/login-removed.ts', 'delete me');
-  await write(workspace, 'layout/index.tsx', 'new base');
-  await write(workspace, 'pages/Login/index.tsx', 'new login');
-  await write(workspace, 'hooks/useLoginState.ts', 'new login hook');
-  await write(workspace, 'generated/extensions/providers.ts', 'must be ignored');
+  await write(workspace, 'src/layout/index.tsx', 'new base');
+  await write(workspace, 'src/pages/Login/index.tsx', 'new login');
+  await write(workspace, 'src/hooks/useLoginState.ts', 'new login hook');
+  await write(workspace, 'src/generated/extensions/providers.ts', 'must be ignored');
   const loginChanges = await syncWorkspace('login', { workspaceRoot: workspace, ownerRoots: owners, skipStateCheck: true });
   assert.deepEqual(loginChanges, [
     'CREATE extensions/login/src/hooks/useLoginState.ts',
@@ -52,20 +57,20 @@ try {
     'DELETE extensions/login/src/utils/login-removed.ts',
     'DELETE base/src/utils/removed.ts',
   ]);
-  assert.equal(await readFile(path.join(owners.base, 'layout/index.tsx'), 'utf8'), 'new base');
+  assert.equal(await readFile(path.join(owners.base, 'src/layout/index.tsx'), 'utf8'), 'new base');
   assert.equal(await readFile(path.join(owners.login, 'hooks/useLoginState.ts'), 'utf8'), 'new login hook');
   await assert.rejects(readFile(path.join(owners.base, 'hooks/useLoginState.ts')));
   assert.equal((await syncWorkspace('login', { workspaceRoot: workspace, ownerRoots: owners, skipStateCheck: true })).length, 0);
 
   // An Authorization workspace contains its transitive Login dependency and writes new files to Authorization.
   await reset();
-  await write(owners.base, 'base.ts', 'old');
+  await write(owners.base, 'src/base.ts', 'old');
   await write(owners.login, 'login.ts', 'old');
   await write(owners.authorization, 'authorization.ts', 'old');
-  await write(workspace, 'base.ts', 'base update');
-  await write(workspace, 'login.ts', 'login update');
-  await write(workspace, 'authorization.ts', 'authorization update');
-  await write(workspace, 'hooks/useRoleEditor.ts', 'new authorization hook');
+  await write(workspace, 'src/base.ts', 'base update');
+  await write(workspace, 'src/login.ts', 'login update');
+  await write(workspace, 'src/authorization.ts', 'authorization update');
+  await write(workspace, 'src/hooks/useRoleEditor.ts', 'new authorization hook');
   const authorizationChanges = await syncWorkspace('authorization', { workspaceRoot: workspace, ownerRoots: owners, skipStateCheck: true });
   assert.deepEqual(authorizationChanges, [
     'UPDATE extensions/authorization/src/authorization.ts',
@@ -76,9 +81,9 @@ try {
 
   // Duplicate paths are never resolved by priority, including when missing from the workspace.
   await reset();
-  await write(owners.base, 'foo.ts', 'base');
+  await write(owners.base, 'src/foo.ts', 'base');
   await write(owners.login, 'foo.ts', 'login');
-  await assert.rejects(syncWorkspace('login', { workspaceRoot: workspace, ownerRoots: owners, skipStateCheck: true }), /SOURCE_OWNER_CONFLICT: foo.ts/);
+  await assert.rejects(syncWorkspace('login', { workspaceRoot: workspace, ownerRoots: owners, skipStateCheck: true }), /SOURCE_OWNER_CONFLICT: src\/foo.ts/);
   await assert.rejects(syncWorkspace('full', { workspaceRoot: workspace, ownerRoots: owners, skipStateCheck: true }), /PROFILE_NOT_SYNCABLE: full/);
   process.stdout.write('Base and Extension workspace sync scenarios passed.\n');
 } finally {

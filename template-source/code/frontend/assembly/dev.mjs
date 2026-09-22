@@ -8,7 +8,7 @@ const profileArgument = process.argv.find((item) => item.startsWith('--profile='
 const profile = profileArgument?.slice('--profile='.length) || 'full';
 await profileConfig(profile);
 const assembler = path.join(frontendRoot, 'assembly', 'assemble.mjs');
-const destination = path.join(frontendRoot, 'src');
+const destination = path.join(frontendRoot, 'workspace');
 let rebuilding = false;
 
 function run(command, args) {
@@ -29,6 +29,8 @@ async function assembleSafely() {
     await rm(staging, { recursive: true, force: true });
     await run(process.execPath, [assembler, `--profile=${profile}`, `--output=${path.basename(staging)}`]);
     await rm(backup, { recursive: true, force: true });
+    try { await rename(path.join(destination, 'node_modules'), path.join(staging, 'node_modules')); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
     await rename(destination, backup);
     await rename(staging, destination);
     await rm(backup, { recursive: true, force: true });
@@ -36,7 +38,7 @@ async function assembleSafely() {
     process.stdout.write(`Assembled ${profile} profile.\n`);
   } catch (error) {
     await rm(staging, { recursive: true, force: true });
-    process.stderr.write(`${error.message}\nKeeping the last valid src.\n`);
+    process.stderr.write(`${error.message}\nKeeping the last valid workspace.\n`);
   } finally {
     rebuilding = false;
   }
@@ -44,9 +46,9 @@ async function assembleSafely() {
 
 await assembleSafely();
 
-if (profile === 'base') process.stdout.write('Workspace is editable. Run pnpm sync:base to persist changes to base/src.\n');
+if (profile === 'base') process.stdout.write('Workspace is editable. Run pnpm sync:base to persist changes to base/.\n');
 else if (profile === 'full') process.stdout.write('Full workspace is for integration verification. Do not use it as a source editing workspace.\n');
 else process.stdout.write(`Workspace is editable. Run pnpm sync:${profile} to persist changes.\n`);
 
-const vite = spawn('pnpm', ['exec', 'vite', '--port', '3000'], { cwd: frontendRoot, stdio: 'inherit' });
+const vite = spawn('pnpm', ['exec', 'vite', '--port', '3000'], { cwd: destination, stdio: 'inherit' });
 vite.on('exit', (code) => process.exitCode = code ?? 0);

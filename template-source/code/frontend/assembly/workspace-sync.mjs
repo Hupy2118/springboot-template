@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ASSEMBLY_MANAGED_FILES, GENERATED_MARKER } from './assembly-contract.mjs';
 import { frontendRoot, profileConfig } from './profiles.mjs';
-import { ownersForProfile, resolveExistingOwner, SourceOwnershipError } from './source-ownership.mjs';
+import { ownersForProfile, resolveExistingOwner, sourcePath, SourceOwnershipError } from './source-ownership.mjs';
 import { readWorkspaceState } from './workspace-state.mjs';
 
 export class WorkspaceSyncError extends Error { constructor(code, message) { super(`${code}: ${message}`); this.code = code; } }
@@ -14,7 +14,7 @@ async function files(directory, prefix = '') {
     const entries = await readdir(directory, { withFileTypes: true });
     return (await Promise.all(entries.map(async (entry) => {
       const relative = path.join(prefix, entry.name).replaceAll('\\', '/');
-      if (relative === GENERATED_MARKER || ASSEMBLY_MANAGED_FILES.has(relative)) return [];
+      if (relative === GENERATED_MARKER || relative === '.devagentstudio-template-workspace.json' || relative === '.gitkeep' || relative === 'node_modules' || relative === 'dist' || ASSEMBLY_MANAGED_FILES.has(relative)) return [];
       return entry.isDirectory() ? files(path.join(directory, entry.name), relative) : [relative];
     }))).flat().sort();
   } catch (error) {
@@ -42,9 +42,12 @@ async function removeEmptyParents(directory, stop) {
     try { if ((await readdir(directory)).length) return; await rm(directory); directory = path.dirname(directory); } catch { return; }
   }
 }
-function sourceLabel(owner, relative) { return `${owner.id === 'base' ? 'base/src' : `extensions/${owner.id}/src`}/${relative}`; }
+function sourceLabel(owner, relative) {
+  const sourceRelative = owner.workspacePrefix ? relative.slice(`${owner.workspacePrefix}/`.length) : relative;
+  return `${owner.id === 'base' ? 'base' : `extensions/${owner.id}/src`}/${sourceRelative}`;
+}
 
-export async function syncWorkspace(profile, { workspaceRoot = path.join(frontendRoot, 'src'), ownerRoots, skipStateCheck = false } = {}) {
+export async function syncWorkspace(profile, { workspaceRoot = path.join(frontendRoot, 'workspace'), ownerRoots, skipStateCheck = false } = {}) {
   const config = await profileConfig(profile);
   if (config.editTarget === null) throw new WorkspaceSyncError('PROFILE_NOT_SYNCABLE', profile);
   if (!skipStateCheck) await ensureWorkspace(profile, workspaceRoot);
@@ -52,7 +55,10 @@ export async function syncWorkspace(profile, { workspaceRoot = path.join(fronten
   const editTarget = owners.find((owner) => owner.id === config.editTarget);
   if (!editTarget) throw new WorkspaceSyncError('NEW_FILE_OWNER_REQUIRED', profile);
   const workspaceFiles = new Set(await files(workspaceRoot));
-  const sourceFiles = new Set((await Promise.all(owners.map((owner) => files(owner.root)))).flat());
+  const sourceFiles = new Set((await Promise.all(owners.map(async (owner) => {
+    const prefix = owner.workspacePrefix ? `${owner.workspacePrefix}/` : '';
+    return (await files(owner.root)).map((relative) => `${prefix}${relative}`);
+  }))).flat());
   const plan = [];
   for (const relative of [...new Set([...workspaceFiles, ...sourceFiles])].sort()) {
     let owner;
@@ -63,12 +69,12 @@ export async function syncWorkspace(profile, { workspaceRoot = path.join(fronten
     }
     if (workspaceFiles.has(relative)) {
       if (!owner) plan.push({ type: 'CREATE', relative, owner: editTarget });
-      else if (!(await sameContent(path.join(workspaceRoot, relative), path.join(owner.root, relative)))) plan.push({ type: 'UPDATE', relative, owner });
+      else if (!(await sameContent(path.join(workspaceRoot, relative), sourcePath(owner, relative)))) plan.push({ type: 'UPDATE', relative, owner });
     } else if (owner) plan.push({ type: 'DELETE', relative, owner });
   }
   const changes = [];
   for (const item of plan) {
-    const target = path.join(item.owner.root, item.relative);
+    const target = sourcePath(item.owner, item.relative);
     if (item.type === 'DELETE') { await rm(target, { force: true }); await removeEmptyParents(path.dirname(target), item.owner.root); }
     else await copy(path.join(workspaceRoot, item.relative), target);
     changes.push(`${item.type} ${sourceLabel(item.owner, item.relative)}`);

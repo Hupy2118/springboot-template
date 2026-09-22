@@ -6,13 +6,13 @@ import { frontendRoot } from './profiles.mjs';
 import { GENERATED_MARKER } from './assembly-contract.mjs';
 
 const execute = promisify(execFile);
-export const statePath = path.join(frontendRoot, '.devagentstudio-template-workspace.json');
+export const statePath = path.join(frontendRoot, 'workspace', '.devagentstudio-template-workspace.json');
 
 async function files(root, prefix = '') {
   const entries = await readdir(root, { withFileTypes: true });
   const nested = await Promise.all(entries.map((entry) => {
     const relative = path.join(prefix, entry.name);
-    if (relative === GENERATED_MARKER) return [];
+    if (relative === GENERATED_MARKER || relative === '.devagentstudio-template-workspace.json' || relative === '.gitkeep' || relative === 'node_modules' || relative === 'dist') return [];
     return entry.isDirectory() ? files(path.join(root, entry.name), relative) : [relative];
   }));
   return nested.flat().sort();
@@ -34,7 +34,7 @@ export async function workspaceDirty() {
   const temporary = await mkdtemp(path.join(frontendRoot, '.workspace-status-'));
   try {
     await execute(process.execPath, [path.join(frontendRoot, 'assembly', 'assemble.mjs'), `--profile=${state.profile}`, `--output=${temporary}`], { cwd: frontendRoot });
-    const workspace = path.join(frontendRoot, 'src');
+    const workspace = path.join(frontendRoot, 'workspace');
     const [actual, expected] = await Promise.all([files(workspace), files(temporary)]);
     const all = [...new Set([...actual, ...expected])];
     const drift = [];
@@ -49,6 +49,6 @@ export async function workspaceDirty() {
 
 export async function assertWorkspaceClean() {
   const status = await workspaceDirty();
-  if (status.dirty) throw new Error(`WORKSPACE_SOURCE_DRIFT: ${status.drift.slice(0, 10).map((file) => `src/${file}`).join(', ')}`);
+  if (status.dirty) throw new Error(`WORKSPACE_SOURCE_DRIFT: ${status.drift.slice(0, 10).join(', ')}`);
   return status;
 }

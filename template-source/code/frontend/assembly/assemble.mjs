@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { extensionsForProfile } from './profiles.mjs';
@@ -7,7 +7,7 @@ import { ASSEMBLY_MANAGED_FILES } from './assembly-contract.mjs';
 import { assertWorkspaceClean, writeWorkspaceState } from './workspace-state.mjs';
 
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const sourceRoot = path.join(frontendRoot, 'base', 'src');
+const sourceRoot = path.join(frontendRoot, 'base');
 const extensionRoot = path.join(frontendRoot, 'extensions');
 
 class AssemblyError extends Error {
@@ -23,7 +23,7 @@ function argument(name, fallback) {
 }
 
 function outputDirectory() {
-  const candidate = path.resolve(frontendRoot, argument('--output', 'src'));
+  const candidate = path.resolve(frontendRoot, argument('--output', 'workspace'));
   if (candidate === frontendRoot || !candidate.startsWith(`${frontendRoot}${path.sep}`)) {
     throw new AssemblyError('INVALID_OUTPUT_DIRECTORY', 'output must be a directory below the frontend root');
   }
@@ -217,8 +217,14 @@ async function assemble() {
   const selected = selectExtensions(await manifests(), requested, disabled);
   await verifyContributionSources(selected);
   const destination = outputDirectory();
-  const primaryOutput = destination === path.join(frontendRoot, 'src');
+  const primaryOutput = destination === path.join(frontendRoot, 'workspace');
   if (primaryOutput && argument('--force', '') !== 'true') await assertWorkspaceClean();
+  const preservedNodeModules = path.join(frontendRoot, `.workspace-node_modules-${process.pid}`);
+  if (primaryOutput) {
+    await rm(preservedNodeModules, { recursive: true, force: true });
+    try { await rename(path.join(destination, 'node_modules'), preservedNodeModules); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
   await rm(destination, { recursive: true, force: true });
   await mkdir(destination, { recursive: true });
   await cp(sourceRoot, destination, { recursive: true });
@@ -226,10 +232,11 @@ async function assemble() {
   for (const extension of selected) {
     const extensionSource = path.join(extension.directory, 'src');
     for (const file of await filesRecursively(extensionSource)) {
-      if (ASSEMBLY_MANAGED_FILES.has(file) || owners.has(file)) throw new AssemblyError('FILE_COLLISION', `${owners.get(file) || 'assembly'} and ${extension.id}: src/${file}`);
-      owners.set(file, extension.id);
+      const target = path.posix.join('src', file.replaceAll('\\', '/'));
+      if (ASSEMBLY_MANAGED_FILES.has(target) || owners.has(target)) throw new AssemblyError('FILE_COLLISION', `${owners.get(target) || 'assembly'} and ${extension.id}: src/${file}`);
+      owners.set(target, extension.id);
     }
-    await cp(extensionSource, destination, { recursive: true });
+    await cp(extensionSource, path.join(destination, 'src'), { recursive: true });
   }
   const providers = contributionList(selected, 'providers');
   const rootRouteContributions = contributionList(selected, 'rootRoutes');
@@ -237,11 +244,11 @@ async function assemble() {
   const initializerContributions = contributionList(selected, 'initializers');
   const reporterContributions = contributionList(selected, 'errorReporters');
   const generated = new Map([
-    ['generated/extensions/providers.ts', generateProviderRegistry(providers)],
-    ['generated/extensions/rootRoutes.tsx', generateRootRouteRegistry(rootRouteContributions)],
-    ['generated/extensions/systemPageRoutes.ts', generatePageRouteRegistry(pageRouteContributions)],
-    ['generated/extensions/initializers.ts', generateInitializerRegistry(initializerContributions)],
-    ['generated/extensions/errorReporters.ts', generateErrorReporterRegistry(reporterContributions)],
+    ['src/generated/extensions/providers.ts', generateProviderRegistry(providers)],
+    ['src/generated/extensions/rootRoutes.tsx', generateRootRouteRegistry(rootRouteContributions)],
+    ['src/generated/extensions/systemPageRoutes.ts', generatePageRouteRegistry(pageRouteContributions)],
+    ['src/generated/extensions/initializers.ts', generateInitializerRegistry(initializerContributions)],
+    ['src/generated/extensions/errorReporters.ts', generateErrorReporterRegistry(reporterContributions)],
   ]);
   for (const [relative, content] of generated) {
     const target = path.join(destination, relative);
@@ -254,6 +261,11 @@ async function assemble() {
     extensions: selected.map((extension) => extension.id),
     assemblySchemaVersion: 1,
   }, null, 2)}\n`);
+  if (primaryOutput) await writeFile(path.join(destination, '.gitkeep'), '');
+  if (primaryOutput) {
+    try { await rename(preservedNodeModules, path.join(destination, 'node_modules')); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
   if (primaryOutput && profile) await writeWorkspaceState(profile);
   process.stdout.write(`Assembled ${selected.map((extension) => extension.id).join(', ') || 'base-only'} into ${path.relative(frontendRoot, destination)}\n`);
 }

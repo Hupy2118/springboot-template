@@ -40,7 +40,7 @@
   "include": [
     "src",
     "vite-env.d.ts"
-  ],
+, "devtools"  ],
   "exclude": [
     "node_modules",
     "build"
