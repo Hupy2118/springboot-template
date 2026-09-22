@@ -2,7 +2,7 @@
 
 > 适用分支：`template_refactor`  
 > 目标：将开发者在完整工程中的能力开发结果，自动转换为符合现有 Template Capability V2 契约的 Capability。  
-> 本方案必须服从 `docs/XCodeAgent_Template_Capability_增量更新方案_双端实施计划_断点修复版.md`，不得新增第二套 Runtime Contract。
+> 本方案必须服从 `docs/DevAgentStudio_Template_Capability_增量更新方案_双端实施计划_断点修复版.md`，不得新增第二套 Runtime Contract。
 
 ---
 
@@ -25,7 +25,7 @@ Template Engine / Service
   ↓
 StrategyUpdatePackageV2
   ↓
-XCodeAgent Workspace
+DevAgent Studio Workspace
 ```
 
 保持原有契约不变：
@@ -405,7 +405,7 @@ Target 必须属于 pristine Base Target Registry。
 例如：
 
 ```text
-// xcodeagent:capability-page-routes
+// devagentstudio:capability-page-routes
 ```
 
 开发者插入内容后自动生成：
@@ -651,7 +651,7 @@ EOF newline
 
 ---
 
-## Stage 9：Generate / XCodeAgent 继续实施step6 等价验证
+## Stage 9：Generate / DevAgent Studio 继续实施step6 等价验证
 
 这是发布前核心契约 Gate。
 
@@ -672,7 +672,7 @@ V2ProjectGenerator
 和：
 
 ```text
-XCodeAgent Executor V2
+DevAgent Studio Executor V2
 ```
 
 要求：
@@ -816,7 +816,7 @@ Codex 实施时必须遵守：
 
 12. 每个 Capability 必须有 CAPABILITY_POSTCONDITION。
 
-13. Generate 与 XCodeAgent Executor 必须等价。
+13. Generate 与 DevAgent Studio Executor 必须等价。
 
 14. Published Loader 不得提供 skipDigest。
 
@@ -852,7 +852,7 @@ verify
     ↓
 Generate == Workbench
     ↓
-Generate == XCodeAgent Executor
+Generate == DevAgent Studio Executor
     ↓
 Postcondition + Build/Test
     ↓

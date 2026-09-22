@@ -6,7 +6,7 @@
 
 Engine Service 是无状态计算入口，不是 Project Registry、Workspace Manager 或 ChangeSet 状态机。不得在 Service 中增加数据库、JDBC/JPA/MyBatis、Flyway、Redis、Repository/DAO、Project ID、服务端 TemplateState 或幂等记录。
 
-实际生成工程中的 Workspace Apply、构建/测试、失败恢复和 State 推进属于外部 XcodeAgent/调用方，不在本仓库 Service 的职责中。
+实际生成工程中的 Workspace Apply、构建/测试、失败恢复和 State 推进属于外部 DevAgentStudio/调用方，不在本仓库 Service 的职责中。
 
 ## 目录职责
 

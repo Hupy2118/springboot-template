@@ -5,7 +5,7 @@
 ## 注入内容
 
 - `POST /api/login/mock` 接收 `memberId` 和 `memberName`，签发 HttpOnly Cookie，并返回当前模拟用户。
-- `MockJwtService` 创建和解析本地模拟 JWT；`MockLoginProperties` 使用 `xcodeagent.login.mock-login` 前缀配置 Cookie、签发方、TTL 与密钥。
+- `MockJwtService` 创建和解析本地模拟 JWT；`MockLoginProperties` 使用 `devagentstudio.login.mock-login` 前缀配置 Cookie、签发方、TTL 与密钥。
 - `UserWebMvcInterceptor` 从 Cookie 恢复当前用户到 `BaseUserDataThreadHodler`，并在请求结束后清理上下文。
 - 引擎将该拦截器以顺序 100 注册到受管 Web MVC 扩展面，且排除 `/api/login/mock`。
 

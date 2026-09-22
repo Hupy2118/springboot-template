@@ -1,5 +1,5 @@
 {
-  "name": "@za38.03/xcode-agent-lowcode-template",
+  "name": "@za38.03/devagentstudio-lowcode-template",
   "version": "1.0.0",
   "private": true,
   "packageManager": "pnpm@11.9.0",
@@ -37,7 +37,7 @@
     "preview": "vite preview",
     "test": "jest --config jest.config.cjs --runInBand",
     "test:source-path": "node scripts/test-source-path-plugin.mjs",
-    "test:route-projector": "node scripts/xcodeagent/test-route-projector.mjs"
+    "test:route-projector": "node scripts/devagentstudio/test-route-projector.mjs"
   },
   "dependencies": {
     "@ant-design/cssinjs": "^1.21.1",

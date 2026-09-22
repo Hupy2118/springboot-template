@@ -18,9 +18,9 @@ export type PageRouteGuardFactory = (
  * factories with reduceRight so generated nesting stays deterministic.
  */
 export const appRouteGuards: AppRouteGuardFactory[] = [
-  // xcodeagent:app-route-guards
+  // devagentstudio:app-route-guards
 ];
 
 export const pageRouteGuards: PageRouteGuardFactory[] = [
-  // xcodeagent:page-route-guards
+  // devagentstudio:page-route-guards
 ];

@@ -2,7 +2,7 @@
 
 ## 一、共同前提：冻结双端接口协议
 
-本次修复过程中，XCodeAgent 与 springboot-template 必须共同遵守以下协议，**不得自行增加、删除或重命名字段**。
+本次修复过程中，DevAgent Studio 与 springboot-template 必须共同遵守以下协议，**不得自行增加、删除或重命名字段**。
 
 ### 1. `/v1/generate`
 
@@ -107,7 +107,7 @@ diagnostics
 * `position`：必填
 * `name`：可选
 
-以 XCodeAgent 当前 Executor 能力为标准，springboot-template 向其对齐。
+以 DevAgent Studio 当前 Executor 能力为标准，springboot-template 向其对齐。
 
 ---
 
@@ -204,11 +204,11 @@ Loader 与 WireStrategyCompiler 使用相同协议规则，避免一层接受、
 
 ---
 
-## 任务 3：将 astSelector 对齐 XCodeAgent
+## 任务 3：将 astSelector 对齐 DevAgent Studio
 
 ### 目的
 
-消除当前 Template 与 XCodeAgent 的 selector 参数差异。
+消除当前 Template 与 DevAgent Studio 的 selector 参数差异。
 
 ### 方案
 
@@ -245,7 +245,7 @@ position 仅 before / after
 
 ### 目的
 
-使 Template 生产的 Validation Plan 与 XCodeAgent 实际执行逻辑一致。
+使 Template 生产的 Validation Plan 与 DevAgent Studio 实际执行逻辑一致。
 
 ### 方案
 
@@ -279,7 +279,7 @@ path + pointer
 
 这是本次唯一明确增加的 Validation 子字段。
 
-上线时必须与 XCodeAgent 对应版本配套。
+上线时必须与 DevAgent Studio 对应版本配套。
 
 ---
 
@@ -345,7 +345,7 @@ AUTHORIZATION_BOOTSTRAP_DDL
 
 ### 接口约束
 
-属于 Template 内部 Release Contract，不影响 XCodeAgent HTTP 请求。
+属于 Template 内部 Release Contract，不影响 DevAgent Studio HTTP 请求。
 
 ---
 
@@ -471,7 +471,7 @@ traceId
 
 ### 第一批：不改变协议的修复
 
-XCodeAgent：
+DevAgent Studio：
 
 ```text
 1. APPLY / RECONCILE
@@ -509,7 +509,7 @@ springboot-template
     ↓
 按冻结协议生成 Package
 
-XCodeAgent
+DevAgent Studio
     ↓
 按同一协议解析和执行
 
@@ -518,7 +518,7 @@ XCodeAgent
 验证通过
 ```
 
-其中 `astSelector` 主要由 Template 向 XCodeAgent 对齐。
+其中 `astSelector` 主要由 Template 向 DevAgent Studio 对齐。
 
 `JSON_STRUCTURE_CHECK` 两端共同使用：
 
@@ -544,7 +544,7 @@ Golden Fixture
 springboot-template：
 负责协议生产、Release 合法性、Generate
 
-XCodeAgent：
+DevAgent Studio：
 负责协议消费、Workspace 增量执行、Validation
 
 双端：

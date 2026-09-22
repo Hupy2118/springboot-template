@@ -6,7 +6,7 @@ import { frontendRoot } from './profiles.mjs';
 import { GENERATED_MARKER } from './assembly-contract.mjs';
 
 const execute = promisify(execFile);
-export const statePath = path.join(frontendRoot, '.xcodeagent-template-workspace.json');
+export const statePath = path.join(frontendRoot, '.devagentstudio-template-workspace.json');
 
 async function files(root, prefix = '') {
   const entries = await readdir(root, { withFileTypes: true });

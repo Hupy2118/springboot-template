@@ -43,7 +43,7 @@ java -jar template-engine/engine-service/target/engine-service-1.0.0-SNAPSHOT.ja
   --spring.config.additional-location="file:$(pwd)/template-engine/engine-service/config/application-local.yml"
 ```
 
-`TEMPLATE_ENGINE_SOURCE_ROOT` 必须是模板源的绝对路径；没有默认相对路径。`application-local.yml` 固定绑定 `127.0.0.1`，仅适用于本机 XCodeAgent 的辅助 Runtime；它不提供应用层认证。
+`TEMPLATE_ENGINE_SOURCE_ROOT` 必须是模板源的绝对路径；没有默认相对路径。`application-local.yml` 固定绑定 `127.0.0.1`，仅适用于本机 DevAgent Studio 的辅助 Runtime；它不提供应用层认证。
 
 启动成功后，可用以下 URL 访问：
 
@@ -102,11 +102,11 @@ Tomcat 默认会在文件名中加入日期，例如 `access.2026-09-09.log`，�
 }
 ```
 
-预期 HTTP `200`、`Content-Type: application/zip`。在 Postman 选择 **Send and Download**；ZIP 应包含 `frontend/`、`backend/` 和 `.xcodeagent/template-state.json`。
+预期 HTTP `200`、`Content-Type: application/zip`。在 Postman 选择 **Send and Download**；ZIP 应包含 `frontend/`、`backend/` 和 `.devagentstudio/template-state.json`。
 
 ### 2. Update
 
-`/v1/update` 是无状态接口。先从 Generate ZIP 取出 `.xcodeagent/template-state.json`，将其完整 JSON 作为 `currentTemplateState` 传回：
+`/v1/update` 是无状态接口。先从 Generate ZIP 取出 `.devagentstudio/template-state.json`，将其完整 JSON 作为 `currentTemplateState` 传回：
 
 ```json
 {

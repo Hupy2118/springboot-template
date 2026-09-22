@@ -9,6 +9,6 @@ node_modules/
 dist/
 .eslintcache
 .quality
-.xcodeagent-template-workspace.json
+.devagentstudio-template-workspace.json
 .workspace-status-*
 .build-workspace-*

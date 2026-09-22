@@ -11,7 +11,7 @@ const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 
 const generatedRoot = path.join(frontendRoot, 'src');
 const releaseManifest = path.join(frontendRoot, 'base.yaml');
 const temporaryRoot = await mkdtemp(path.join(frontendRoot, '.assembly-verify-'));
-const ignored = new Set(['.xcodeagent-template-generated.json']);
+const ignored = new Set(['.devagentstudio-template-generated.json']);
 
 async function files(directory, prefix = '') {
   const entries = await readdir(directory, { withFileTypes: true });

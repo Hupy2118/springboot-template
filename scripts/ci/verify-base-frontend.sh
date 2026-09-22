@@ -3,7 +3,7 @@
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
-workspace=$(mktemp -d "${TMPDIR:-/tmp}/xcodeagent-base-frontend.XXXXXX")
+workspace=$(mktemp -d "${TMPDIR:-/tmp}/devagentstudio-base-frontend.XXXXXX")
 trap 'rm -rf "$workspace"' EXIT HUP INT TERM
 
 # The empty V2 project is exactly the declared Base. Do not copy ignored local modules.

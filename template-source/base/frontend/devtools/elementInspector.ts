@@ -1,9 +1,9 @@
-const INSPECTOR_CHANNEL = 'xcode-agent:element-inspector';
+const INSPECTOR_CHANNEL = 'devagentstudio:element-inspector';
 const INSPECTOR_VERSION = 1;
 const SOURCE_PATTERN = /^(\/src\/[^:]+):(\d+):(\d+)$/;
-const OVERLAY_CLASS = '__xcode-agent-element-inspector-overlay';
-const ACTIVE_CLASS = '__xcode-agent-element-inspector-active';
-const STYLE_ID = '__xcode-agent-element-inspector-style';
+const OVERLAY_CLASS = '__devagentstudio-element-inspector-overlay';
+const ACTIVE_CLASS = '__devagentstudio-element-inspector-active';
+const STYLE_ID = '__devagentstudio-element-inspector-style';
 
 type InspectorCommand = {
   channel: typeof INSPECTOR_CHANNEL;
@@ -19,7 +19,7 @@ type SourceLocation = {
 };
 
 type InspectorWindow = Window & {
-  __xcodeAgentElementInspectorCleanup__?: () => void;
+  __devAgentStudioElementInspectorCleanup__?: () => void;
 };
 
 /** 判断父窗口消息是否为受支持的审查启停命令。 */
@@ -80,8 +80,8 @@ function ensureOverlayStyle(): HTMLStyleElement {
         linear-gradient(0deg, #ff2d2d 50%, transparent 50%) 0 0 / 2px 10px repeat-y,
         linear-gradient(0deg, #ff2d2d 50%, transparent 50%) 100% 0 / 2px 10px repeat-y;
       animation:
-        xcode-agent-inspector-border-flow 0.65s linear infinite,
-        xcode-agent-inspector-glow 1.6s ease-in-out infinite;
+        devagentstudio-inspector-border-flow 0.65s linear infinite,
+        devagentstudio-inspector-glow 1.6s ease-in-out infinite;
       will-change: background-position, box-shadow;
     }
     .${OVERLAY_CLASS}::before {
@@ -104,12 +104,12 @@ function ensureOverlayStyle(): HTMLStyleElement {
       bottom: auto;
       border-radius: 0 0 3px 0;
     }
-    @keyframes xcode-agent-inspector-border-flow {
+    @keyframes devagentstudio-inspector-border-flow {
       to {
         background-position: 10px 0, -10px 100%, 0 -10px, 100% 10px;
       }
     }
-    @keyframes xcode-agent-inspector-glow {
+    @keyframes devagentstudio-inspector-glow {
       0%, 100% {
         box-shadow: 0 0 0 1px rgba(255, 45, 45, 0.18), 0 0 8px rgba(255, 45, 45, 0.2);
       }
@@ -133,7 +133,7 @@ function ensureOverlayStyle(): HTMLStyleElement {
 /** 安装预览 iframe 内元素审查器，并复用全局清理句柄避免热更新重复监听。 */
 export function installElementInspector(): () => void {
   const inspectorWindow = window as InspectorWindow;
-  inspectorWindow.__xcodeAgentElementInspectorCleanup__?.();
+  inspectorWindow.__devAgentStudioElementInspectorCleanup__?.();
 
   const style = ensureOverlayStyle();
   const overlay = document.createElement('div');
@@ -247,11 +247,11 @@ export function installElementInspector(): () => void {
     document.documentElement.classList.remove(ACTIVE_CLASS);
     overlay.remove();
     style.remove();
-    if (inspectorWindow.__xcodeAgentElementInspectorCleanup__ === cleanup) {
-      delete inspectorWindow.__xcodeAgentElementInspectorCleanup__;
+    if (inspectorWindow.__devAgentStudioElementInspectorCleanup__ === cleanup) {
+      delete inspectorWindow.__devAgentStudioElementInspectorCleanup__;
     }
   };
 
-  inspectorWindow.__xcodeAgentElementInspectorCleanup__ = cleanup;
+  inspectorWindow.__devAgentStudioElementInspectorCleanup__ = cleanup;
   return cleanup;
 }

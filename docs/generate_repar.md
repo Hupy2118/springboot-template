@@ -95,7 +95,7 @@ import type { PageRouteDefinition } from '@/typings/routes';
  * 大多数 Capability 新增页面时只需要修改这里。
  */
 export const capabilityPageRoutes: PageRouteDefinition[] = [
-  // xcodeagent:capability-page-routes
+  // devagentstudio:capability-page-routes
 ];
 
 /**
@@ -105,7 +105,7 @@ export const capabilityPageRoutes: PageRouteDefinition[] = [
  * 不使用主 Layout 的页面。
  */
 export const capabilityRootRoutes: RouteObject[] = [
-  // xcodeagent:capability-root-routes
+  // devagentstudio:capability-root-routes
 ];
 
 /**
@@ -116,7 +116,7 @@ export const capabilityRootRoutes: RouteObject[] = [
  */
 export const capabilityPageWrappers:
   Array<(element: ReactNode, page: PageRouteDefinition) => ReactNode> = [
-    // xcodeagent:capability-page-wrappers
+    // devagentstudio:capability-page-wrappers
   ];
 ```
 
@@ -248,7 +248,7 @@ frontend/src/capability-extensions/providers.tsx
 ```text
 Capability Provider 注册列表
 +
-xcodeagent:capability-providers Anchor
+devagentstudio:capability-providers Anchor
 ```
 
 例如：
@@ -263,7 +263,7 @@ import type { ComponentType, PropsWithChildren } from 'react';
  */
 export const capabilityProviders:
   ComponentType<PropsWithChildren>[] = [
-    // xcodeagent:capability-providers
+    // devagentstudio:capability-providers
   ];
 ```
 
@@ -311,7 +311,7 @@ export const useCapabilityMenus = (
 ): Route[] => {
   let current = menus;
 
-  // xcodeagent:capability-menu-transforms
+  // devagentstudio:capability-menu-transforms
 
   return current;
 };
@@ -526,7 +526,7 @@ export const capabilityPageRoutes = [
     pageId: 'page1',
     name: 'Page 1',
   },
-  // xcodeagent:capability-page-routes
+  // devagentstudio:capability-page-routes
 ];
 ```
 
@@ -553,7 +553,7 @@ CAPABILITY EXTENSION SURFACE
 
 允许：
 - 新增 import
-- 在 xcodeagent Anchor 前新增内容
+- 在 devagentstudio Anchor 前新增内容
 
 禁止：
 - 删除或修改 Anchor

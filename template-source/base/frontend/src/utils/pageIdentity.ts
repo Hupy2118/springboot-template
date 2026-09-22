@@ -8,13 +8,13 @@ function assertPageId(pageId: string) {
   }
 }
 
-/** 将 XcodeAgent pageId 转换为 React 页面目录名。 */
+/** 将 DevAgentStudio pageId 转换为 React 页面目录名。 */
 export function pageDirectoryFromId(pageId: string) {
   assertPageId(pageId);
   return pageId.split('_').map((segment) => segment[0].toUpperCase() + segment.slice(1)).join('');
 }
 
-/** 将 XcodeAgent pageId 转换为业务路由段。 */
+/** 将 DevAgentStudio pageId 转换为业务路由段。 */
 export function pageRouteSegmentFromId(pageId: string) {
   assertPageId(pageId);
   return pageId.replace(/_/g, '-');

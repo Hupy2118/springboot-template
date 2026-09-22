@@ -5,7 +5,7 @@
   "outputSchema": "route-projector-output.schema.json",
   "command": [
     "node",
-    "frontend/scripts/xcodeagent/route-projector.mjs",
+    "frontend/scripts/devagentstudio/route-projector.mjs",
     "apply"
   ]
 }

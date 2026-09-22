@@ -112,7 +112,7 @@ import ExcelExport from '@/pages/ExcelExport';
   path: '/excel-export',
   element: <ExcelExport />,
 },
-// xcodeagent:page-routes
+// devagentstudio:page-routes
 ```
 
 运行 `status` 后应出现一个 Import 和一个 Anchor insert。不要自行书写或改动 `managedMarker`；它由 Compiler 根据 Capability、Target、Anchor 自动生成。
@@ -238,12 +238,12 @@ unzip -t "$validation_dir/project.zip"
 
 # 新增文件、注册 Surface 与调用方持有的 State 都必须存在。
 unzip -Z1 "$validation_dir/project.zip" | rg -x \
-  'frontend/src/pages/Home/index.tsx|frontend/src/capability-extensions/routes.tsx|\.xcodeagent/template-state\.json'
+  'frontend/src/pages/Home/index.tsx|frontend/src/capability-extensions/routes.tsx|\.devagentstudio/template-state\.json'
 unzip -p "$validation_dir/project.zip" frontend/src/capability-extensions/routes.tsx | \
   rg -F "import Home from '@/pages/Home';"
 unzip -p "$validation_dir/project.zip" frontend/src/capability-extensions/routes.tsx | \
   rg -F "pageId: 'home'"
-unzip -p "$validation_dir/project.zip" .xcodeagent/template-state.json | \
+unzip -p "$validation_dir/project.zip" .devagentstudio/template-state.json | \
   rg -F '"excel-export"'
 ```
 

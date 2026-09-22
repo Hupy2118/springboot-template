@@ -204,7 +204,7 @@ generated/extensions/systemPageRoutes.ts
 generated/extensions/initializers.ts
 generated/extensions/errorReporters.ts
 
-.xcodeagent-template-generated.json
+.devagentstudio-template-generated.json
 ```
 
 这些内容不能进入：

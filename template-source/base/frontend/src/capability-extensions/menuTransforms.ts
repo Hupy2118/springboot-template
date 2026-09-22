@@ -8,6 +8,6 @@ import type { AppMenuItem } from '@/typings/menu';
  */
 export const useCapabilityMenuTransforms = (menus: AppMenuItem[]): AppMenuItem[] => {
   let current = menus;
-  // xcodeagent:capability-menu-transforms
+  // devagentstudio:capability-menu-transforms
   return current;
 };

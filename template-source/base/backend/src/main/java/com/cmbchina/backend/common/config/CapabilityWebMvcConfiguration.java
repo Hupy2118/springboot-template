@@ -15,6 +15,6 @@ public class CapabilityWebMvcConfiguration implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // xcodeagent:capability-interceptors
+        // devagentstudio:capability-interceptors
     }
 }

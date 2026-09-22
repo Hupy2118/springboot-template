@@ -7,9 +7,9 @@
 当前 Template Service 使用静态 Bearer Token 进行认证：
 
 ```text
-XCodeAgent
+DevAgent Studio
   │
-  │ Authorization: Bearer ${XCODEAGENT_TEMPLATE_ENGINE_TOKEN}
+  │ Authorization: Bearer ${DEVAGENTSTUDIO_TEMPLATE_ENGINE_TOKEN}
   ▼
 Template Service
   │
@@ -20,10 +20,10 @@ Template Service
 /v1/update
 ```
 
-现阶段 `XCODEAGENT_TEMPLATE_ENGINE_TOKEN` 使用固定值，例如：
+现阶段 `DEVAGENTSTUDIO_TEMPLATE_ENGINE_TOKEN` 使用固定值，例如：
 
 ```env
-XCODEAGENT_TEMPLATE_ENGINE_TOKEN=stage3-demo-token
+DEVAGENTSTUDIO_TEMPLATE_ENGINE_TOKEN=stage3-demo-token
 ```
 
 Template Service 再通过预配置的 SHA-256 摘要识别该固定 Token。
@@ -43,14 +43,14 @@ Template Service 再通过预配置的 SHA-256 摘要识别该固定 Token。
 
 当前阶段明确 Template Service 的定位：
 
-> Template Service 是 XCodeAgent 的本地辅助服务，不是独立对外开放的公共服务。
+> Template Service 是 DevAgent Studio 的本地辅助服务，不是独立对外开放的公共服务。
 
 本地部署模式调整为：
 
 ```text
 ┌────────────────────────────── 本机 ──────────────────────────────┐
 │                                                                  │
-│  XCodeAgent Backend                                              │
+│  DevAgent Studio Backend                                              │
 │        │                                                         │
 │        │ HTTP                                                    │
 │        │ http://127.0.0.1:18080                                  │
@@ -117,7 +117,7 @@ Principal
 Scope
 tokenSha256
 Authorization Bearer Header
-XCODEAGENT_TEMPLATE_ENGINE_TOKEN
+DEVAGENTSTUDIO_TEMPLATE_ENGINE_TOKEN
 TEMPLATE_ENGINE_LOCAL_FULL_TOKEN_SHA256
 TEMPLATE_ENGINE_LOCAL_PLAN_TOKEN_SHA256
 ```
@@ -228,7 +228,7 @@ springboot-template
     ├── Integration Tests
     └── README / 启动脚本
 
-XCodeAgent
+DevAgent Studio
 └── Backend
     ├── Settings
     ├── TemplateEngineClient
@@ -352,7 +352,7 @@ Authorization: Bearer xxx
 
 ```text
 template-engine/engine-service/
-src/main/java/com/xcodeagent/template/engine/service/
+src/main/java/com/devagentstudio/template/engine/service/
 TokenAuthenticator.java
 ```
 
@@ -429,7 +429,7 @@ scopes
 
 ```java
 @ConfigurationProperties(
-    prefix = "xcodeagent.template-engine"
+    prefix = "devagentstudio.template-engine"
 )
 public class TemplateEngineProperties {
 
@@ -464,7 +464,7 @@ server:
   address: 127.0.0.1
   port: ${TEMPLATE_ENGINE_PORT:18080}
 
-xcodeagent:
+devagentstudio:
   template-engine:
     source-root: ${TEMPLATE_ENGINE_SOURCE_ROOT}
 ```
@@ -606,11 +606,11 @@ server.address = 127.0.0.1
 
 ---
 
-## 3. 阶段二：移除 XCodeAgent 中的 Template Engine Token
+## 3. 阶段二：移除 DevAgent Studio 中的 Template Engine Token
 
 ### 3.1 删除 Settings 字段
 
-当前 XCodeAgent Backend：
+当前 DevAgent Studio Backend：
 
 ```python
 template_engine_base_url: str = ""
@@ -620,7 +620,7 @@ template_engine_token: str = ""
 并从：
 
 ```text
-XCODEAGENT_TEMPLATE_ENGINE_TOKEN
+DEVAGENTSTUDIO_TEMPLATE_ENGINE_TOKEN
 ```
 
 读取 Token。
@@ -635,16 +635,16 @@ template_engine_base_url: str = ""
 
 ```text
 template_engine_token
-XCODEAGENT_TEMPLATE_ENGINE_TOKEN
+DEVAGENTSTUDIO_TEMPLATE_ENGINE_TOKEN
 ```
 
 保留：
 
 ```text
-XCODEAGENT_TEMPLATE_ENGINE_BASE_URL
-XCODEAGENT_TEMPLATE_ENGINE_CONNECT_TIMEOUT_SECONDS
-XCODEAGENT_TEMPLATE_ENGINE_READ_TIMEOUT_SECONDS
-XCODEAGENT_TEMPLATE_PACKAGE_MAX_BYTES
+DEVAGENTSTUDIO_TEMPLATE_ENGINE_BASE_URL
+DEVAGENTSTUDIO_TEMPLATE_ENGINE_CONNECT_TIMEOUT_SECONDS
+DEVAGENTSTUDIO_TEMPLATE_ENGINE_READ_TIMEOUT_SECONDS
+DEVAGENTSTUDIO_TEMPLATE_PACKAGE_MAX_BYTES
 ```
 
 ---
@@ -721,7 +721,7 @@ headers={
 
 `update()` 同样删除 Authorization。
 
-最终 XCodeAgent 与 Template Service 的传输协议只包含：
+最终 DevAgent Studio 与 Template Service 的传输协议只包含：
 
 ```text
 HTTP Endpoint
@@ -772,30 +772,30 @@ TemplateEngineClient(
 删除：
 
 ```env
-XCODEAGENT_TEMPLATE_ENGINE_TOKEN=stage3-demo-token
+DEVAGENTSTUDIO_TEMPLATE_ENGINE_TOKEN=stage3-demo-token
 ```
 
 最终保留类似：
 
 ```env
 # Template Engine local service
-XCODEAGENT_TEMPLATE_ENGINE_BASE_URL=http://127.0.0.1:18080
-XCODEAGENT_TEMPLATE_ENGINE_CONNECT_TIMEOUT_SECONDS=10
-XCODEAGENT_TEMPLATE_ENGINE_READ_TIMEOUT_SECONDS=120
-XCODEAGENT_TEMPLATE_PACKAGE_MAX_BYTES=104857600
+DEVAGENTSTUDIO_TEMPLATE_ENGINE_BASE_URL=http://127.0.0.1:18080
+DEVAGENTSTUDIO_TEMPLATE_ENGINE_CONNECT_TIMEOUT_SECONDS=10
+DEVAGENTSTUDIO_TEMPLATE_ENGINE_READ_TIMEOUT_SECONDS=120
+DEVAGENTSTUDIO_TEMPLATE_PACKAGE_MAX_BYTES=104857600
 ```
 
 同时删除所有“Renderer 不持有此凭据”“Engine token”等已经失效的说明。
 
 ---
 
-### 3.6 修改 XCodeAgent 测试
+### 3.6 修改 DevAgent Studio 测试
 
 全局搜索：
 
 ```text
 template_engine_token
-XCODEAGENT_TEMPLATE_ENGINE_TOKEN
+DEVAGENTSTUDIO_TEMPLATE_ENGINE_TOKEN
 Bearer
 stage3-demo-token
 test-token
@@ -842,7 +842,7 @@ Engine 错误透传
 
 ## 4. 迁移顺序
 
-为了避免 Template Service 与 XCodeAgent 必须同时升级，采用服务端优先迁移。
+为了避免 Template Service 与 DevAgent Studio 必须同时升级，采用服务端优先迁移。
 
 ### Step 1：先升级 Template Service
 
@@ -862,7 +862,7 @@ Engine 错误透传
 不要求 Authorization Header
 ```
 
-旧 XCodeAgent 仍然会发送：
+旧 DevAgent Studio 仍然会发送：
 
 ```http
 Authorization: Bearer stage3-demo-token
@@ -873,7 +873,7 @@ Authorization: Bearer stage3-demo-token
 因此这一阶段具备向后兼容性：
 
 ```text
-旧 XCodeAgent
+旧 DevAgent Studio
    ↓ 带无效但无害的 Authorization Header
 新 Template Service
    ↓
@@ -914,12 +914,12 @@ lsof -nP -iTCP:18080 -sTCP:LISTEN
 
 ---
 
-### Step 3：再升级 XCodeAgent
+### Step 3：再升级 DevAgent Studio
 
 删除：
 
 ```text
-XCODEAGENT_TEMPLATE_ENGINE_TOKEN
+DEVAGENTSTUDIO_TEMPLATE_ENGINE_TOKEN
 template_engine_token
 TemplateEngineClient.token
 Authorization Bearer Header
@@ -928,7 +928,7 @@ Authorization Bearer Header
 此时：
 
 ```text
-新 XCodeAgent
+新 DevAgent Studio
     ↓ 无 Authorization
 新 Template Service
     ↓
@@ -943,7 +943,7 @@ Authorization Bearer Header
 
 ```bash
 rg -n \
-  "XCODEAGENT_TEMPLATE_ENGINE_TOKEN|\
+  "DEVAGENTSTUDIO_TEMPLATE_ENGINE_TOKEN|\
 TEMPLATE_ENGINE_LOCAL_FULL_TOKEN_SHA256|\
 TEMPLATE_ENGINE_LOCAL_PLAN_TOKEN_SHA256|\
 TokenAuthenticator|\
@@ -977,7 +977,7 @@ Template Package / 文件内容 SHA-256
 ### 5.1 Local Mode
 
 ```text
-XCodeAgent
+DevAgent Studio
    ↓
 127.0.0.1
    ↓
@@ -999,9 +999,9 @@ Loopback only
 未来如果 Template Service 需要共享部署：
 
 ```text
-XCodeAgent A ─┐
-XCodeAgent B ─┼──── Enterprise Auth Layer
-XCodeAgent C ─┘              │
+DevAgent Studio A ─┐
+DevAgent Studio B ─┼──── Enterprise Auth Layer
+DevAgent Studio C ─┘              │
                               ▼
                        Template Service
 ```
@@ -1080,7 +1080,7 @@ TemplateStateV2
 TokenAuthenticator
 TemplateEngineProperties.Principal
 
-XCODEAGENT_TEMPLATE_ENGINE_TOKEN
+DEVAGENTSTUDIO_TEMPLATE_ENGINE_TOKEN
 
 TEMPLATE_ENGINE_LOCAL_FULL_TOKEN_SHA256
 TEMPLATE_ENGINE_LOCAL_PLAN_TOKEN_SHA256
@@ -1100,7 +1100,7 @@ template.update
 应继续存在：
 
 ```text
-XCODEAGENT_TEMPLATE_ENGINE_BASE_URL
+DEVAGENTSTUDIO_TEMPLATE_ENGINE_BASE_URL
 TEMPLATE_ENGINE_SOURCE_ROOT
 
 Template Package SHA-256
@@ -1127,11 +1127,11 @@ Capability State
 - Generate / Update 的业务行为与改造前一致。
 - Golden / Reconcile / Idempotency 测试通过。
 
-### 7.2 XCodeAgent
+### 7.2 DevAgent Studio
 
 必须满足：
 
-- 不再读取 `XCODEAGENT_TEMPLATE_ENGINE_TOKEN`。
+- 不再读取 `DEVAGENTSTUDIO_TEMPLATE_ENGINE_TOKEN`。
 - `Settings` 不再包含 `template_engine_token`。
 - `TemplateEngineClient` 不再接收 token 参数。
 - Generate / Update 请求不发送 Authorization Header。
@@ -1144,7 +1144,7 @@ Capability State
 执行全仓搜索后：
 
 ```text
-XCODEAGENT_TEMPLATE_ENGINE_TOKEN
+DEVAGENTSTUDIO_TEMPLATE_ENGINE_TOKEN
 TEMPLATE_ENGINE_LOCAL_FULL_TOKEN_SHA256
 TEMPLATE_ENGINE_LOCAL_PLAN_TOKEN_SHA256
 TokenAuthenticator
@@ -1184,7 +1184,7 @@ lsof -nP -iTCP:18080 -sTCP:LISTEN
 ┌──────────────────────────────────────────────────────┐
 │ Local Machine                                        │
 │                                                      │
-│  XCodeAgent Backend                                  │
+│  DevAgent Studio Backend                                  │
 │      │                                               │
 │      │ HTTP / no credential                          │
 │      ▼                                               │
@@ -1205,7 +1205,7 @@ lsof -nP -iTCP:18080 -sTCP:LISTEN
 
                     Future Enterprise Mode
 
-XCodeAgent
+DevAgent Studio
     │
     ▼
 Enterprise Authentication Layer

@@ -248,7 +248,7 @@ async function assemble() {
     await mkdir(path.dirname(target), { recursive: true });
     await writeFile(target, content);
   }
-  await writeFile(path.join(destination, '.xcodeagent-template-generated.json'), `${JSON.stringify({
+  await writeFile(path.join(destination, '.devagentstudio-template-generated.json'), `${JSON.stringify({
     generated: true,
     profile: profile || 'custom',
     extensions: selected.map((extension) => extension.id),

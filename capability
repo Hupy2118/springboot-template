@@ -10,4 +10,4 @@ CLASSPATH="$CLASSPATH:$HOME/.m2/repository/com/fasterxml/jackson/core/jackson-co
 CLASSPATH="$CLASSPATH:$HOME/.m2/repository/com/fasterxml/jackson/core/jackson-databind/2.13.4/jackson-databind-2.13.4.jar"
 CLASSPATH="$CLASSPATH:$HOME/.m2/repository/com/fasterxml/jackson/dataformat/jackson-dataformat-yaml/2.13.4/jackson-dataformat-yaml-2.13.4.jar"
 CLASSPATH="$CLASSPATH:$HOME/.m2/repository/org/yaml/snakeyaml/1.30/snakeyaml-1.30.jar"
-exec java -cp "$CLASSPATH" com.xcodeagent.template.authoring.CapabilityCli "$@"
+exec java -cp "$CLASSPATH" com.devagentstudio.template.authoring.CapabilityCli "$@"

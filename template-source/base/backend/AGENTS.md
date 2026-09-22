@@ -5,7 +5,7 @@
 修改代码前必须参考：
 
 - `docs/project-structure.md`：工程结构、分层职责和依赖方向。
-- `.xcodeagent/context/codebase-manifest.json`：当前工程有效架构视图；仅当该文件存在时必须参考。
+- `.devagentstudio/context/codebase-manifest.json`：当前工程有效架构视图；仅当该文件存在时必须参考。
 
 ## Code Change Rules
 

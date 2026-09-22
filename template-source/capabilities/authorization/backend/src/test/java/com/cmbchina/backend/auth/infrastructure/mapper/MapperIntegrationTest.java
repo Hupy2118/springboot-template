@@ -19,7 +19,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@SpringBootTest(properties = "xcodeagent.authorization.bootstrap-on-startup=false")
+@SpringBootTest(properties = "devagentstudio.authorization.bootstrap-on-startup=false")
 @Transactional
 @EnabledIfEnvironmentVariable(named = "RUN_MYSQL_INTEGRATION", matches = "true")
 class MapperIntegrationTest {

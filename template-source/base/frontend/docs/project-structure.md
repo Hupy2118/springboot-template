@@ -30,8 +30,8 @@ src/
 
 ## 页面与路由
 
-- 共享业务页面路由由 Template Route Projector 统一注册到 `src/constants/routes.tsx` 的 `XCODEAGENT_BUSINESS_ROUTES_START/END` 受管区域。Page Agent 只负责生成 `src/pages/<Feature>/` 页面实现，不得直接编辑该区域。
-- Route Projector 位于 `scripts/xcodeagent/route-projector.mjs`，只接受 `route-projector.v2`。其 Descriptor、Input Schema 与 Output Schema 分别投影至 `.xcodeagent/template-contracts/route-projector.json`、`route-projector-input.schema.json`、`route-projector-output.schema.json`；调用方只通过这些公开契约调用它。
+- 共享业务页面路由由 Template Route Projector 统一注册到 `src/constants/routes.tsx` 的 `DEVAGENTSTUDIO_BUSINESS_ROUTES_START/END` 受管区域。Page Agent 只负责生成 `src/pages/<Feature>/` 页面实现，不得直接编辑该区域。
+- Route Projector 位于 `scripts/devagentstudio/route-projector.mjs`，只接受 `route-projector.v2`。其 Descriptor、Input Schema 与 Output Schema 分别投影至 `.devagentstudio/template-contracts/route-projector.json`、`route-projector-input.schema.json`、`route-projector-output.schema.json`；调用方只通过这些公开契约调用它。
 - Projector 按 `pageId → PascalCase 页面目录 → src/pages/<PageDirectory>/index.tsx` 判断页面是否存在。仅非链接的普通 `index.tsx` 进入 `appliedPageIds`；缺失、目录、链接或其他非普通入口进入 `skippedPageIds`。`welcome` 与 Capability 平台页面等保留 ID 由模板内部拒绝，调用方不维护该集合。
 - Projector 每次以当前输入顺序全量 reconcile 受管区域，stdout 只输出 `status`、`requestedPageIds`、`appliedPageIds`、`skippedPageIds`。它先完成全部校验和内存生成，再通过同目录临时文件、`fsync`、rename 替换写入；Windows 遇到短暂的占用错误会有限重试。写入保持原文件的换行符约定，避免不同系统的 checkout 设置产生伪变更。
 - 所有进入主 Layout 的页面（业务、系统和 Capability）必须使用小写 snake_case `pageId`。例如 `asset_list` 对应 `src/pages/AssetList/index.tsx` 和 `/page/asset-list`。

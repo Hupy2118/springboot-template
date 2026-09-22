@@ -37,13 +37,13 @@ pnpm verify:update:authorization
 
 Authorization 自动包含 Login 依赖，因此修改已有 Login 文件仍会回写 Login。Extension Workspace 中修改或删除 Base 文件是允许的，但必须完成下游组合构建验证。
 
-Provider、Root Route、Page Route、Initializer、Error Reporter 和依赖关系属于 Extension Contract，直接修改 `extensions/<id>/extension.yaml`，随后重新运行 dev 或 build。绝不能直接修改 `src/generated/extensions/*` 或 `.xcodeagent-template-generated.json`；它们由 Assembly 管理且 Sync 会忽略。
+Provider、Root Route、Page Route、Initializer、Error Reporter 和依赖关系属于 Extension Contract，直接修改 `extensions/<id>/extension.yaml`，随后重新运行 dev 或 build。绝不能直接修改 `src/generated/extensions/*` 或 `.devagentstudio-template-generated.json`；它们由 Assembly 管理且 Sync 会忽略。
 
 ## Full 与 Workspace 管理
 
 `pnpm dev:full` 和 `pnpm build:full` 用于 Base + Login + Authorization 集成验证。Full 没有 `editTarget`，不可 Sync，也不构成新的源码边界。
 
-`pnpm build:<profile>` 会临时备份当前 `src` 及 `.xcodeagent-template-workspace.json`、组装目标 Profile 并构建，最后原样恢复备份。因此可以在任何开发 Workspace 中运行构建，未同步修改也不会被覆盖。
+`pnpm build:<profile>` 会临时备份当前 `src` 及 `.devagentstudio-template-workspace.json`、组装目标 Profile 并构建，最后原样恢复备份。因此可以在任何开发 Workspace 中运行构建，未同步修改也不会被覆盖。
 
 若明确放弃未同步 Workspace 修改，可使用 `pnpm reset:<profile>`；`materialize:base` 与 `materialize:full` 是面向预览/发布的等价快捷命令。
 

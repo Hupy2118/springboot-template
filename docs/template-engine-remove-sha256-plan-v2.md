@@ -620,7 +620,7 @@ nextStateDigest
 payloadManifest[*].sha256
 ```
 
-可能影响 XCodeAgent 或其他 Package Consumer。
+可能影响 DevAgent Studio 或其他 Package Consumer。
 
 实施前必须搜索：
 
@@ -656,7 +656,7 @@ consumer
 
 #### 方案 A：同步升级
 
-Template Engine 和全部 XCodeAgent / Consumer 在同一版本窗口升级。
+Template Engine 和全部 DevAgent Studio / Consumer 在同一版本窗口升级。
 
 适用于内部系统强一致发布。
 
@@ -717,7 +717,7 @@ Template Engine 单仓验收只验证自身 Package Contract、生成结果与�
 ```text
 Template Engine Package
         ↓
-外部 XCodeAgent / 调用方
+外部 DevAgent Studio / 调用方
         ↓
 Workspace Apply
         ↓
@@ -976,7 +976,7 @@ digest-derived packageId
 
 ## 22. 步骤 6：检查所有 Package Consumer
 
-在 XCodeAgent / Consumer 仓库搜索：
+在 DevAgent Studio / Consumer 仓库搜索：
 
 ```text
 packageId
@@ -1164,7 +1164,7 @@ Workspace Apply
 State Persist
 ```
 
-它们应放入跨仓库 E2E 验收，由 XCodeAgent / 实际调用方执行。
+它们应放入跨仓库 E2E 验收，由 DevAgent Studio / 实际调用方执行。
 
 ---
 
@@ -1267,7 +1267,7 @@ Authentication regression tests
 ```text
 Workspace abstraction
 Workspace Apply runtime
-XCodeAgent state repository
+DevAgent Studio state repository
 调用方 State Persist
 ```
 
@@ -1280,7 +1280,7 @@ XCodeAgent state repository
 ```text
 Template Engine
    ↓
-真实 XCodeAgent / Consumer
+真实 DevAgent Studio / Consumer
    ↓
 Package Parse
    ↓
@@ -1294,7 +1294,7 @@ Consumer State Persist
 该测试可以位于：
 
 ```text
-XCodeAgent 仓库
+DevAgent Studio 仓库
 独立 integration repository
 发布流水线
 ```
@@ -1402,7 +1402,7 @@ Security Layer 的 SHA-256 是否移除，不属于本次默认改造范围。
 15. template-engine 本仓库集成测试只验证 Service/Core/Package Contract，
     不要求实现 Workspace Apply 或 State Persist。
 
-16. Workspace Apply / State Persist 属于外部 XCodeAgent/调用方职责，
+16. Workspace Apply / State Persist 属于外部 DevAgent Studio/调用方职责，
     仅作为跨仓库 E2E 发布门槛。
 
 17. 跨仓库 E2E 必须验证：

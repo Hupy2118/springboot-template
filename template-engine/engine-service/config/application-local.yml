@@ -2,6 +2,6 @@ server:
   address: 127.0.0.1
   port: ${TEMPLATE_ENGINE_PORT:18080}
 
-xcodeagent:
+devagentstudio:
   template-engine:
     source-root: ${TEMPLATE_ENGINE_SOURCE_ROOT}

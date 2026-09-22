@@ -1,30 +1,30 @@
 # Route Projection 模板契约化改造方案
 
-> 适用范围  
-> - XCodeAgent：`YYYWYF/XCodeAgent`，`dev_agent` 分支  
-> - Template：`Hupy2118/springboot-template`，`template_refactor` 分支  
-> - 目标：移除 XCodeAgent 中对 `routes.tsx`、`PAGE_ROUTES`、marker、import、React Router 结构等模板实现细节的硬编码；Route Projection 作为一个确定性的 Platform Action 在 Build DAG 中可见，由模板工程负责具体路由投影实现。
+> 适用范围
+> - DevAgent Studio：`YYYWYF/DevAgentStudio`，`dev_agent` 分支
+> - Template：`Hupy2118/springboot-template`，`template_refactor` 分支
+> - 目标：移除 DevAgent Studio 中对 `routes.tsx`、`PAGE_ROUTES`、marker、import、React Router 结构等模板实现细节的硬编码；Route Projection 作为一个确定性的 Platform Action 在 Build DAG 中可见，由模板工程负责具体路由投影实现。
 
 ---
 
-# 1. 基本契约：XCodeAgent 与模板工程如何协作
+# 1. 基本契约：DevAgent Studio 与模板工程如何协作
 
 ## 1.1 当前问题
 
-当前 XCodeAgent 的 `Backend/app/services/route_projection.py` 同时承担两类职责：
+当前 DevAgent Studio 的 `Backend/app/services/route_projection.py` 同时承担两类职责：
 
 1. 从规划产物中识别有哪些业务页面；
 2. 理解当前前端模板的具体实现，并直接写入：
    - `frontend/src/constants/routes.tsx`
-   - `XCODEAGENT_BUSINESS_ROUTE_IMPORTS_START/END`
-   - `XCODEAGENT_BUSINESS_ROUTES_START/END`
+   - `DEVAGENTSTUDIO_BUSINESS_ROUTE_IMPORTS_START/END`
+   - `DEVAGENTSTUDIO_BUSINESS_ROUTES_START/END`
    - React Component import
    - `path`
    - `menu`
    - `element`
    - `resourceKey`
 
-这导致 XCodeAgent 与模板实现强耦合。
+这导致 DevAgent Studio 与模板实现强耦合。
 
 当前模板已经采用“页面身份驱动”的路由机制：
 
@@ -54,7 +54,7 @@ createLayoutMenus()
 Menu
 ```
 
-因此 XCodeAgent 不应该继续自己理解并渲染 `PAGE_ROUTES` 的具体 TSX 结构。
+因此 DevAgent Studio 不应该继续自己理解并渲染 `PAGE_ROUTES` 的具体 TSX 结构。
 
 ---
 
@@ -67,7 +67,7 @@ ProductPlan / TechnicalPlan / authorization_manifest
                      │
                      │ 业务事实
                      ▼
-                XCodeAgent
+                DevAgent Studio
                      │
                      │ 判断本次是否需要 Route Projection
                      │ 并在 Build DAG 中显式生成 Platform Action
@@ -84,9 +84,9 @@ ProductPlan / TechnicalPlan / authorization_manifest
 
 核心原则：
 
-### XCodeAgent 负责 What
+### DevAgent Studio 负责 What
 
-XCodeAgent 负责确定：
+DevAgent Studio 负责确定：
 
 - 当前应用有哪些业务页面；
 - 稳定 `pageId`；
@@ -117,7 +117,7 @@ Template 负责决定：
 
 一句话：
 
-> XCodeAgent 决定“哪些页面需要被投影”，Template 决定“这些页面如何在当前模板版本中落成真实路由”。
+> DevAgent Studio 决定“哪些页面需要被投影”，Template 决定“这些页面如何在当前模板版本中落成真实路由”。
 
 ---
 
@@ -232,7 +232,7 @@ name
 resourceKey（可选）
 ```
 
-因此 XCodeAgent 只从两个权威来源取值：
+因此 DevAgent Studio 只从两个权威来源取值：
 
 ```text
 ProductPlan.pages
@@ -272,7 +272,7 @@ authorization_manifest
 - Endpoint / Action binding 与路由注册无关，不传给模板；
 - 该对象只存在于运行时内存 / stdin，不落盘，不成为新的 Planning Artifact。
 
-XCodeAgent 的组装逻辑保持非常轻量：
+DevAgent Studio 的组装逻辑保持非常轻量：
 
 ```python
 def build_route_projector_input(product_plan, authorization_manifest):
@@ -301,7 +301,7 @@ def build_route_projector_input(product_plan, authorization_manifest):
 
 > 在执行 Route Projector 前，把两个已有权威来源裁剪成模板真正需要的最小运行时 DTO。
 
-XCodeAgent 不允许加入：
+DevAgent Studio 不允许加入：
 
 ```text
 pageKey
@@ -439,7 +439,7 @@ apply
 例如：
 
 ```bash
-node frontend/scripts/xcodeagent/route-projector.mjs apply
+node frontend/scripts/devagentstudio/route-projector.mjs apply
 ```
 
 职责：
@@ -470,7 +470,7 @@ resourceKey（可选）
 当前 authorization_manifest
 ```
 
-但这两个上游产物只由 XCodeAgent 读取。XCodeAgent 先合成为：
+但这两个上游产物只由 DevAgent Studio 读取。DevAgent Studio 先合成为：
 
 ```text
 最小 RouteProjectorInput
@@ -505,10 +505,10 @@ Template Route Projector 实际只看到这个 DTO：
 
 ## 1.6 Template Projector 的发现契约
 
-XCodeAgent 不能把：
+DevAgent Studio 不能把：
 
 ```text
-frontend/scripts/xcodeagent/route-projector.mjs
+frontend/scripts/devagentstudio/route-projector.mjs
 ```
 
 写死在 Python 中。
@@ -523,15 +523,15 @@ template-source/base/
 │   └── route-projector.json
 └── frontend/
     └── scripts/
-        └── xcodeagent/
+        └── devagentstudio/
             └── route-projector.mjs
 ```
 
 生成到 Workspace：
 
 ```text
-.xcodeagent/template-contracts/route-projector.json
-frontend/scripts/xcodeagent/route-projector.mjs
+.devagentstudio/template-contracts/route-projector.json
+frontend/scripts/devagentstudio/route-projector.mjs
 ```
 
 Descriptor V1：
@@ -542,16 +542,16 @@ Descriptor V1：
   "protocol": "route-projector.v1",
   "command": [
     "node",
-    "frontend/scripts/xcodeagent/route-projector.mjs",
+    "frontend/scripts/devagentstudio/route-projector.mjs",
     "apply"
   ]
 }
 ```
 
-XCodeAgent 只知道统一发现入口：
+DevAgent Studio 只知道统一发现入口：
 
 ```text
-.xcodeagent/template-contracts/route-projector.json
+.devagentstudio/template-contracts/route-projector.json
 ```
 
 至于：
@@ -713,7 +713,7 @@ acceptance_criteria
 
 ## 1.10 如何决定是否把 Route Projection 加入 DAG
 
-当前版本仍由 XCodeAgent 从：
+当前版本仍由 DevAgent Studio 从：
 
 ```text
 Confirmed ProductPlan
@@ -1035,7 +1035,7 @@ pageId
 
 Route Projector 只负责注册页面身份和权限事实，不负责注入组件实现。
 
-同时也不由 XCodeAgent 自己把 ProductPlan.path 翻译成 React Router path。
+同时也不由 DevAgent Studio 自己把 ProductPlan.path 翻译成 React Router path。
 
 ### 特殊动态路由
 
@@ -1076,7 +1076,7 @@ template-source/base/contracts/route-projector.json
   "protocol": "route-projector.v1",
   "command": [
     "node",
-    "frontend/scripts/xcodeagent/route-projector.mjs",
+    "frontend/scripts/devagentstudio/route-projector.mjs",
     "apply"
   ]
 }
@@ -1091,12 +1091,12 @@ template-source/base/base.yaml
 声明生成：
 
 ```text
-.xcodeagent/template-contracts/route-projector.json
+.devagentstudio/template-contracts/route-projector.json
 ```
 
 目的：
 
-> Projector 入口属于 Template Source Contract，而不是 XCodeAgent 配置。
+> Projector 入口属于 Template Source Contract，而不是 DevAgent Studio 配置。
 
 ---
 
@@ -1105,7 +1105,7 @@ template-source/base/base.yaml
 新增：
 
 ```text
-template-source/base/frontend/scripts/xcodeagent/route-projector.mjs
+template-source/base/frontend/scripts/devagentstudio/route-projector.mjs
 ```
 
 职责：
@@ -1122,7 +1122,7 @@ stdin 读取最小 RouteProjectorInput
 更新受管区域
 ```
 
-这里的 Route Projector **不读取 ProductPlan、TechnicalPlan 或 authorization_manifest 原始结构**；上游事实已经由 XCodeAgent 合成为最小 DTO 后再通过 stdin 传入模板。
+这里的 Route Projector **不读取 ProductPlan、TechnicalPlan 或 authorization_manifest 原始结构**；上游事实已经由 DevAgent Studio 合成为最小 DTO 后再通过 stdin 传入模板。
 
 注意：
 
@@ -1136,15 +1136,15 @@ Route Projector 不创建页面实现
 
 不调用 LLM。
 
-不读取 XCodeAgent Python renderer。
+不读取 DevAgent Studio Python renderer。
 
-不依赖 XCodeAgent 知道 TSX 结构。
+不依赖 DevAgent Studio 知道 TSX 结构。
 
 ---
 
 ## 2.3 Projector 输入处理
 
-Template Route Projector 不再理解 ProductPlan、TechnicalPlan 或 authorization_manifest 的原始结构，只消费 XCodeAgent 已经组装好的最小运行时输入：
+Template Route Projector 不再理解 ProductPlan、TechnicalPlan 或 authorization_manifest 的原始结构，只消费 DevAgent Studio 已经组装好的最小运行时输入：
 
 ```json
 {
@@ -1171,7 +1171,7 @@ authorization pageId 是否存在于 ProductPlan
 Endpoint / Action reference 是否匹配
 ```
 
-这些属于 XCodeAgent 上游规划与权限编译阶段的职责。
+这些属于 DevAgent Studio 上游规划与权限编译阶段的职责。
 
 Route Projector 只保留两类最基本检查：
 
@@ -1254,13 +1254,13 @@ pageId
 当前模板可以继续使用：
 
 ```text
-XCODEAGENT_BUSINESS_ROUTE_IMPORTS_START/END
-XCODEAGENT_BUSINESS_ROUTES_START/END
+DEVAGENTSTUDIO_BUSINESS_ROUTE_IMPORTS_START/END
+DEVAGENTSTUDIO_BUSINESS_ROUTES_START/END
 ```
 
 但这些字符串只允许出现在 Template Repository。
 
-XCodeAgent 不允许再：
+DevAgent Studio 不允许再：
 
 ```text
 引用 marker
@@ -1290,7 +1290,7 @@ Projector 不允许 append：
 事实来源：
 ProductPlan.pages + authorization_manifest
         ↓
-由 XCodeAgent 合成为最小 RouteProjectorInput
+由 DevAgent Studio 合成为最小 RouteProjectorInput
         ↓
 Template Projector 只消费该 DTO
         ↓
@@ -1501,7 +1501,7 @@ template-source/base/frontend/docs/project-structure.md
 
 ```text
 contracts/route-projector.json
-frontend/scripts/xcodeagent/route-projector.mjs
+frontend/scripts/devagentstudio/route-projector.mjs
 相关测试脚本
 ```
 
@@ -1515,12 +1515,12 @@ template-source/base/base.yaml
 
 ---
 
-# 3. XCodeAgent 改造步骤
+# 3. DevAgent Studio 改造步骤
 
 仓库：
 
 ```text
-YYYWYF/XCodeAgent
+YYYWYF/DevAgentStudio
 branch: dev_agent
 ```
 
@@ -1549,7 +1549,7 @@ _write_text_atomically()
 模板 PageKey / path 推导
 ```
 
-最终不再由 XCodeAgent 直接写：
+最终不再由 DevAgent Studio 直接写：
 
 ```text
 frontend/src/constants/routes.tsx
@@ -1603,7 +1603,7 @@ Backend/app/services/template_route_projector.py
 固定读取：
 
 ```text
-<workspace>/.xcodeagent/template-contracts/route-projector.json
+<workspace>/.devagentstudio/template-contracts/route-projector.json
 ```
 
 例如：
@@ -1732,7 +1732,7 @@ action_implementations
 
 ## 3.6 从最近一次成功 Build Run 读取 Route Facts
 
-不再要求 XCodeAgent 从上一 Build 反查：
+不再要求 DevAgent Studio 从上一 Build 反查：
 
 ```text
 旧 ProductPlan
@@ -1998,7 +1998,7 @@ pageId/resourceKey
 verify_route_projection(...)
 ```
 
-这种 XCodeAgent 自己理解模板源码的 EDD。
+这种 DevAgent Studio 自己理解模板源码的 EDD。
 
 但不新增：
 
@@ -2086,7 +2086,7 @@ plans/build-runs/<build_run_id>.json
 
 失败 Build Run 不写新的成功基线。
 
-## 3.14 XCodeAgent 测试调整
+## 3.14 DevAgent Studio 测试调整
 
 ### 删除旧 renderer 测试
 
@@ -2163,7 +2163,7 @@ Projector failed
 
 ```text
 template-source/base/contracts/route-projector.json
-template-source/base/frontend/scripts/xcodeagent/route-projector.mjs
+template-source/base/frontend/scripts/devagentstudio/route-projector.mjs
 ```
 
 预计修改：
@@ -2182,7 +2182,7 @@ template-source/base/frontend/docs/project-structure.md
 
 ---
 
-## 4.2 XCodeAgent Repository
+## 4.2 DevAgent Studio Repository
 
 预计新增：
 
@@ -2237,11 +2237,11 @@ Backend/app/services/route_projection.py
 7. base.yaml 声明
 ```
 
-此阶段 XCodeAgent 暂不切换。
+此阶段 DevAgent Studio 暂不切换。
 
 ---
 
-## Stage 2：XCodeAgent 增加 Projector Adapter
+## Stage 2：DevAgent Studio 增加 Projector Adapter
 
 实现：
 
@@ -2328,10 +2328,10 @@ Build DAG.platform_route_projection
 
 # 6. 最终验收标准
 
-1. XCodeAgent 中不存在 `frontend/src/constants/routes.tsx` 硬编码路径。
-2. XCodeAgent 中不存在业务路由 marker 常量。
-3. XCodeAgent 中不存在 `PAGE_ROUTES` TSX renderer。
-4. XCodeAgent 不再生成 Component import，也不生成或传递 `component` 字段。
+1. DevAgent Studio 中不存在 `frontend/src/constants/routes.tsx` 硬编码路径。
+2. DevAgent Studio 中不存在业务路由 marker 常量。
+3. DevAgent Studio 中不存在 `PAGE_ROUTES` TSX renderer。
+4. DevAgent Studio 不再生成 Component import，也不生成或传递 `component` 字段。
 5. Build DAG 不再保存 `route_projection.pages`。
 6. Route Projection 的页面身份只读取 ProductPlan.pages；TechnicalPlan.pages 不参与 Route Projection。
 7. Route Projector Input 仅包含 `pageId / name / resourceKey（可选）`，并且只作为运行时 DTO。
@@ -2351,8 +2351,8 @@ Build DAG.platform_route_projection
 21. Route Projector 只在所有正常业务 Build Task 成功后执行。
 22. Projector 失败会使 `platform_route_projection` Task 失败。
 23. Projector 产生的 Workspace Change 继续记录为平台动作，不混入 Agent Task Change Set。
-24. Descriptor 缺失时失败，不回退旧 XCodeAgent renderer。
-25. Template Revision 改变路由实现时，只修改 Template Projector，不修改 XCodeAgent Route renderer。
+24. Descriptor 缺失时失败，不回退旧 DevAgent Studio renderer。
+25. Template Revision 改变路由实现时，只修改 Template Projector，不修改 DevAgent Studio Route renderer。
 26. 失败 Build Run 不得覆盖上一成功 Build 的 `routeFacts` 基线。
 27. 成功 Build Run 即使未执行 Route Projection，也必须保存当前 `routeFacts`。
 28. 旧 Build Run 缺少 `routeFacts` 时，下次 Build 强制执行一次 Route Projection，不迁移旧 `route_projection.pages`。
@@ -2372,17 +2372,17 @@ Build DAG.platform_route_projection
 5. Route Facts 与 Route Projector Input 使用同一组最小字段：`pageId / name / resourceKey（可选）`。
 6. Route Projection 节点由 DAG Assembly 确定性追加。
 7. 不让 LLM 生成 route_projection platform task。
-8. 不把旧 route_projection renderer 搬到另一个 XCodeAgent Python 文件。
-9. 不把旧 renderer 简单搬成 XCodeAgent YAML 模板。
+8. 不把旧 route_projection renderer 搬到另一个 DevAgent Studio Python 文件。
+9. 不把旧 renderer 简单搬成 DevAgent Studio YAML 模板。
 10. Template Projector 必须确定性执行，禁止调用 LLM。
-11. XCodeAgent 不解析 routes.tsx 来重新理解模板业务路由结构。
+11. DevAgent Studio 不解析 routes.tsx 来重新理解模板业务路由结构。
 12. Template Projector 不读取或修改 TechnicalPlan，也不修改 ProductPlan。
 13. Template Projector 不生成业务页面 placeholder。
 14. Descriptor 缺失必须失败，不允许 silent fallback。
 15. Template Projector 必须做全量 reconcile，不允许 append-only。
 16. 当前阶段不新增 Route validate / verify 生命周期节点。
 17. 当前阶段不把其他 Platform Projection 一并重构进 DAG。
-18. XCodeAgent 测试只验证 Route Facts 判断、DAG 生命周期和 Projector 调用，不验证 PAGE_ROUTES 具体文本。
+18. DevAgent Studio 测试只验证 Route Facts 判断、DAG 生命周期和 Projector 调用，不验证 PAGE_ROUTES 具体文本。
 19. 禁止为了“路由完整”向 Projector Input 增加 `componentPath`、`componentName` 或显式 import 信息。
 20. 页面组件发现必须继续由 Template Runtime 的 `import.meta.glob` 完成。
 ```
@@ -2409,7 +2409,7 @@ Build DAG.platform_route_projection
                     │
                     ▼
         ┌──────────────────────────────┐
-        │         XCodeAgent           │
+        │         DevAgent Studio           │
         │                              │
         │ build current route input    │
         │ extract current route facts  │
@@ -2451,6 +2451,6 @@ Build DAG.platform_route_projection
 
 最终职责一句话：
 
-> **XCodeAgent 用“最近一次成功 Build Run 冻结的 `routeFacts`”与“当前 ProductPlan + authorization_manifest 合成出的最小 Route Facts”直接比较，决定这次是否需要 Route Projection，并把该动作显式放入 Build DAG；Template Route Projector 只消费最小 DTO 幂等注册 `pageId / name / resourceKey`，页面 Component 始终由模板现有 `import.meta.glob` Runtime 动态发现。**
+> **DevAgent Studio 用“最近一次成功 Build Run 冻结的 `routeFacts`”与“当前 ProductPlan + authorization_manifest 合成出的最小 Route Facts”直接比较，决定这次是否需要 Route Projection，并把该动作显式放入 Build DAG；Template Route Projector 只消费最小 DTO 幂等注册 `pageId / name / resourceKey`，页面 Component 始终由模板现有 `import.meta.glob` Runtime 动态发现。**
 
 这样既解决当前 `route_projection` 时机隐藏、DAG 不可见的问题，也避免每次 Build 都重复执行路由注册，同时不引入 hash、额外快照、前后校验节点或新的页面事实结构。

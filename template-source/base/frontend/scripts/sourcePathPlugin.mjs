@@ -32,7 +32,7 @@ function isFragmentName(name) {
 /** 创建只负责追加 data-path 的 Babel 访问器，不改变原有 JSX 转换方式。 */
 function createSourcePathBabelPlugin(sourcePath) {
   return {
-    name: 'xcode-agent-source-path-babel-plugin',
+    name: 'devagentstudio-source-path-babel-plugin',
     visitor: {
       JSXOpeningElement(nodePath) {
         if (isFragmentName(nodePath.node.name)) return;
@@ -81,7 +81,7 @@ export async function transformSourcePath(code, fileName, rootDir) {
 export function sourcePathPlugin(options = {}) {
   const rootDir = options.rootDir || process.cwd();
   return {
-    name: 'xcode-agent-source-path',
+    name: 'devagentstudio-source-path',
     apply: 'serve',
     enforce: 'pre',
     transform(code, id) {

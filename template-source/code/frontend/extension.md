@@ -553,7 +553,7 @@ generated/extensions/rootRoutes.tsx
 generated/extensions/systemPageRoutes.ts
 generated/extensions/initializers.ts
 generated/extensions/errorReporters.ts
-.xcodeagent-template-generated.json
+.devagentstudio-template-generated.json
 ```
 
 这些文件只能通过：
@@ -824,7 +824,7 @@ vite build
 
 ```text
 frontend/src
-frontend/.xcodeagent-template-workspace.json
+frontend/.devagentstudio-template-workspace.json
 ```
 
 到临时路径，例如：
@@ -1960,7 +1960,7 @@ previous profile reassemble
 1. 修改 `base/src` 后可以直接 `pnpm build:base`；
 2. 当前即使是 Login Workspace，也能执行 `build:base`；
 3. Build 前后的 `src` 内容完全一致；
-4. Build 前后的 `.xcodeagent-template-workspace.json` 完全一致；
+4. Build 前后的 `.devagentstudio-template-workspace.json` 完全一致；
 5. Build 失败也必须恢复；
 6. Build 不产生 Base/Extension Source 修改。
 

@@ -590,8 +590,8 @@ public final class AuthorizationBootstrapCommand {
         private static Arguments parse(String[] args) {
             Path backend = Paths.get("").toAbsolutePath().normalize();
             Path demo = backend.getParent();
-            Path technicalPlan = demo.resolve(".xcodeagent/plans/technical-plan.json");
-            Path application = demo.resolve(".xcodeagent/application.json");
+            Path technicalPlan = demo.resolve(".devagentstudio/plans/technical-plan.json");
+            Path application = demo.resolve(".devagentstudio/application.json");
             Path ddl = backend.resolve("docs/auth/sql/ddl.sql");
             Path applicationYml = backend.resolve("src/main/resources/application.yml");
             String dbUrl = null;

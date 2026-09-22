@@ -48,7 +48,7 @@ src/capability-extensions/menus.ts
 export const useCapabilityMenus = (menus: Route[]): Route[] => {
   let current = menus;
 
-  // xcodeagent:capability-menu-transforms
+  // devagentstudio:capability-menu-transforms
 
   return current;
 };
@@ -136,7 +136,7 @@ export const useCapabilityMenuTransforms = (
 ): AppMenuItem[] => {
   let current = menus;
 
-  // xcodeagent:capability-menu-transforms
+  // devagentstudio:capability-menu-transforms
 
   return current;
 };
@@ -475,7 +475,7 @@ src/capability-extensions/
 
 ```tsx
 export const appRouteGuards = [
-  // xcodeagent:app-route-guards
+  // devagentstudio:app-route-guards
 ];
 ```
 
@@ -485,7 +485,7 @@ Login 开启后：
 export const appRouteGuards = [
   RequireLogin,
 
-  // xcodeagent:app-route-guards
+  // devagentstudio:app-route-guards
 ];
 ```
 
@@ -507,7 +507,7 @@ export type PageRouteGuardFactory = (
 
 ```ts
 export const pageRouteGuards: PageRouteGuardFactory[] = [
-  // xcodeagent:page-route-guards
+  // devagentstudio:page-route-guards
 ];
 ```
 
@@ -643,7 +643,7 @@ frontend.login.register-app-route-guard
 目标：
 
 ```text
-xcodeagent:app-route-guards
+devagentstudio:app-route-guards
 ```
 
 注入：
@@ -669,7 +669,7 @@ frontend.authorization.register-page-route-guard
 目标：
 
 ```text
-xcodeagent:page-route-guards
+devagentstudio:page-route-guards
 ```
 
 注册：
@@ -708,7 +708,7 @@ Authorization
 
 ```text
 PAGE_ROUTES
-→ XCodeAgent Business Route Projection
+→ DevAgent Studio Business Route Projection
 
 capabilityPageRoutes
 → Template Capability Contribution
@@ -1102,7 +1102,7 @@ src/constants/layout.ts
 
 当前 Layout 主链没有明显消费。
 
-如果 XCodeAgent 生成代码也不依赖：
+如果 DevAgent Studio 生成代码也不依赖：
 
 ```text
 整套删除。
@@ -1183,7 +1183,7 @@ additionalData
 
 ### 第一步
 
-确认 XCodeAgent 生成页面是否仍生成：
+确认 DevAgent Studio 生成页面是否仍生成：
 
 ```text
 *.less
@@ -1553,7 +1553,7 @@ utils/workbench.tsx
 确认无消费的旧 LESS 与 Vite less 配置
 ```
 
-`modulePath` 的清理必须晚于 Phase 1：先确认 Generator、Skill、Fixture、Capability Authoring 测试和外部 Template Source 均不再生成或消费它。旧 LESS 必须在确认 XCodeAgent 页面不再生成 `*.less` / `*.module.less` 后才可连同 `variable.less`、Vite `additionalData` 和 less dependency 一并删除；否则仅删除已证实无引用的文件，并保留兼容路径。
+`modulePath` 的清理必须晚于 Phase 1：先确认 Generator、Skill、Fixture、Capability Authoring 测试和外部 Template Source 均不再生成或消费它。旧 LESS 必须在确认 DevAgent Studio 页面不再生成 `*.less` / `*.module.less` 后才可连同 `variable.less`、Vite `additionalData` 和 less dependency 一并删除；否则仅删除已证实无引用的文件，并保留兼容路径。
 
 `utils/workbench.tsx` 删除前还必须确认外链菜单改为明确的链接渲染或 `window.open` 行为，而不是统一执行 `navigate(item.path)`。
 

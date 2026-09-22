@@ -18,4 +18,4 @@ curl -sS -D /private/tmp/engine-service-generate.headers \
 unzip -t /private/tmp/engine-service-generate.zip
 unzip -Z1 /private/tmp/engine-service-generate.zip
 ```
-预期返回 200、Content-Type: application/zip，ZIP 中包含 frontend/、backend/ 和 .xcodeagent/template-state.json。
+预期返回 200、Content-Type: application/zip，ZIP 中包含 frontend/、backend/ 和 .devagentstudio/template-state.json。

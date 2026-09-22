@@ -284,13 +284,13 @@ template-engine/engine-service/config/application-local.yml
 server:
   port: ${TEMPLATE_ENGINE_PORT:18080}
 
-xcodeagent:
+devagentstudio:
   template-engine:
     source-root: ${TEMPLATE_ENGINE_SOURCE_ROOT}
 
     principals:
       - principal-id: local-full
-        principal-type: XCODE_AGENT
+        principal-type: DEVAGENTSTUDIO
         token-sha256: ${TEMPLATE_ENGINE_LOCAL_FULL_TOKEN_SHA256}
         scopes:
           - template.plan
@@ -298,7 +298,7 @@ xcodeagent:
           - template.update
 
       - principal-id: local-plan
-        principal-type: XCODE_AGENT
+        principal-type: DEVAGENTSTUDIO
         token-sha256: ${TEMPLATE_ENGINE_LOCAL_PLAN_TOKEN_SHA256}
         scopes:
           - template.plan
@@ -1095,14 +1095,14 @@ Authentication
 Workspace Apply
 Workspace abstraction
 State Persist
-XCodeAgent runtime
+DevAgent Studio runtime
 ```
 
 ---
 
 ## 18. 跨仓库 E2E
 
-以下仍由 XCodeAgent / 调用方负责：
+以下仍由 DevAgent Studio / 调用方负责：
 
 ```text
 Template Engine Package
