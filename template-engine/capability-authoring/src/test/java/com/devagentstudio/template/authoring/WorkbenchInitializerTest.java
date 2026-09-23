@@ -111,9 +111,7 @@ class WorkbenchInitializerTest {
 
     private Path copyTemplateSource() throws Exception {
         Path source = templateSource(), destination = temporaryDirectory.resolve("template-source");
-        java.util.stream.Stream<Path> paths = Files.walk(source);
-        try { paths.forEach(path -> { try { Path target = destination.resolve(source.relativize(path).toString()); if (Files.isDirectory(path)) Files.createDirectories(target); else Files.copy(path, target); } catch (Exception e) { throw new RuntimeException(e); } }); }
-        finally { paths.close(); }
+        LegacyV2SourceTree.copy(source, destination);
         return destination;
     }
 

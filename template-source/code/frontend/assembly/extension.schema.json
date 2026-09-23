@@ -23,7 +23,8 @@
   "$defs": {
     "sourceContribution": { "type": "object", "required": ["id", "source", "export"], "properties": { "id": { "type": "string" }, "source": { "type": "string", "pattern": "^src/" }, "export": { "type": "string" } }, "additionalProperties": false },
     "sourceContributions": { "type": "array", "items": { "$ref": "#/$defs/sourceContribution" } },
-    "rootRoutes": { "type": "array", "items": { "allOf": [{ "$ref": "#/$defs/sourceContribution" }, { "type": "object", "required": ["path"], "properties": { "path": { "type": "string", "pattern": "^/" } } }] } },
+    "rootRoutes": { "type": "array", "items": { "$ref": "#/$defs/rootRouteContribution" } },
+    "rootRouteContribution": { "type": "object", "required": ["id", "source", "export", "path", "localName"], "properties": { "id": { "type": "string" }, "source": { "type": "string", "pattern": "^src/" }, "export": { "type": "string" }, "path": { "type": "string", "pattern": "^/" }, "localName": { "type": "string", "pattern": "^[A-Z][A-Za-z0-9]*$" } }, "additionalProperties": false },
     "pageRoutes": { "type": "array", "items": { "type": "object", "required": ["id", "path", "label"], "properties": { "id": { "type": "string" }, "path": { "type": "string", "pattern": "^[a-z0-9]+(?:_[a-z0-9]+)*$" }, "label": { "type": "string" }, "icon": { "type": "string" }, "resourceKey": { "type": "string" } }, "additionalProperties": false } }
   }
 }

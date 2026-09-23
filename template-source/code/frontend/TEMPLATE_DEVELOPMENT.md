@@ -11,7 +11,7 @@ pnpm sync:base
 pnpm build:base
 ```
 
-`sync:base` 会将 Base 已有文件、新文件和删除文件回写到 `base/**`。例如，`workspace/vite.config.ts` 回写到 `base/vite.config.ts`，`workspace/src/App.tsx` 回写到 `base/src/App.tsx`。Assembly 生成的 `workspace/src/generated/extensions/**` 及两个 `.devagentstudio-template-*.json` 文件永远不会写入 Base。
+`sync:base` 会将 Base 已有文件、新文件和删除文件回写到 `base/**`。例如，`workspace/vite.config.ts` 回写到 `base/vite.config.ts`，`workspace/src/App.tsx` 回写到 `base/src/App.tsx`。Assembly 生成的 `workspace/src/extensions/**` 及两个 `.devagentstudio-template-*.json` 文件永远不会写入 Base。
 
 ## Extension
 
@@ -33,7 +33,7 @@ pnpm verify:update:authorization
 
 现阶段 Extension 的 `src/**` 合并到 `workspace/src/**`。已有文件会回写原 owner；新文件写入当前 Profile 的 Extension；删除文件从原 owner 删除。同一路径由多个源码根拥有时会以 `SOURCE_OWNER_CONFLICT` 失败，不存在覆盖优先级。
 
-Provider、Root Route、Page Route、Initializer、Error Reporter 和依赖关系属于 Extension Contract，修改 `extensions/<id>/extension.yaml` 后重新运行 dev 或 build。绝不能直接修改 `workspace/src/generated/extensions/**` 或模板状态文件。
+Provider、Root Route、Page Route、Initializer、Error Reporter 和依赖关系属于 Extension Contract，修改 `extensions/<id>/extension.yaml` 后重新运行 dev 或 build。Root Route 的 `localName` 是生成 registry 时使用的组件导入名。绝不能直接修改 `workspace/src/extensions/**` 或模板状态文件。
 
 ## Full 与发布
 

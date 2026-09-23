@@ -1,13 +1,14 @@
 # Spring Boot Template Engine
 
-本仓库将固定的 `template-source` 与 Capability 配置解析为可生成的前后端工程。V1 的交付边界是：加载模板源、计算确定性文件变更，并通过无状态 HTTP Service 返回 Plan 或 ZIP Package；它不管理调用方工程、数据库、Project 或 ChangeSet 状态机。
+本仓库在迁移期并行提供 Legacy V2 与 Extension V3 Preview。两个引擎均为无状态计算服务，只读取各自的 Runtime Source 并返回确定性 ZIP；它们不管理调用方工程、数据库、Project 或 ChangeSet 状态机。
 
 ## 模块
 
-- `template-source/`：Base、Login、Authorization 等 Capability 的受管模板源。
-- `template-engine/engine-core/`：不依赖 Spring 的模板装载、Capability Resolve、渲染和文件级 Diff Core。
+- `template-source/base/`、`template-source/capabilities/`：Legacy V2 Runtime Source。
+- `template-source/code/frontend/`、`template-source/code/backend/`：Extension V3 Preview 的双端 Base + Extension Runtime Source。
+- `template-engine/engine-core/`：不依赖 Spring 的模板装载、Capability/Extension Resolve、Materialization 和 Update Planning Core。
 - `template-engine/engine-service/`：无状态 HTTP API 和 ZIP Package Builder。本地模式固定监听 Loopback，不做应用层认证。
-- `scripts/ci/`：Template Release revision gate 与 Base Frontend 构建检查。
+- `scripts/ci/`：Legacy V2 与 Extension V3 独立 Revision Gate，以及 Base Frontend 构建检查。
 
 ## 构建与测试
 
@@ -28,6 +29,7 @@ Template Source 的发布门禁使用当前分支的共同基线执行：
 
 ```sh
 ./scripts/ci/verify-template-release-revision.sh origin/main
+./scripts/ci/verify-code-template-release-revision.sh origin/main
 ```
 
 ## 启动 Engine Service
@@ -130,6 +132,17 @@ Tomcat 默认会在文件名中加入日期，例如 `access.2026-09-09.log`，�
 当配置改变时，预期 `200 application/zip`，ZIP 仅包含 `strategy-update-package.json` 与可选 `payload/`。将该文件的 `nextTemplateState` 与同一 RequestedConfig 再次提交，预期 `204 No Content`。
 
 完整验收契约见 [docs/REFACTOR.md](docs/REFACTOR.md)。
+
+## Extension V3 Preview
+
+迁移期间接口与源码保持隔离：
+
+| API | Engine | Runtime Source |
+| --- | --- | --- |
+| `/v1/generate`、`/v1/update` | Legacy V2 | `template-source/base`、`template-source/capabilities` |
+| `/v1/generate-next`、`/v1/update-next` | Extension V3 Preview | `template-source/code/frontend`、`template-source/code/backend` |
+
+V3 Semantic Contract 见 [docs/v3.md](docs/v3.md)。HTTP 契约以 OpenAPI 为准，Update ZIP 内部 JSON 以 `template-engine/engine-service/src/main/resources/contracts/v3/` 中的 JSON Schema 为准。V3 Revision 独立使用 `template-source/code/template-revision.txt`。
 
 ## Capability Authoring
 

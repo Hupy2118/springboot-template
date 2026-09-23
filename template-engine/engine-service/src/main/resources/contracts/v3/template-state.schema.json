@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devagentstudio.local/template-engine/v3/template-state.schema.json",
+  "title": "TemplateStateV3",
+  "type": "object",
+  "required": ["schemaVersion", "templateRevision", "requested", "effective", "installedArtifacts", "managedContributions"],
+  "properties": {
+    "schemaVersion": { "const": 3 },
+    "templateRevision": { "$ref": "#/$defs/revision" },
+    "requested": { "$ref": "#/$defs/capabilityMap" },
+    "effective": { "$ref": "#/$defs/capabilityMap" },
+    "installedArtifacts": {
+      "type": "object",
+      "patternProperties": {
+        "^(frontend|backend):[a-z0-9][a-z0-9_-]*:.+$": { "$ref": "#/$defs/installedArtifact" }
+      },
+      "additionalProperties": false
+    },
+    "managedContributions": {
+      "type": "object",
+      "patternProperties": {
+        "^annotation:[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)+$": { "$ref": "#/$defs/javaAnnotationContribution" },
+        "^maven:[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+$": { "$ref": "#/$defs/mavenContribution" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "revision": { "type": "string", "pattern": "^[0-9]{4}\\.[0-9]{2}\\.[0-9]{2}\\.[1-9][0-9]*$" },
+    "capabilityId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "capabilityState": {
+      "type": "object",
+      "required": ["enabled", "config"],
+      "properties": {
+        "enabled": { "const": true },
+        "config": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "capabilityMap": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+      "additionalProperties": { "$ref": "#/$defs/capabilityState" }
+    },
+    "installedArtifact": {
+      "type": "object",
+      "required": ["capabilityId", "target", "installedRevision"],
+      "properties": {
+        "capabilityId": { "$ref": "#/$defs/capabilityId" },
+        "target": { "type": "string", "minLength": 1 },
+        "installedRevision": { "$ref": "#/$defs/revision" }
+      },
+      "additionalProperties": false
+    },
+    "owners": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/capabilityId" }
+    },
+    "javaAnnotationContribution": {
+      "type": "object",
+      "required": ["type", "target", "owners", "spec", "appliedRevision"],
+      "properties": {
+        "type": { "const": "JAVA_ANNOTATION" },
+        "target": { "const": "backend/src/main/java/com/cmbchina/backend/Application.java" },
+        "owners": { "$ref": "#/$defs/owners" },
+        "spec": {
+          "type": "object",
+          "required": ["annotationClass"],
+          "properties": { "annotationClass": { "type": "string", "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)+$" } },
+          "additionalProperties": false
+        },
+        "appliedRevision": { "$ref": "#/$defs/revision" }
+      },
+      "additionalProperties": false
+    },
+    "mavenContribution": {
+      "type": "object",
+      "required": ["type", "target", "owners", "spec", "appliedRevision"],
+      "properties": {
+        "type": { "const": "MAVEN_DEPENDENCY" },
+        "target": { "const": "backend/pom.xml" },
+        "owners": { "$ref": "#/$defs/owners" },
+        "spec": {
+          "type": "object",
+          "required": ["groupId", "artifactId", "version", "scope"],
+          "properties": {
+            "groupId": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+            "artifactId": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+            "version": { "type": ["string", "null"] },
+            "scope": { "enum": ["compile", "provided", "runtime", "test", "system", null] }
+          },
+          "additionalProperties": false
+        },
+        "appliedRevision": { "$ref": "#/$defs/revision" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

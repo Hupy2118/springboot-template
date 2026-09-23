@@ -61,7 +61,9 @@ function validateManifest(manifest, manifestPath) {
     }
   }
   for (const route of manifest.contributes.rootRoutes) {
-    if (!route.path?.startsWith('/')) throw new AssemblyError('INVALID_EXTENSION_DEFINITION', `${manifest.id} root route must start with /`);
+    if (!route.path?.startsWith('/') || !/^[A-Z][A-Za-z0-9]*$/.test(route.localName || '')) {
+      throw new AssemblyError('INVALID_EXTENSION_DEFINITION', `${manifest.id} root route must have an absolute path and PascalCase localName`);
+    }
   }
   for (const route of manifest.contributes.pageRoutes) {
     if (!route.id || !route.label || !/^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(route.path || '')) {
@@ -161,10 +163,10 @@ function contributionList(extensions, key) {
   return contributions;
 }
 
-function imports(contributions, prefix) {
+function imports(contributions, prefix, localNameFor) {
   return contributions.map((item, index) => {
     const relative = item.source.slice(4).replace(/\.(tsx?|jsx?)$/, '');
-    const local = `${prefix}${index}`;
+    const local = localNameFor ? localNameFor(item, index) : `${prefix}${index}`;
     return { local, line: item.export === 'default' ? `import ${local} from '@/${relative}';` : `import { ${item.export} as ${local} } from '@/${relative}';` };
   });
 }
@@ -176,11 +178,14 @@ function generateProviderRegistry(providers) {
 
 function generateRootRouteRegistry(routes) {
   const paths = new Set();
+  const localNames = new Set();
   for (const route of routes) {
     if (paths.has(route.path)) throw new AssemblyError('DUPLICATE_ROUTE', route.path);
+    if (localNames.has(route.localName)) throw new AssemblyError('DUPLICATE_ROOT_ROUTE_LOCAL_NAME', route.localName);
     paths.add(route.path);
+    localNames.add(route.localName);
   }
-  const entries = imports(routes, 'RootRoute');
+  const entries = imports(routes, 'RootRoute', (route) => route.localName);
   return `import type { RouteObject } from 'react-router-dom';\n${entries.map((entry) => entry.line).join('\n')}\n\nexport const extensionRootRoutes: RouteObject[] = [${routes.map((route, index) => `\n  { path: '${route.path}', element: <${entries[index].local} /> },`).join('')}\n];\n`;
 }
 
@@ -244,11 +249,11 @@ async function assemble() {
   const initializerContributions = contributionList(selected, 'initializers');
   const reporterContributions = contributionList(selected, 'errorReporters');
   const generated = new Map([
-    ['src/generated/extensions/providers.ts', generateProviderRegistry(providers)],
-    ['src/generated/extensions/rootRoutes.tsx', generateRootRouteRegistry(rootRouteContributions)],
-    ['src/generated/extensions/systemPageRoutes.ts', generatePageRouteRegistry(pageRouteContributions)],
-    ['src/generated/extensions/initializers.ts', generateInitializerRegistry(initializerContributions)],
-    ['src/generated/extensions/errorReporters.ts', generateErrorReporterRegistry(reporterContributions)],
+    ['src/extensions/providers.ts', generateProviderRegistry(providers)],
+    ['src/extensions/rootRoutes.tsx', generateRootRouteRegistry(rootRouteContributions)],
+    ['src/extensions/systemPageRoutes.ts', generatePageRouteRegistry(pageRouteContributions)],
+    ['src/extensions/initializers.ts', generateInitializerRegistry(initializerContributions)],
+    ['src/extensions/errorReporters.ts', generateErrorReporterRegistry(reporterContributions)],
   ]);
   for (const [relative, content] of generated) {
     const target = path.join(destination, relative);

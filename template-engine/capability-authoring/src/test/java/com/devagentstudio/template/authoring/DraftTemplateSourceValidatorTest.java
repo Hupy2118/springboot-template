@@ -32,6 +32,6 @@ class DraftTemplateSourceValidatorTest {
         assertThrows(TemplateSourceException.class, () -> new DraftTemplateSourceValidator().validate(source));
     }
 
-    private Path copy(Path source) throws Exception { Path destination = temporaryDirectory.resolve("template-source"); java.util.stream.Stream<Path> paths = Files.walk(source); try { paths.forEach(path -> { try { Path target = destination.resolve(source.relativize(path).toString()); if (Files.isDirectory(path)) Files.createDirectories(target); else Files.copy(path, target); } catch (Exception e) { throw new RuntimeException(e); } }); } finally { paths.close(); } return destination; }
+    private Path copy(Path source) throws Exception { Path destination = temporaryDirectory.resolve("template-source"); LegacyV2SourceTree.copy(source, destination); return destination; }
     private static Path templateSource() { Path current = Paths.get(System.getProperty("user.dir")).toAbsolutePath(); while (current != null && !Files.isDirectory(current.resolve("template-source"))) current = current.getParent(); if (current == null) throw new AssertionError("repository root"); return current.resolve("template-source"); }
 }

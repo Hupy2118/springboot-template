@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devagentstudio.local/template-engine/v3/extension-update-package.schema.json",
+  "title": "ExtensionUpdatePackageV3",
+  "type": "object",
+  "required": ["protocolVersion", "packageId", "mode", "sourceRevision", "currentStateDigest", "nextStateDigest", "operations", "validationPlan", "payloadManifest", "nextTemplateState", "diagnostics"],
+  "properties": {
+    "protocolVersion": { "const": "3" },
+    "packageId": { "type": "string", "pattern": "^pkg-[0-9a-f]{16}$" },
+    "mode": { "enum": ["APPLY", "RECONCILE"] },
+    "sourceRevision": { "type": "string", "pattern": "^[0-9]{4}\\.[0-9]{2}\\.[0-9]{2}\\.[1-9][0-9]*$" },
+    "currentStateDigest": { "$ref": "#/$defs/digest" },
+    "nextStateDigest": { "$ref": "#/$defs/digest" },
+    "operations": { "type": "array", "items": { "$ref": "operation.schema.json" } },
+    "validationPlan": { "type": "array", "maxItems": 0 },
+    "payloadManifest": {
+      "type": "object",
+      "patternProperties": {
+        "^payload/.+$": { "$ref": "#/$defs/payloadMetadata" }
+      },
+      "additionalProperties": false
+    },
+    "nextTemplateState": { "$ref": "template-state.schema.json" },
+    "diagnostics": { "type": "array", "maxItems": 0 }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "payloadMetadata": {
+      "type": "object",
+      "required": ["size", "sha256"],
+      "properties": {
+        "size": { "type": "integer", "minimum": 0 },
+        "sha256": { "$ref": "#/$defs/digest" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

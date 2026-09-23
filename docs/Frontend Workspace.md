@@ -275,11 +275,11 @@ Workspace 同相对路径
 继续生成：
 
 ```text
-workspace/src/generated/extensions/providers.ts
-workspace/src/generated/extensions/rootRoutes.tsx
-workspace/src/generated/extensions/systemPageRoutes.ts
-workspace/src/generated/extensions/initializers.ts
-workspace/src/generated/extensions/errorReporters.ts
+workspace/src/extensions/providers.ts
+workspace/src/extensions/rootRoutes.tsx
+workspace/src/extensions/systemPageRoutes.ts
+workspace/src/extensions/initializers.ts
+workspace/src/extensions/errorReporters.ts
 ```
 
 以及：
@@ -451,7 +451,7 @@ extensions/login/src/pages/Login/helper.ts
 以下文件不得 Sync：
 
 ```text
-workspace/src/generated/extensions/**
+workspace/src/extensions/**
 workspace/.devagentstudio-template-generated.json
 workspace/.devagentstudio-template-workspace.json
 ```

@@ -28,7 +28,7 @@ public final class CapabilityBuildService {
         CapabilityStatusReport report = new CapabilityStatusReport(draft);
         if (report.status() == CapabilityStatusReport.Status.BLOCKED) throw unsupported(report);
         Path staging;
-        try { staging = Files.createTempDirectory(sourceRoot.getParent(), ".capability-build-"); CapabilityCompiler.copy(sourceRoot, staging); }
+        try { staging = LegacyV2SourceTree.createStage(sourceRoot, ".capability-build-"); }
         catch (IOException e) { throw new TemplateSourceException("CAPABILITY_BUILD_FAILED: " + e.getMessage()); }
         try {
             CompileState previous = new CompileStateStore().load(workbench);
@@ -38,7 +38,7 @@ public final class CapabilityBuildService {
             CompileState current = new CapabilityCompiler().compileInto(staging, project, contract);
             new DraftTemplateSourceValidator().validate(staging);
             new RoundTripVerifier().verify(staging, project, id);
-            CapabilityCompiler.replace(sourceRoot, staging);
+            LegacyV2SourceTree.replace(sourceRoot, staging, "capabilities", "strategy-registry-v2.yaml");
             new CompileStateStore().save(workbench, current);
             return report;
         } catch (RuntimeException e) { CapabilityCompiler.delete(staging); throw e; }

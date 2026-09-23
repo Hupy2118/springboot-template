@@ -1,6 +1,7 @@
 package com.devagentstudio.template.engine.service;
 
 import com.devagentstudio.template.engine.source.TemplateSourceException;
+import com.devagentstudio.template.engine.core.v3.V3Exception;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -15,6 +16,9 @@ import java.util.UUID;
 public class ApiExceptionHandler {
     @ExceptionHandler(ServiceException.class)
     ResponseEntity<Map<String, Object>> service(ServiceException exception) { return response(exception.code(), exception.getMessage(), exception.status()); }
+
+    @ExceptionHandler(V3Exception.class)
+    ResponseEntity<Map<String, Object>> v3(V3Exception exception) { return response(exception.code(), exception.getMessage(), exception.status()); }
 
     @ExceptionHandler(TemplateSourceException.class)
     ResponseEntity<Map<String, Object>> core(TemplateSourceException exception) {

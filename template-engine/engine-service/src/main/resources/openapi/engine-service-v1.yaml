@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: DevAgentStudio Template Engine Service
-  version: v2
+  version: v2+v3-preview
 paths:
   /v1/generate:
     post:
@@ -22,9 +22,36 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
         '500': { $ref: '#/components/responses/Error' }
+  /v1/generate-next:
+    post:
+      operationId: generateNext
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GenerateNextRequest' }
+      responses:
+        '200': { description: Complete V3 project ZIP, content: { application/zip: { schema: { type: string, format: binary } } } }
+        '400': { $ref: '#/components/responses/ErrorV3' }
+        '500': { $ref: '#/components/responses/ErrorV3' }
+  /v1/update-next:
+    post:
+      operationId: updateNext
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateNextRequest' }
+      responses:
+        '200': { description: V3 Extension Update ZIP, content: { application/zip: { schema: { type: string, format: binary } } } }
+        '204': { description: No state or package changes; response body is empty }
+        '400': { $ref: '#/components/responses/ErrorV3' }
+        '409': { $ref: '#/components/responses/ErrorV3' }
+        '500': { $ref: '#/components/responses/ErrorV3' }
 components:
   responses:
     Error: { description: Error envelope, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    ErrorV3: { description: V3 error envelope, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorV3' } } } }
   schemas:
     GenerateRequest:
       type: object
@@ -44,4 +71,109 @@ components:
     CapabilityStateV2: { type: object, required: [enabled, config], additionalProperties: false, properties: { enabled: { type: boolean, enum: [true] }, config: { type: object } } }
     AppliedAdditionStateV2: { type: object, required: [capabilityId, target, installedRevision], additionalProperties: false, properties: { capabilityId: { type: string }, target: { type: string }, installedRevision: { type: string } } }
     TemplateStateV2: { type: object, required: [schemaVersion, templateRevision, requested, effective, appliedAdditions], additionalProperties: false, properties: { schemaVersion: { type: integer, enum: [2] }, templateRevision: { type: string }, requested: { type: object, additionalProperties: { $ref: '#/components/schemas/CapabilityStateV2' } }, effective: { type: object, additionalProperties: { $ref: '#/components/schemas/CapabilityStateV2' } }, appliedAdditions: { type: object, additionalProperties: { $ref: '#/components/schemas/AppliedAdditionStateV2' } } } }
+    GenerateNextRequest:
+      type: object
+      required: [requestedConfig]
+      additionalProperties: false
+      properties: { requestedConfig: { $ref: '#/components/schemas/RequestedConfigV3' } }
+    UpdateNextRequest:
+      type: object
+      required: [protocolVersion, currentTemplateState, requestedConfig, mode]
+      additionalProperties: false
+      properties:
+        protocolVersion: { type: string, enum: ['3'] }
+        currentTemplateState: { $ref: '#/components/schemas/TemplateStateV3' }
+        requestedConfig: { $ref: '#/components/schemas/RequestedConfigV3' }
+        mode: { type: string, enum: [APPLY, RECONCILE] }
+    RequestedConfigV3:
+      type: object
+      required: [capabilities]
+      additionalProperties: false
+      properties:
+        capabilities:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/CapabilityRequestV3' }
+    CapabilityRequestV3:
+      type: object
+      required: [enabled, config]
+      additionalProperties: false
+      properties:
+        enabled: { type: boolean }
+        config: { type: object, additionalProperties: true }
+    CapabilityStateV3:
+      type: object
+      required: [enabled, config]
+      additionalProperties: false
+      properties:
+        enabled: { type: boolean, enum: [true] }
+        config: { type: object, additionalProperties: true }
+    InstalledArtifactStateV3:
+      type: object
+      required: [capabilityId, target, installedRevision]
+      additionalProperties: false
+      properties:
+        capabilityId: { type: string, pattern: '^[a-z0-9][a-z0-9_-]*$' }
+        target: { type: string, minLength: 1 }
+        installedRevision: { type: string, pattern: '^\\d{4}\\.\\d{2}\\.\\d{2}\\.[1-9]\\d*$' }
+    JavaAnnotationSpecV3:
+      type: object
+      required: [annotationClass]
+      additionalProperties: false
+      properties:
+        annotationClass: { type: string, pattern: '^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)+$' }
+    MavenDependencySpecV3:
+      type: object
+      required: [groupId, artifactId, version, scope]
+      additionalProperties: false
+      properties:
+        groupId: { type: string, pattern: '^[A-Za-z0-9_.-]+$' }
+        artifactId: { type: string, pattern: '^[A-Za-z0-9_.-]+$' }
+        version: { type: string, nullable: true }
+        scope: { type: string, nullable: true, enum: [compile, provided, runtime, test, system, null] }
+    JavaAnnotationContributionStateV3:
+      type: object
+      required: [type, target, owners, spec, appliedRevision]
+      additionalProperties: false
+      properties:
+        type: { type: string, enum: [JAVA_ANNOTATION] }
+        target: { type: string, enum: ['backend/src/main/java/com/cmbchina/backend/Application.java'] }
+        owners: { type: array, minItems: 1, uniqueItems: true, items: { type: string, pattern: '^[a-z0-9][a-z0-9_-]*$' } }
+        spec: { $ref: '#/components/schemas/JavaAnnotationSpecV3' }
+        appliedRevision: { type: string, pattern: '^\\d{4}\\.\\d{2}\\.\\d{2}\\.[1-9]\\d*$' }
+    MavenContributionStateV3:
+      type: object
+      required: [type, target, owners, spec, appliedRevision]
+      additionalProperties: false
+      properties:
+        type: { type: string, enum: [MAVEN_DEPENDENCY] }
+        target: { type: string, enum: ['backend/pom.xml'] }
+        owners: { type: array, minItems: 1, uniqueItems: true, items: { type: string, pattern: '^[a-z0-9][a-z0-9_-]*$' } }
+        spec: { $ref: '#/components/schemas/MavenDependencySpecV3' }
+        appliedRevision: { type: string, pattern: '^\\d{4}\\.\\d{2}\\.\\d{2}\\.[1-9]\\d*$' }
+    ManagedContributionStateV3:
+      oneOf:
+        - { $ref: '#/components/schemas/JavaAnnotationContributionStateV3' }
+        - { $ref: '#/components/schemas/MavenContributionStateV3' }
+    TemplateStateV3:
+      type: object
+      required: [schemaVersion, templateRevision, requested, effective, installedArtifacts, managedContributions]
+      additionalProperties: false
+      properties:
+        schemaVersion: { type: integer, enum: [3] }
+        templateRevision: { type: string, pattern: '^\\d{4}\\.\\d{2}\\.\\d{2}\\.[1-9]\\d*$' }
+        requested: { type: object, additionalProperties: { $ref: '#/components/schemas/CapabilityStateV3' } }
+        effective: { type: object, additionalProperties: { $ref: '#/components/schemas/CapabilityStateV3' } }
+        installedArtifacts: { type: object, additionalProperties: { $ref: '#/components/schemas/InstalledArtifactStateV3' } }
+        managedContributions: { type: object, additionalProperties: { $ref: '#/components/schemas/ManagedContributionStateV3' } }
+    ErrorV3:
+      type: object
+      required: [code, message, details, traceId]
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          enum: [BAD_REQUEST, PROTOCOL_VERSION_UNSUPPORTED, TEMPLATE_STATE_SCHEMA_UNSUPPORTED, TEMPLATE_STATE_INVALID, CAPABILITY_UNKNOWN, CAPABILITY_REMOVAL_UNSUPPORTED, RECONCILE_STATE_CHANGE_REQUIRED, TEMPLATE_RELEASE_DOWNGRADE_UNSUPPORTED, TEMPLATE_SOURCE_INVALID, EXTENSION_CONTRACT_MISMATCH, MAVEN_DEPENDENCY_CONFLICT, PACKAGE_BUILD_FAILED]
+        message: { type: string }
+        details: { type: object }
+        traceId: { type: string }
     Error: { type: object, required: [code, message, details, traceId], additionalProperties: false, properties: { code: { type: string }, message: { type: string }, details: { type: object }, traceId: { type: string } } }

@@ -1,4 +1,4 @@
 import type { RouteObject } from 'react-router-dom';
-import { extensionRootRoutes } from '@/generated/extensions/rootRoutes';
+import { extensionRootRoutes } from '@/extensions/rootRoutes';
 
 export const ROOT_ROUTES: RouteObject[] = extensionRootRoutes;

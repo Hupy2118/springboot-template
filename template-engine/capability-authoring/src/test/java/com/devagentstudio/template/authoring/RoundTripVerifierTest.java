@@ -18,7 +18,7 @@ class RoundTripVerifierTest {
     @Test void rejectsMissingOrChangedGeneratedFiles() throws Exception { Path workbench = new WorkbenchInitializer(source(), temporaryDirectory.resolve(".workbench")).initialize("draft-roundtrip", Collections.singletonList("login")); Files.write(workbench.resolve("project/backend/README.md"), "changed".getBytes(StandardCharsets.UTF_8)); assertThrows(TemplateSourceException.class, () -> new RoundTripVerifier().verify(source(), workbench.resolve("project"), "login")); }
     @Test void buildsCapabilityWithAnImportAndAnchorInsertion() throws Exception {
         Path draftSource = temporaryDirectory.resolve("template-source");
-        CapabilityCompiler.copy(source(), draftSource);
+        LegacyV2SourceTree.copy(source(), draftSource);
         Path workbenches = temporaryDirectory.resolve(".workbench");
         Path workbench = new WorkbenchInitializer(draftSource, workbenches).initialize("excel-export-test", Collections.<String>emptyList());
         Path routes = workbench.resolve("project/frontend/src/capability-extensions/routes.tsx");

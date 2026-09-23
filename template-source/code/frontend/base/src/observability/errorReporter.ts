@@ -1,4 +1,4 @@
-import { extensionErrorReporters } from '@/generated/extensions/errorReporters';
+import { extensionErrorReporters } from '@/extensions/errorReporters';
 
 export function reportError(error: Error, info?: unknown) {
   for (const report of extensionErrorReporters) {

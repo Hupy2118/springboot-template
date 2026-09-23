@@ -21,24 +21,26 @@ try {
   assert.equal(await readFile(path.join(output, 'index.html'), 'utf8').then(() => true), true);
   assert.equal(await readFile(path.join(output, 'vite.config.ts'), 'utf8').then(() => true), true);
   assert.equal(await readFile(path.join(output, 'public', 'favicon.svg'), 'utf8').then(() => true), true);
-  let providers = await readFile(path.join(output, 'src', 'generated', 'extensions', 'providers.ts'), 'utf8');
-  let rootRoutes = await readFile(path.join(output, 'src', 'generated', 'extensions', 'rootRoutes.tsx'), 'utf8');
-  let pageRoutes = await readFile(path.join(output, 'src', 'generated', 'extensions', 'systemPageRoutes.ts'), 'utf8');
+  let providers = await readFile(path.join(output, 'src', 'extensions', 'providers.ts'), 'utf8');
+  let rootRoutes = await readFile(path.join(output, 'src', 'extensions', 'rootRoutes.tsx'), 'utf8');
+  let pageRoutes = await readFile(path.join(output, 'src', 'extensions', 'systemPageRoutes.ts'), 'utf8');
   assert.match(providers, /extensionProviders: ComponentType<PropsWithChildren>\[\] = \[\];/);
   assert.match(rootRoutes, /extensionRootRoutes: RouteObject\[\] = \[\n\];/);
   assert.match(pageRoutes, /extensionSystemPageRoutes: PageRouteDefinition\[\] = \[\n\s*\];/);
   assert.match(await readFile(path.join(output, 'src', 'providers', 'AppProviders.tsx'), 'utf8'), /extensionProviders/);
 
   await assemble('login');
-  providers = await readFile(path.join(output, 'src', 'generated', 'extensions', 'providers.ts'), 'utf8');
-  rootRoutes = await readFile(path.join(output, 'src', 'generated', 'extensions', 'rootRoutes.tsx'), 'utf8');
+  providers = await readFile(path.join(output, 'src', 'extensions', 'providers.ts'), 'utf8');
+  rootRoutes = await readFile(path.join(output, 'src', 'extensions', 'rootRoutes.tsx'), 'utf8');
   assert.match(providers, /extensionProviders: ComponentType<PropsWithChildren>\[\] = \[Provider0\];/);
   assert.match(rootRoutes, /path: '\/login'/);
   assert.match(rootRoutes, /path: '\/logout'/);
+  assert.match(rootRoutes, /import LoginPage from '@\/pages\/Login\/index';/);
+  assert.match(rootRoutes, /import LogoutPage from '@\/pages\/Logout\/index';/);
 
   await assemble('login,authorization');
-  providers = await readFile(path.join(output, 'src', 'generated', 'extensions', 'providers.ts'), 'utf8');
-  pageRoutes = await readFile(path.join(output, 'src', 'generated', 'extensions', 'systemPageRoutes.ts'), 'utf8');
+  providers = await readFile(path.join(output, 'src', 'extensions', 'providers.ts'), 'utf8');
+  pageRoutes = await readFile(path.join(output, 'src', 'extensions', 'systemPageRoutes.ts'), 'utf8');
   assert.match(providers, /extensionProviders: ComponentType<PropsWithChildren>\[\] = \[Provider0, Provider1\];/);
   assert.match(pageRoutes, /path: 'authorization_management'/);
 

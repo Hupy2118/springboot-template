@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devagentstudio.local/template-engine/v3/operation.schema.json",
+  "title": "OperationV3",
+  "type": "object",
+  "required": ["schemaVersion", "operationId", "index", "type", "target", "parameters", "payloadRef"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "operationId": { "type": "string", "minLength": 1 },
+    "index": { "type": "integer", "minimum": 0 },
+    "type": { "enum": ["ADD_FILE", "REPLACE_MANAGED_FILE", "ENSURE_JAVA_ANNOTATION", "REMOVE_JAVA_ANNOTATION", "ENSURE_MAVEN_DEPENDENCY", "REMOVE_MAVEN_DEPENDENCY"] },
+    "target": { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(/|$))(?!.*\\\\).+$" },
+    "parameters": { "type": "object" },
+    "payloadRef": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "ADD_FILE" } }, "required": ["type"] },
+      "then": { "properties": { "parameters": { "const": {} }, "payloadRef": { "type": "string", "pattern": "^payload/.+$" }, "target": { "pattern": "^(frontend|backend)/.+$" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "REPLACE_MANAGED_FILE" } }, "required": ["type"] },
+      "then": { "properties": { "parameters": { "const": {} }, "payloadRef": { "type": "string", "pattern": "^payload/.+$" }, "target": { "enum": ["frontend/src/extensions/providers.ts", "frontend/src/extensions/rootRoutes.tsx", "frontend/src/extensions/systemPageRoutes.ts", "frontend/src/extensions/initializers.ts", "frontend/src/extensions/errorReporters.ts"] } } }
+    },
+    {
+      "if": { "properties": { "type": { "enum": ["ENSURE_JAVA_ANNOTATION", "REMOVE_JAVA_ANNOTATION"] } }, "required": ["type"] },
+      "then": { "properties": { "target": { "const": "backend/src/main/java/com/cmbchina/backend/Application.java" }, "parameters": { "$ref": "#/$defs/javaAnnotationParameters" }, "payloadRef": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "type": { "enum": ["ENSURE_MAVEN_DEPENDENCY", "REMOVE_MAVEN_DEPENDENCY"] } }, "required": ["type"] },
+      "then": { "properties": { "target": { "const": "backend/pom.xml" }, "parameters": { "$ref": "#/$defs/mavenDependencyParameters" }, "payloadRef": { "type": "null" } } }
+    }
+  ],
+  "$defs": {
+    "javaAnnotationParameters": {
+      "type": "object",
+      "required": ["annotationClass"],
+      "properties": { "annotationClass": { "type": "string", "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)+$" } },
+      "additionalProperties": false
+    },
+    "mavenDependencyParameters": {
+      "type": "object",
+      "required": ["groupId", "artifactId", "version", "scope"],
+      "properties": {
+        "groupId": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+        "artifactId": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+        "version": { "type": ["string", "null"] },
+        "scope": { "enum": ["compile", "provided", "runtime", "test", "system", null] }
+      },
+      "additionalProperties": false
+    }
+  }
+}

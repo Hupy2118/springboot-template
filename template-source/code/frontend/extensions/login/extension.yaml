@@ -6,8 +6,8 @@
       { "id": "login.provider", "source": "src/providers/LoginProvider.tsx", "export": "LoginProvider" }
     ],
     "rootRoutes": [
-      { "id": "login.login", "path": "/login", "source": "src/pages/Login/index.tsx", "export": "default" },
-      { "id": "login.logout", "path": "/logout", "source": "src/pages/Logout/index.tsx", "export": "default" }
+      { "id": "login.login", "path": "/login", "source": "src/pages/Login/index.tsx", "export": "default", "localName": "LoginPage" },
+      { "id": "login.logout", "path": "/logout", "source": "src/pages/Logout/index.tsx", "export": "default", "localName": "LogoutPage" }
     ],
     "pageRoutes": [],
     "initializers": [],

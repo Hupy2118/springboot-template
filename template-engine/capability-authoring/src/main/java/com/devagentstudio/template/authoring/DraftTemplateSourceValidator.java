@@ -17,7 +17,7 @@ public final class DraftTemplateSourceValidator {
     public TemplateRelease validate(Path rawSourceRoot) {
         Path source = rawSourceRoot.toAbsolutePath().normalize();
         Path temporary;
-        try { temporary = Files.createTempDirectory("devagentstudio-draft-"); copy(source, temporary); }
+        try { temporary = Files.createTempDirectory("devagentstudio-draft-"); LegacyV2SourceTree.copy(source, temporary); }
         catch (IOException e) { throw new TemplateSourceException("DRAFT_VALIDATION_FAILED: " + e.getMessage()); }
         try {
             Files.write(temporary.resolve("template-revision.txt"), (DRAFT_REVISION + "\n").getBytes(StandardCharsets.UTF_8));
@@ -26,6 +26,5 @@ public final class DraftTemplateSourceValidator {
         finally { delete(temporary); }
     }
 
-    private static void copy(Path from, Path to) throws IOException { java.util.stream.Stream<Path> paths = Files.walk(from); try { paths.forEach(path -> { try { Path target = to.resolve(from.relativize(path).toString()); if (Files.isDirectory(path)) Files.createDirectories(target); else Files.copy(path, target); } catch (IOException e) { throw new TemplateSourceException("DRAFT_VALIDATION_FAILED: " + e.getMessage()); } }); } finally { paths.close(); } }
     private static void delete(Path root) { try { java.util.stream.Stream<Path> paths = Files.walk(root); try { paths.sorted(Collections.reverseOrder()).forEach(path -> { try { Files.deleteIfExists(path); } catch (IOException ignored) { } }); } finally { paths.close(); } } catch (IOException ignored) { } }
 }

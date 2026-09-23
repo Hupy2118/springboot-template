@@ -1,4 +1,5 @@
 workspace/*
+build/*
 !workspace/.gitkeep
 node_modules/
 .assembly-next-*

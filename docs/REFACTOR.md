@@ -1,17 +1,29 @@
-# Template Engine V2 Contract
+# Template Engine Contract Index / Migration Boundary
 
-V1 file-diff engine、`managedFiles` State、aggregate renderer 和私有 Update ZIP 已完成 Cutover 并删除。
+The repository maintains two isolated Template Engine releases during migration.
 
-当前权威契约如下：
+## Legacy V2
 
-- HTTP：`template-engine/engine-service/src/main/resources/openapi/engine-service-v1.yaml`（内容版本为 V2）
-- 双端实施与验收：`docs/DevAgentStudio_Template_Capability_增量更新方案_双端实施计划_断点修复版.md`
-- Template Source：`capability-v2.yaml`、`strategy-registry-v2.yaml`、Base Atomic Surface 与 `templateRevision`
+- `POST /v1/generate` and `POST /v1/update` remain the Legacy V2 API during this stage.
+- HTTP contract: `template-engine/engine-service/src/main/resources/openapi/engine-service-v1.yaml`.
+- Semantic contract: the existing V2 implementation and its fixtures/tests.
+- Runtime source: `template-source/base/**`, `template-source/capabilities/**`, and `template-source/strategy-registry-v2.yaml`.
+- Revision: `template-source/template-revision.txt`, governed by `scripts/ci/verify-template-release-revision.sh`.
+- V2 State and Update Package semantics are unchanged. Service remains stateless and never applies packages to a caller workspace.
+- `capability-authoring` stages and commits only Legacy V2-owned paths. It preserves `template-source/code/**` and all other non-V2 content when compiling or publishing a V2 capability.
 
-Service 只生成 `TemplateStateV2` 和 `StrategyUpdatePackageV2`；它不读取或保存 Workspace，也不执行 Apply、Rollback 或 State Commit。
+## Extension V3 Preview
 
-## Template Release Loader Gate
+- `POST /v1/generate-next` and `POST /v1/update-next` are the V3 Preview API. They do not change the Legacy V2 endpoints.
+- HTTP contract: the V3 paths and request/error schemas in `engine-service-v1.yaml`.
+- Semantic contract: [docs/v3.md](v3.md).
+- V3 Update ZIP JSON contract: `template-engine/engine-service/src/main/resources/contracts/v3/*.schema.json`.
+- Runtime source: `template-source/code/frontend/base/**`, `template-source/code/frontend/extensions/*/extension.yaml`, `template-source/code/frontend/extensions/*/src/**`, `template-source/code/backend/base/**`, `template-source/code/backend/extensions/*/extension.yaml`, `template-source/code/backend/extensions/*/{src,docs,migrations}/**`, and `template-source/code/template-revision.txt`.
+- Revision: `template-source/code/template-revision.txt`, governed independently by `scripts/ci/verify-code-template-release-revision.sh`.
+- V3 State and Package remain caller-owned. Workspace apply, package rollback, builds/tests, and State commit are external DevAgentStudio/caller responsibilities. The engine may use a test-only reference executor to verify the package contract; it must not add a production workspace executor.
 
-`CapabilityV2Loader` 在接受 Template Release 前 fail-closed 校验：Capability `requires` 的唯一性、引用存在性与无环图；全部十种 Wire Strategy 的精确参数 allow-list；Base 的 import、anchor 与结构化 AST selector surface；Registry Strategy 是否可由当前 Generate materializer 执行；以及 Migration asset、deployment/consumer path 和已冻结 execution trigger。当前唯一支持的 Migration trigger 为 `AUTHORIZATION_BOOTSTRAP_DDL`。任何不满足条件的 Release 均不得进入 Plan、Generate 或 Update。
+## Migration boundary
 
-`templateRevision` 是 Template Release 的唯一版本标识。`CapabilityV2Loader` 不读取或校验 `template-source/release-digests.yaml`；相同 revision 下的内容身份与 revision 单调递增由发布流程和 CI 治理。TemplateState 的变化以结构化状态比较，Update Package 不使用 state、payload 或 package digest。Local Template Service 固定监听 `127.0.0.1`，以 Loopback 作为网络暴露边界，不实施应用层认证；未来共享或远程部署时，认证必须在 HTTP 接入层独立引入。`JSON_STRUCTURE_CHECK` 的正式参数和 postcondition check 均为 `path`、`pointer`、`expected`，`expected` 为非空字符串。
+V2 and V3 have separate Runtime Source, Revision, State schema, and Update Package protocols. Changes to one source tree do not implicitly require synchronizing the other. A product change that intentionally updates both must be represented and revision-gated as two independent source changes.
+
+During this preview stage, do not route `/v1/generate` or `/v1/update` to V3, remove V2 contracts, or delete Legacy source. Formal cutover is a later change.

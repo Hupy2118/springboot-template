@@ -21,9 +21,9 @@ public final class CapabilityCompiler {
     public void compile(Path rawSourceRoot, Path project, CapabilityContractDraft draft) {
         Path root = rawSourceRoot.toAbsolutePath().normalize();
         Path staging;
-        try { staging = Files.createTempDirectory(root.getParent(), ".capability-compile-"); copy(root, staging); }
+        try { staging = LegacyV2SourceTree.createStage(root, ".capability-compile-"); }
         catch (IOException e) { throw new TemplateSourceException("CAPABILITY_COMPILE_FAILED: " + e.getMessage()); }
-        try { compileInto(staging, project, draft); replace(root, staging); }
+        try { compileInto(staging, project, draft); LegacyV2SourceTree.replace(root, staging, "capabilities", "strategy-registry-v2.yaml"); }
         catch (RuntimeException e) { delete(staging); throw e; }
         catch (IOException e) { delete(staging); throw new TemplateSourceException("CAPABILITY_COMPILE_FAILED: " + e.getMessage()); }
     }

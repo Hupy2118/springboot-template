@@ -16,6 +16,8 @@ class CapabilityCompilerTest {
     @Test void writesAtomicEntriesOnceAndKeepsTheSourceTreeConsistent() throws Exception {
         Path source = temporaryDirectory.resolve("source"), project = temporaryDirectory.resolve("project");
         Files.createDirectories(source.resolve("capabilities")); Files.createDirectories(project);
+        Files.createDirectories(source.resolve("code/frontend/node_modules"));
+        Files.write(source.resolve("code/frontend/node_modules/preserved.txt"), "local-only".getBytes(StandardCharsets.UTF_8));
         Files.write(source.resolve("strategy-registry-v2.yaml"), "schemaVersion: 2\ntargets: []\nanchors: []\nstrategies: []\nvalidators: []\n".getBytes(StandardCharsets.UTF_8));
         Files.write(project.resolve("feature.ts"), "export default 1;\n".getBytes(StandardCharsets.UTF_8));
         CapabilityDraft changes = new CapabilityDraft("feature", Collections.singletonList(new AdditionDraft("feature.feature-ts", "feature.ts", "feature.ts")), Collections.<StrategyDraft>emptyList(), Collections.<UnsupportedChange>emptyList());
@@ -23,6 +25,7 @@ class CapabilityCompilerTest {
         CapabilityContractDraft draft = new CapabilityContractDraft(changes, Collections.<String>emptyList(), Collections.<MigrationDraft>emptyList(), Collections.singletonList(new ValidatorDraft("feature.postcondition", validator)));
         CapabilityCompiler compiler = new CapabilityCompiler(); compiler.compile(source, project, draft);
         assertTrue(Files.isRegularFile(source.resolve("capabilities/feature/capability-v2.yaml")));
+        assertTrue(Files.isRegularFile(source.resolve("code/frontend/node_modules/preserved.txt")));
         assertTrue(new String(Files.readAllBytes(source.resolve("strategy-registry-v2.yaml")), StandardCharsets.UTF_8).contains("feature.postcondition"));
         assertThrows(RuntimeException.class, () -> compiler.compile(source, project, draft));
     }
