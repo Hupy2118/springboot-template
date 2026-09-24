@@ -27,6 +27,7 @@
     "verify:assembly": "node assembly/verify-generated.mjs",
     "verify:release": "node assembly/verify-release.mjs",
     "test:assembly": "node assembly/test-assemble.mjs",
+    "test:dependency-runtime": "node assembly/test-dependency-runtime.mjs",
     "test:workspace-sync": "node assembly/test-workspace-sync.mjs",
     "verify:update:base": "pnpm build:base && pnpm build:login && pnpm build:authorization && pnpm build:full",
     "verify:update:login": "pnpm build:login && pnpm build:authorization && pnpm build:full",

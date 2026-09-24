@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import path from 'node:path';
 import { extensionsForProfile, frontendRoot } from './profiles.mjs';
 import { statePath } from './workspace-state.mjs';
+import { ensureDependencies } from './dependency-runtime.mjs';
 
 const execute = promisify(execFile);
 const profileArgument = process.argv.find((item) => item.startsWith('--profile='));
@@ -43,6 +44,8 @@ try {
   if (hadWorkspace) await copyWorkspaceSource(workspace, workspaceBackup);
   if (hadState) await cp(statePath, stateBackup);
   await execute(process.execPath, [assembler, `--profile=${profile}`, '--force=true'], { cwd: frontendRoot });
+  const dependencies = await ensureDependencies(workspace);
+  process.stdout.write(dependencies.reused ? 'Reusing verified workspace dependencies.\n' : 'Installed workspace dependencies.\n');
   await execute('pnpm', ['exec', 'tsc', '-b'], { cwd: workspace });
   await execute('pnpm', ['exec', 'vite', 'build'], { cwd: workspace });
 } finally {
