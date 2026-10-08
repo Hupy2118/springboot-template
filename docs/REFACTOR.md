@@ -1,29 +1,41 @@
-# Template Engine Contract Index / Migration Boundary
+# Template Engine V3 收敛记录与契约索引
 
-The repository maintains two isolated Template Engine releases during migration.
+Template Engine 已收敛为单一 V3 实现。`template-source/code/` 是唯一 Runtime Source；`template-source/code/template-revision.txt` 是唯一 Release Revision。
 
-## Legacy V2
+## Runtime 与服务边界
 
-- `POST /v1/generate` and `POST /v1/update` remain the Legacy V2 API during this stage.
-- HTTP contract: `template-engine/engine-service/src/main/resources/openapi/engine-service-v1.yaml`.
-- Semantic contract: the existing V2 implementation and its fixtures/tests.
-- Runtime source: `template-source/base/**`, `template-source/capabilities/**`, and `template-source/strategy-registry-v2.yaml`.
-- Revision: `template-source/template-revision.txt`, governed by `scripts/ci/verify-template-release-revision.sh`.
-- V2 State and Update Package semantics are unchanged. Service remains stateless and never applies packages to a caller workspace.
-- `capability-authoring` stages and commits only Legacy V2-owned paths. It preserves `template-source/code/**` and all other non-V2 content when compiling or publishing a V2 capability.
+- Core 仅保留 `core/v3`、`source/v3` 及 `core/common/StateDigest`。Digest 的递归排序、JSON 序列化与 SHA-256 格式保持不变。
+- Service 只注册 `CodeTemplateRelease`、`ExtensionResolver`、`V3ProjectMaterializer` 与 `V3UpdatePlanner`，并且只从 `<source-root>/code` 装载 Release。
+- Service 是无状态计算入口；Workspace Apply、回滚、构建、测试和 State 提交均由调用方负责。
+- `V3UpdatePlanner` 的 Release Refresh 行为及 Update Package 的 `validationPlan` 语义保持原样：V3.0 中 `validationPlan` 与 `diagnostics` 固定为空数组。
 
-## Extension V3 Preview
+## HTTP 与 Package 契约
 
-- `POST /v1/generate-next` and `POST /v1/update-next` are the V3 Preview API. They do not change the Legacy V2 endpoints.
-- HTTP contract: the V3 paths and request/error schemas in `engine-service-v1.yaml`.
-- Semantic contract: [docs/v3.md](v3.md).
-- V3 Update ZIP JSON contract: `template-engine/engine-service/src/main/resources/contracts/v3/*.schema.json`.
-- Runtime source: `template-source/code/frontend/base/**`, `template-source/code/frontend/extensions/*/extension.yaml`, `template-source/code/frontend/extensions/*/src/**`, `template-source/code/backend/base/**`, `template-source/code/backend/extensions/*/extension.yaml`, `template-source/code/backend/extensions/*/{src,docs,migrations}/**`, and `template-source/code/template-revision.txt`.
-- Revision: `template-source/code/template-revision.txt`, governed independently by `scripts/ci/verify-code-template-release-revision.sh`.
-- V3 State and Package remain caller-owned. Workspace apply, package rollback, builds/tests, and State commit are external DevAgentStudio/caller responsibilities. The engine may use a test-only reference executor to verify the package contract; it must not add a production workspace executor.
+仅公开以下接口：
 
-## Migration boundary
+- `POST /v1/generate`：V3 RequestedConfig，返回完整工程 ZIP 和 V3 TemplateState。
+- `POST /v1/update`：`protocolVersion` 必须为字符串 `"3"`；使用 V3 TemplateState，返回 V3 Update Package，或在无变化时返回 `204`。
 
-V2 and V3 have separate Runtime Source, Revision, State schema, and Update Package protocols. Changes to one source tree do not implicitly require synchronizing the other. A product change that intentionally updates both must be represented and revision-gated as two independent source changes.
+旧协议不兼容：`protocolVersion: "2"` 返回 `PROTOCOL_VERSION_UNSUPPORTED`；`schemaVersion: 2` 返回 `TEMPLATE_STATE_SCHEMA_UNSUPPORTED`。不存在自动 State 转换或兼容端点。
 
-During this preview stage, do not route `/v1/generate` or `/v1/update` to V3, remove V2 contracts, or delete Legacy source. Formal cutover is a later change.
+OpenAPI 是 HTTP 契约的唯一权威：`template-engine/engine-service/src/main/resources/openapi/engine-service-v1.yaml`。ZIP JSON 契约位于 `template-engine/engine-service/src/main/resources/contracts/v3/`。
+
+## 维护与验证
+
+Base 和 Extension 只在 `template-source/code/frontend/` 和 `template-source/code/backend/` 中维护。Assembly、workspace、profiles 与维护文档不属于 Runtime Release 输入。
+
+完成 Source 或 Core 改动后执行：
+
+```sh
+mvn -f template-engine/pom.xml verify
+./scripts/ci/verify-code-template-release-revision.sh <base-ref>
+```
+
+完成 Service 改动后至少执行：
+
+```sh
+mvn -f template-engine/pom.xml -pl engine-service -am package
+git diff --check
+```
+
+涉及 HTTP、ZIP 或启动配置时，还应使用 `template-engine/engine-service/config/application-local.yml` 和绝对 `TEMPLATE_ENGINE_SOURCE_ROOT` 进行真实 JAR 验收。服务固定监听 `127.0.0.1`。

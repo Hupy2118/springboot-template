@@ -82,7 +82,7 @@ class V3AssemblyParityIT {
     private byte[] generate(MockMvc mvc, Map<String, Object> capabilities) throws Exception {
         Map<String, Object> config = new LinkedHashMap<String, Object>(); config.put("capabilities", capabilities);
         Map<String, Object> request = new LinkedHashMap<String, Object>(); request.put("requestedConfig", config);
-        return mvc.perform(post("/v1/generate-next").contentType(MediaType.APPLICATION_JSON).accept("application/zip")
+        return mvc.perform(post("/v1/generate").contentType(MediaType.APPLICATION_JSON).accept("application/zip")
                         .content(JSON.writeValueAsBytes(request)))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
     }

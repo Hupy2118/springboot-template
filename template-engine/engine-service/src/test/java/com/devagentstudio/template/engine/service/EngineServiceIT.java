@@ -11,28 +11,29 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.charset.StandardCharsets;
-import java.util.zip.ZipInputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(SpringExtension.class)
@@ -47,187 +48,141 @@ class EngineServiceIT {
     }
 
     @Test
-    void localProfileBindsOnlyToIpv4Loopback() throws Exception {
-        String localProfile = new String(Files.readAllBytes(repositoryRoot()
-                .resolve("template-engine/engine-service/config/application-local.yml")), StandardCharsets.UTF_8);
-        assertTrue(localProfile.contains("address: 127.0.0.1"));
-        assertTrue(!localProfile.contains("address: 0.0.0.0"));
+    void generateIsDeterministicAndIncludesDependencyClosureAndResourceOwners() throws Exception {
+        MockMvc mvc = mvc();
+        byte[] base = generate(mvc, capabilities());
+        assertArrayEquals(base, generate(mvc, capabilities()));
+        JsonNode baseState = zipJson(base, ".devagentstudio/template-state.json");
+        assertEquals(6, baseState.size());
+        assertEquals(3, baseState.path("schemaVersion").asInt());
+        assertEquals(0, baseState.path("installedArtifacts").size());
+        assertEquals(0, baseState.path("managedContributions").size());
+        assertTrue(hasZipEntry(base, "frontend/src/extensions/providers.ts"));
+
+        byte[] auth = generate(mvc, capabilities("authorization", true));
+        assertArrayEquals(auth, generate(mvc, capabilities("authorization", true)));
+        JsonNode authState = zipJson(auth, ".devagentstudio/template-state.json");
+        assertTrue(authState.path("requested").has("authorization"));
+        assertFalse(authState.path("requested").has("login"));
+        assertTrue(authState.path("effective").has("login"));
+        assertTrue(authState.path("effective").has("authorization"));
+        assertTrue(hasZipEntry(auth, "frontend/src/pages/Login/index.tsx"));
+        assertTrue(hasZipEntry(auth, "backend/migrations/001-schema.sql"));
+        assertFalse(hasZipPrefix(auth, "backend/assembly/"));
+        JsonNode maven = authState.path("managedContributions").path("maven:ZA21:bee-starter-auth");
+        assertEquals("MAVEN_DEPENDENCY", maven.path("type").asText());
+        assertEquals(Arrays.asList("login"), JSON.convertValue(maven.path("owners"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)));
     }
 
     @Test
-    void planGenerateUpdateWithoutAuthenticationAreStateless() throws Exception {
-        MockMvc mvc = MockMvcBuilders.webAppContextSetup(context).build();
-        String requestedAuthorization = "{\"capabilities\":{\"authorization\":{\"enabled\":true,\"config\":{}}}}";
-        byte[] generated = mvc.perform(post("/v1/generate").contentType(MediaType.APPLICATION_JSON).content("{\"requestedConfig\":" + requestedAuthorization + "}"))
-                .andExpect(status().isOk()).andExpect(content().contentType("application/zip")).andReturn().getResponse().getContentAsByteArray();
-        JsonNode generatedState = zipJson(generated, ".devagentstudio/template-state.json");
-        assertEquals(2, generatedState.path("schemaVersion").asInt());
-        assertTrue(!generatedState.has("managedFiles"));
-        assertTrue(generatedState.path("appliedAdditions").has("authorization.role-page"));
-        assertTrue(zipText(generated, "backend/docs/auth/sql/ddl.sql").contains("CREATE TABLE `role`"));
-        assertTrue(!hasZipEntry(generated, "backend/docs/auth/sql/initialization.sql"));
-        assertTrue(!hasZipPrefix(generated, "frontend/node_modules/"));
-        assertEquals(readTemplateContract("route-projector.json"),
-                zipText(generated, ".devagentstudio/template-contracts/route-projector.json"));
-        assertEquals(readTemplateContract("route-projector-input.schema.json"),
-                zipText(generated, ".devagentstudio/template-contracts/route-projector-input.schema.json"));
-        assertEquals(readTemplateContract("route-projector-output.schema.json"),
-                zipText(generated, ".devagentstudio/template-contracts/route-projector-output.schema.json"));
+    void updateProducesOrderedDeterministicPackageThenSupportsNoChangeAndReconcile() throws Exception {
+        MockMvc mvc = mvc();
+        JsonNode baseState = zipJson(generate(mvc, capabilities()), ".devagentstudio/template-state.json");
+        Map<String, Object> request = updateRequest(baseState, capabilities("authorization", true), "APPLY");
+        byte[] first = postZip(mvc, "/v1/update", request, 200);
+        byte[] second = postZip(mvc, "/v1/update", request, 200);
+        assertArrayEquals(first, second);
+        JsonNode metadata = zipJson(first, "extension-update-package.json");
+        assertEquals("3", metadata.path("protocolVersion").asText());
+        assertEquals("APPLY", metadata.path("mode").asText());
+        assertTrue(metadata.path("operations").size() > 7);
+        assertEquals(metadata.path("operations").size(), continuousIndexes(metadata.path("operations")));
+        assertEquals(0, metadata.path("validationPlan").size());
+        assertEquals(0, metadata.path("diagnostics").size());
+        assertEquals(metadata.path("payloadManifest").size(), payloadEntryCount(first));
+        assertEquals("ADD_FILE", metadata.path("operations").get(0).path("type").asText());
+        assertEquals("ENSURE_MAVEN_DEPENDENCY", findOperation(metadata.path("operations"), "ENSURE_MAVEN_DEPENDENCY").path("type").asText());
+        assertEquals("REPLACE_MANAGED_FILE", metadata.path("operations").get(metadata.path("operations").size() - 1).path("type").asText());
 
-        String update = "{\"protocolVersion\":\"2\",\"currentTemplateState\":" + generatedState + ",\"requestedConfig\":" + requestedAuthorization + ",\"mode\":\"RECONCILE\"}";
-        byte[] changed = mvc.perform(post("/v1/update").contentType(MediaType.APPLICATION_JSON).content(update))
-                .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
-        JsonNode updatePackage = zipJson(changed, "strategy-update-package.json");
-        JsonNode nextState = updatePackage.path("nextTemplateState");
-        assertEquals("2", updatePackage.path("protocolVersion").asText());
-        assertTrue(updatePackage.path("strategies").size() > 0);
-        assertTrue(updatePackage.path("payloadManifest").has("payload/backend/docs/auth/sql/ddl.sql"));
-        assertEquals(updatePackage.path("strategies").size(), continuousIndexes(updatePackage.path("strategies")));
-        for (JsonNode validation : updatePackage.path("validationPlan")) {
-            assertTrue(validation.hasNonNull("validationId"));
-            assertTrue(!validation.has("validatorId"));
-            assertTrue(!validation.has("parameters"));
-            assertTrue(validation.has("executionMode") && validation.has("blocking")
-                    && validation.has("timeoutSeconds") && validation.has("workingDirectory"));
-        }
-        for (JsonNode strategy : updatePackage.path("strategies")) {
-            if ("ADD_FILE".equals(strategy.path("type").asText())) {
-                assertEquals(0, strategy.path("parameters").size());
-                assertTrue(updatePackage.path("payloadManifest").has(strategy.path("payloadRef").asText()));
-            } else assertTrue(strategy.path("payloadRef").isNull());
-        }
-        for (String entry : zipEntries(changed))
-            assertTrue("strategy-update-package.json".equals(entry) || entry.startsWith("payload/"), entry);
-        byte[] repeated = mvc.perform(post("/v1/update").contentType(MediaType.APPLICATION_JSON).content(update))
-                .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
-        assertArrayEquals(changed, repeated);
-        assertTrue(nextState.path("effective").has("login"));
-        assertTrue(nextState.path("effective").has("authorization"));
+        String targetState = JSON.writeValueAsString(metadata.path("nextTemplateState"));
+        mvc.perform(post("/v1/update").contentType(MediaType.APPLICATION_JSON)
+                .content(JSON.writeValueAsString(updateRequest(JSON.readTree(targetState), capabilities("authorization", true), "APPLY"))))
+                .andExpect(status().isNoContent());
 
-        String noChange = "{\"protocolVersion\":\"2\",\"currentTemplateState\":" + nextState + ",\"requestedConfig\":" + requestedAuthorization + ",\"mode\":\"APPLY\"}";
-        mvc.perform(post("/v1/update").contentType(MediaType.APPLICATION_JSON).content(noChange)).andExpect(status().isNoContent());
+        byte[] reconcile = postZip(mvc, "/v1/update", updateRequest(JSON.readTree(targetState), capabilities("authorization", true), "RECONCILE"), 200);
+        JsonNode repair = zipJson(reconcile, "extension-update-package.json");
+        assertEquals(targetState, JSON.writeValueAsString(repair.path("nextTemplateState")));
+        assertEquals(7, repair.path("operations").size());
+        assertEquals(5, countOperation(repair.path("operations"), "REPLACE_MANAGED_FILE"));
+        assertEquals(1, countOperation(repair.path("operations"), "ENSURE_JAVA_ANNOTATION"));
+        assertEquals(1, countOperation(repair.path("operations"), "ENSURE_MAVEN_DEPENDENCY"));
     }
 
     @Test
-    void generateGoldenIsDeterministicAndMatchesUpdateAtomicSurfaceApplication() throws Exception {
-        MockMvc mvc = MockMvcBuilders.webAppContextSetup(context).build();
-        String empty = "{\"capabilities\":{}}";
-        String login = "{\"capabilities\":{\"login\":{\"enabled\":true,\"config\":{}}}}";
-        String authorization = "{\"capabilities\":{\"authorization\":{\"enabled\":true,\"config\":{}}}}";
-        String both = "{\"capabilities\":{\"authorization\":{\"enabled\":true,\"config\":{}},\"login\":{\"enabled\":true,\"config\":{}}}}";
-        for (String requested : Arrays.asList(empty, login, authorization, both)) {
-            byte[] first = generate(mvc, requested);
-            assertArrayEquals(first, generate(mvc, requested));
-            JsonNode state = zipJson(first, ".devagentstudio/template-state.json");
-            assertEquals(5, state.size());
-            assertEquals(2, state.path("schemaVersion").asInt());
-            assertTrue(state.has("templateRevision") && state.has("requested") && state.has("effective") && state.has("appliedAdditions"));
-        }
+    void updateMapsProtocolStateAndRemovalErrorsToFrozenCodes() throws Exception {
+        MockMvc mvc = mvc();
+        JsonNode state = zipJson(generate(mvc, capabilities("authorization", true)), ".devagentstudio/template-state.json");
 
-        byte[] pristine = generate(mvc, empty);
-        JsonNode pristineState = zipJson(pristine, ".devagentstudio/template-state.json");
-        byte[] generated = generate(mvc, authorization);
-        String update = "{\"protocolVersion\":\"2\",\"currentTemplateState\":" + pristineState
-                + ",\"requestedConfig\":" + authorization + ",\"mode\":\"APPLY\"}";
-        byte[] updateZip = mvc.perform(post("/v1/update")
-                        .contentType(MediaType.APPLICATION_JSON).content(update))
-                .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
-        JsonNode updatePackage = zipJson(updateZip, "strategy-update-package.json");
-        Map<String, String> applied = new LinkedHashMap<String, String>();
-        for (String path : surfacePaths()) applied.put(path, zipText(pristine, path));
-        for (JsonNode strategy : updatePackage.path("strategies")) applySurfaceStrategy(applied, strategy);
-        for (String path : surfacePaths()) assertEquals(zipText(generated, path), applied.get(path), path);
-        assertTrue(zipText(generated, "frontend/src/capability-extensions/menuTransforms.ts").contains("useAuthorizationMenuTransform(current)"));
-        assertTrue(zipText(generated, "backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java")
-                .contains("ResourcePermissionInterceptor.class"));
+        Map<String, Object> request = updateRequest(state, capabilities("authorization", true), "APPLY");
+        request.put("protocolVersion", "2");
+        assertError(mvc, request, 400, "PROTOCOL_VERSION_UNSUPPORTED");
+
+        request = updateRequest(state, capabilities("authorization", true), "APPLY");
+        Map<String, Object> stale = JSON.convertValue(state, Map.class);
+        stale.put("schemaVersion", 2); request.put("currentTemplateState", stale);
+        assertError(mvc, request, 400, "TEMPLATE_STATE_SCHEMA_UNSUPPORTED");
+
+        request = updateRequest(state, capabilities("login", true), "APPLY");
+        assertError(mvc, request, 409, "CAPABILITY_REMOVAL_UNSUPPORTED");
+
+        request = updateRequest(state, capabilities("authorization", true), "APPLY");
+        Map<String, Object> invalid = JSON.convertValue(state, Map.class);
+        ((Map<String, Object>) invalid.get("managedContributions")).put("wrong-key", ((Map<String, Object>) invalid.get("managedContributions")).values().iterator().next());
+        request.put("currentTemplateState", invalid);
+        assertError(mvc, request, 400, "TEMPLATE_STATE_INVALID");
     }
 
-    private static JsonNode zipJson(byte[] zip, String path) throws Exception {
-        return JSON.readTree(zipBytes(zip, path));
+    private MockMvc mvc() { return org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup(context).build(); }
+    private byte[] generate(MockMvc mvc, Map<String, Object> capabilities) throws Exception {
+        Map<String, Object> body = new LinkedHashMap<String, Object>(); body.put("requestedConfig", config(capabilities));
+        return postZip(mvc, "/v1/generate", body, 200);
     }
-    private static String readTemplateContract(String file) throws Exception {
-        return new String(Files.readAllBytes(repositoryRoot().resolve("template-source/base/contracts").resolve(file)), StandardCharsets.UTF_8);
+    private byte[] postZip(MockMvc mvc, String path, Map<String, Object> body, int status) throws Exception {
+        MvcResult result = mvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).accept("application/zip")
+                .content(JSON.writeValueAsBytes(body))).andExpect(status().is(status)).andReturn();
+        return result.getResponse().getContentAsByteArray();
     }
-    private static byte[] generate(MockMvc mvc, String requested) throws Exception {
-        return mvc.perform(post("/v1/generate")
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"requestedConfig\":" + requested + "}"))
-                .andExpect(status().isOk()).andExpect(content().contentType("application/zip"))
-                .andReturn().getResponse().getContentAsByteArray();
+    private void assertError(MockMvc mvc, Map<String, Object> request, int status, String code) throws Exception {
+        MvcResult result = mvc.perform(post("/v1/update").contentType(MediaType.APPLICATION_JSON).content(JSON.writeValueAsBytes(request)))
+                .andExpect(status().is(status)).andReturn();
+        assertEquals(code, JSON.readTree(result.getResponse().getContentAsByteArray()).path("code").asText());
     }
-    private static List<String> surfacePaths() {
-        return Arrays.asList("frontend/src/capability-extensions/providers.tsx", "frontend/src/capability-extensions/routes.tsx",
-                "frontend/src/capability-extensions/routeGuards.tsx", "frontend/src/capability-extensions/menuTransforms.ts",
-                "backend/src/main/java/com/cmbchina/backend/common/config/CapabilityWebMvcConfiguration.java");
+    private Map<String, Object> updateRequest(JsonNode state, Map<String, Object> capabilities, String mode) {
+        Map<String, Object> body = new LinkedHashMap<String, Object>();
+        body.put("protocolVersion", "3"); body.put("currentTemplateState", JSON.convertValue(state, Map.class));
+        body.put("requestedConfig", config(capabilities)); body.put("mode", mode); return body;
     }
-    private static void applySurfaceStrategy(Map<String, String> files, JsonNode strategy) {
-        String target = strategy.path("target").asText();
-        String source = files.get(target);
-        if (source == null) return;
-        String type = strategy.path("type").asText();
-        JsonNode parameters = strategy.path("parameters");
-        if ("ENSURE_IMPORT".equals(type)) {
-            String statement = parameters.path("importStatement").asText();
-            if (!source.contains(statement)) {
-                int last = source.lastIndexOf("import ");
-                int end = source.indexOf('\n', last);
-                files.put(target, source.substring(0, end + 1) + statement + "\n" + source.substring(end + 1));
-            }
-        } else if ("TEXT_ANCHOR_INSERT".equals(type)) {
-            String anchor = parameters.path("anchor").asText();
-            String content = parameters.path("content").asText();
-            int index = source.indexOf(anchor);
-            if (index < 0 || index != source.lastIndexOf(anchor)) throw new AssertionError("invalid Golden anchor " + target);
-            if ("before".equals(parameters.path("position").asText())) {
-                int newline = source.lastIndexOf('\n', index - 1);
-                index = newline < 0 ? 0 : newline + 1;
-            }
-            files.put(target, source.substring(0, index) + content + source.substring(index));
-        }
+    private Map<String, Object> config(Map<String, Object> capabilities) {
+        Map<String, Object> result = new LinkedHashMap<String, Object>(); result.put("capabilities", capabilities); return result;
     }
-    private static int continuousIndexes(JsonNode strategies) {
-        int index = 0;
-        for (JsonNode strategy : strategies) {
-            if (strategy.path("index").asInt(-1) != index) throw new AssertionError("strategy index is not continuous");
-            index++;
-        }
-        return index;
+    private Map<String, Object> capabilities() { return new LinkedHashMap<String, Object>(); }
+    private Map<String, Object> capabilities(String id, boolean enabled) {
+        Map<String, Object> capability = new LinkedHashMap<String, Object>(); capability.put("enabled", enabled); capability.put("config", new LinkedHashMap<String, Object>());
+        Map<String, Object> result = new LinkedHashMap<String, Object>(); result.put(id, capability); return result;
     }
-    private static List<String> zipEntries(byte[] zip) throws Exception {
-        List<String> entries = new ArrayList<String>();
-        ZipInputStream input = new ZipInputStream(new ByteArrayInputStream(zip));
-        java.util.zip.ZipEntry entry;
-        while ((entry = input.getNextEntry()) != null) entries.add(entry.getName());
-        return entries;
-    }
-    private static String zipText(byte[] zip, String path) throws Exception {
-        return new String(zipBytes(zip, path), StandardCharsets.UTF_8);
-    }
-    private static byte[] zipBytes(byte[] zip, String path) throws Exception {
-        ZipInputStream input = new ZipInputStream(new ByteArrayInputStream(zip));
-        java.util.zip.ZipEntry entry;
+    private JsonNode zipJson(byte[] zip, String path) throws Exception { return JSON.readTree(zipBytes(zip, path)); }
+    private byte[] zipBytes(byte[] zip, String path) throws Exception {
+        ZipInputStream input = new ZipInputStream(new ByteArrayInputStream(zip)); ZipEntry entry;
         while ((entry = input.getNextEntry()) != null) if (path.equals(entry.getName())) {
-            ByteArrayOutputStream output = new ByteArrayOutputStream();
-            byte[] buffer = new byte[4096]; int count;
-            while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
-            return output.toByteArray();
+            ByteArrayOutputStream output = new ByteArrayOutputStream(); byte[] buffer = new byte[4096]; int count;
+            while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count); return output.toByteArray();
         }
         throw new AssertionError("missing ZIP entry " + path);
     }
-    private static boolean hasZipEntry(byte[] zip, String path) throws Exception {
-        ZipInputStream input = new ZipInputStream(new ByteArrayInputStream(zip));
-        java.util.zip.ZipEntry entry;
-        while ((entry = input.getNextEntry()) != null) if (path.equals(entry.getName())) return true;
-        return false;
+    private boolean hasZipEntry(byte[] zip, String path) throws Exception { for (String entry : zipEntries(zip)) if (entry.equals(path)) return true; return false; }
+    private boolean hasZipPrefix(byte[] zip, String prefix) throws Exception { for (String entry : zipEntries(zip)) if (entry.startsWith(prefix)) return true; return false; }
+    private List<String> zipEntries(byte[] zip) throws Exception {
+        List<String> result = new ArrayList<String>(); ZipInputStream input = new ZipInputStream(new ByteArrayInputStream(zip)); ZipEntry entry;
+        while ((entry = input.getNextEntry()) != null) result.add(entry.getName()); return result;
     }
-    private static boolean hasZipPrefix(byte[] zip, String prefix) throws Exception {
-        ZipInputStream input = new ZipInputStream(new ByteArrayInputStream(zip));
-        java.util.zip.ZipEntry entry;
-        while ((entry = input.getNextEntry()) != null) if (entry.getName().startsWith(prefix)) return true;
-        return false;
-    }
+    private int payloadEntryCount(byte[] zip) throws Exception { int result = 0; for (String entry : zipEntries(zip)) if (entry.startsWith("payload/")) result++; return result; }
+    private int continuousIndexes(JsonNode operations) { for (int i = 0; i < operations.size(); i++) assertEquals(i, operations.get(i).path("index").asInt(-1)); return operations.size(); }
+    private int countOperation(JsonNode operations, String type) { int result = 0; for (JsonNode item : operations) if (type.equals(item.path("type").asText())) result++; return result; }
+    private JsonNode findOperation(JsonNode operations, String type) { for (JsonNode item : operations) if (type.equals(item.path("type").asText())) return item; throw new AssertionError("operation missing " + type); }
     private static Path repositoryRoot() {
         Path current = Paths.get(System.getProperty("user.dir")).toAbsolutePath();
         while (current != null && !Files.isDirectory(current.resolve("template-source"))) current = current.getParent();
-        assertNotNull(current, "repository root"); return current;
+        if (current == null) throw new AssertionError("repository root not found");
+        return current;
     }
 }

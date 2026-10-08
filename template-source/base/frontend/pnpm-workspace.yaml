@@ -1,8 +1,0 @@
-packages:
-  - '.'
-allowBuilds:
-  esbuild: true
-
-# Fail installation when a newly introduced dependency requires an
-# unreviewed build script, instead of silently skipping it.
-strictDepBuilds: true

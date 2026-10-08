@@ -9,7 +9,6 @@
 
     <modules>
         <module>engine-core</module>
-        <module>capability-authoring</module>
         <module>engine-service</module>
     </modules>
 

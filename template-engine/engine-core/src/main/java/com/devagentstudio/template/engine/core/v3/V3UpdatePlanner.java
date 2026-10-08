@@ -1,6 +1,6 @@
 package com.devagentstudio.template.engine.core.v3;
 
-import com.devagentstudio.template.engine.core.v2.StateDigest;
+import com.devagentstudio.template.engine.core.common.StateDigest;
 
 import java.util.ArrayList;
 import java.util.Arrays;

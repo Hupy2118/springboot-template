@@ -1,6 +1,0 @@
-<dependencies>
-  <dependency>
-    <groupId>ZA21</groupId>
-      <artifactId>bee-starter-auth</artifactId>
-  </dependency>
-</dependencies>

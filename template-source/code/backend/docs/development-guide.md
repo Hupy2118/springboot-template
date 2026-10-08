@@ -228,7 +228,7 @@ git diff --check
 
 在下一阶段 Template Engine 直接消费 Base + Extension + Assembly 模型之前：
 
-- 不修改 Engine、旧 `base`、旧 `capabilities` 或 `strategy-registry-v2.yaml`；
+- 不修改 Engine；只在 `template-source/code/` 的 Base 或 Extension 边界内维护模板；
 - 不建立 Publisher、双写脚本或临时兼容层；
 - 不在后端模型中引入 Strategy Registry、通用 Java/AST Patch 或 Runtime Registry。
 

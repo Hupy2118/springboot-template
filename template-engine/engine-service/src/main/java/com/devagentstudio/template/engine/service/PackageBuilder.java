@@ -1,100 +1,62 @@
 package com.devagentstudio.template.engine.service;
 
+import com.devagentstudio.template.engine.core.common.StateDigest;
+import com.devagentstudio.template.engine.core.v3.CodeTemplateRelease;
+import com.devagentstudio.template.engine.core.v3.V3Exception;
+import com.devagentstudio.template.engine.core.v3.V3UpdateResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.devagentstudio.template.engine.core.v2.ModificationStrategy;
-import com.devagentstudio.template.engine.core.v2.StateDigest;
-import com.devagentstudio.template.engine.core.v2.TemplateStateV2;
-import com.devagentstudio.template.engine.core.v2.UpdateResult;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-/** Builds only response bytes. It never creates a caller workspace or durable server state. */
+/** Builds the V3 generate and update ZIPs without touching a caller Workspace. */
 final class PackageBuilder {
     private static final long ZIP_TIMESTAMP = 0L;
     private final ObjectMapper json;
-    private final Path sourceRoot;
-    private final WireStrategyCompiler strategyCompiler = new WireStrategyCompiler();
-    private final ValidatorCompiler validatorCompiler = new ValidatorCompiler();
-    PackageBuilder(ObjectMapper json, Path sourceRoot) { this.json = json; this.sourceRoot = sourceRoot.toAbsolutePath().normalize(); }
+    private final CodeTemplateRelease release;
+    PackageBuilder(ObjectMapper json, CodeTemplateRelease release) { this.json = json; this.release = release; }
 
-    byte[] generatedProject(Map<String, String> project, TemplateStateV2 nextTemplateState) {
-        Map<String, byte[]> entries = new LinkedHashMap<String, byte[]>();
-        for (Map.Entry<String, String> file : project.entrySet()) entries.put(file.getKey(), bytes(file.getValue()));
-        entries.put(".devagentstudio/template-state.json", jsonBytes(EngineMapper.stateV2(nextTemplateState)));
+    byte[] generatedProject(Map<String, byte[]> project, Map<String, Object> state) {
+        Map<String, byte[]> entries = new TreeMap<String, byte[]>(project);
+        entries.put(".devagentstudio/template-state.json", jsonBytes(state));
         return zip(entries);
     }
 
-    byte[] updatePackage(UpdateResult result, TemplateStateV2 current, String mode) {
-        if (result.kind() != UpdateResult.Kind.CHANGE) throw new ServiceException("PACKAGE_BUILD_FAILED", "update package requires changes", 500);
-        Map<String, byte[]> entries = new LinkedHashMap<String, byte[]>();
+    byte[] updatePackage(V3UpdateResult result) {
+        if (result.kind() != V3UpdateResult.Kind.CHANGE) throw packageError("update package requires changes");
         Map<String, Object> metadata = new LinkedHashMap<String, Object>();
-        metadata.put("protocolVersion", "2");
-        metadata.put("packageId", "pkg-" + StateDigest.of(EngineMapper.stateV2(result.nextTemplateState())).substring(7, 23));
-        metadata.put("mode", mode);
-        metadata.put("sourceRevision", current.templateRevision());
-        metadata.put("currentStateDigest", StateDigest.of(EngineMapper.stateV2(current)));
-        metadata.put("nextStateDigest", StateDigest.of(EngineMapper.stateV2(result.nextTemplateState())));
-        List<Map<String, Object>> strategies = new ArrayList<Map<String, Object>>();
-        Map<String, Object> manifest = new LinkedHashMap<String, Object>();
-        int index = 0;
-        for (ModificationStrategy strategy : result.strategies()) if ("ADD_FILE".equals(strategy.type())) {
-            Object capabilityId = strategy.parameters().get("capabilityId");
-            Object sourceRef = strategy.parameters().get("sourceRef");
-            if (!(capabilityId instanceof String) || !(sourceRef instanceof String)) throw new ServiceException("PACKAGE_BUILD_FAILED", "ADD_FILE source metadata missing", 500);
-            Path source = sourceRoot.resolve("capabilities").resolve((String) capabilityId).resolve((String) sourceRef).normalize();
-            if (!source.startsWith(sourceRoot) || !Files.isRegularFile(source)) throw new ServiceException("PACKAGE_BUILD_FAILED", "ADD_FILE source missing", 500);
-            String payloadRef = "payload/" + strategy.target();
-            try { entries.put(payloadRef, Files.readAllBytes(source)); }
-            catch (IOException e) { throw new ServiceException("PACKAGE_BUILD_FAILED", "cannot read ADD_FILE source", 500); }
-            strategies.add(strategyCompiler.compile(strategy, index++, Collections.<String, Object>emptyMap(), payloadRef));
-        } else {
-            strategies.add(strategyCompiler.compile(strategy, index++, strategy.parameters(), null));
+        String currentDigest = StateDigest.of(result.currentState());
+        String nextDigest = StateDigest.of(result.nextState());
+        metadata.put("protocolVersion", "3"); metadata.put("packageId", "pkg-" + nextDigest.substring(7, 23));
+        metadata.put("mode", result.mode()); metadata.put("sourceRevision", release.revision());
+        metadata.put("currentStateDigest", currentDigest); metadata.put("nextStateDigest", nextDigest);
+        metadata.put("operations", result.operations()); metadata.put("validationPlan", Collections.emptyList());
+        Map<String, Object> manifest = new TreeMap<String, Object>();
+        Map<String, byte[]> entries = new TreeMap<String, byte[]>();
+        for (Map.Entry<String, byte[]> payload : result.payloads().entrySet()) {
+            if (!payload.getKey().startsWith("payload/") || !safe(payload.getKey())) throw packageError("unsafe payload path");
+            entries.put(payload.getKey(), payload.getValue());
+            Map<String, Object> value = new LinkedHashMap<String, Object>();
+            value.put("size", payload.getValue().length); value.put("sha256", StateDigest.sha256(payload.getValue()));
+            manifest.put(payload.getKey(), value);
         }
-        for (Map.Entry<String, byte[]> entry : entries.entrySet()) manifest.put(entry.getKey(), payload(entry.getValue()));
-        metadata.put("strategies", strategies);
-        List<Map<String, Object>> validation = validatorCompiler.compile(result);
-        validateReconcile(mode, current, result.nextTemplateState(), validation);
-        metadata.put("validationPlan", validation);
-        metadata.put("payloadManifest", manifest);
-        metadata.put("nextTemplateState", EngineMapper.stateV2(result.nextTemplateState()));
-        metadata.put("diagnostics", Collections.emptyList());
-        entries.put("strategy-update-package.json", jsonBytes(metadata));
+        metadata.put("payloadManifest", manifest); metadata.put("nextTemplateState", result.nextState()); metadata.put("diagnostics", Collections.emptyList());
+        entries.put("extension-update-package.json", jsonBytes(metadata));
         return zip(entries);
     }
 
-    private void validateReconcile(String mode, TemplateStateV2 current,
-                                   TemplateStateV2 next, List<Map<String, Object>> validation) {
-        if (!"RECONCILE".equals(mode)) return;
-        if (!StateDigest.of(EngineMapper.stateV2(current)).equals(StateDigest.of(EngineMapper.stateV2(next))))
-            throw new ServiceException("RECONCILE_STATE_CHANGE_REQUIRED", "RECONCILE must not change TemplateState", 409);
-        java.util.Set<String> covered = new java.util.HashSet<String>();
-        for (Map<String, Object> item : validation) if ("CAPABILITY_POSTCONDITION".equals(item.get("type"))) {
-            Object capabilityId = item.get("capabilityId"); Object checks = item.get("checks");
-            if (capabilityId instanceof String && checks instanceof List && !((List<?>) checks).isEmpty()) covered.add((String) capabilityId);
-        }
-        if (!covered.containsAll(next.effective().keySet())) throw new ServiceException("PACKAGE_BUILD_FAILED", "RECONCILE postconditions missing", 500);
-    }
-    private Map<String, Object> payload(byte[] bytes) {
-        Map<String, Object> result = new LinkedHashMap<String, Object>(); result.put("size", bytes.length); result.put("sha256", StateDigest.sha256(bytes)); return result;
-    }
     private byte[] jsonBytes(Object value) {
         try { return json.writeValueAsBytes(value); }
-        catch (IOException e) { throw new ServiceException("PACKAGE_BUILD_FAILED", "cannot serialize package", 500); }
-    }
-    private byte[] bytes(String content) {
-        if (content == null) throw new ServiceException("PACKAGE_BUILD_FAILED", "file operation content missing", 500);
-        return content.getBytes(StandardCharsets.UTF_8);
+        catch (IOException e) { throw packageError("cannot serialize V3 package"); }
     }
     private byte[] zip(Map<String, byte[]> values) {
         try {
@@ -102,14 +64,17 @@ final class PackageBuilder {
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             ZipOutputStream zip = new ZipOutputStream(output, StandardCharsets.UTF_8);
             for (String path : paths) {
-                safe(path);
+                if (!safe(path)) throw packageError("unsafe V3 package path " + path);
                 ZipEntry entry = new ZipEntry(path); entry.setTime(ZIP_TIMESTAMP);
                 zip.putNextEntry(entry); zip.write(values.get(path)); zip.closeEntry();
             }
             zip.finish(); zip.close(); return output.toByteArray();
-        } catch (IOException e) { throw new ServiceException("PACKAGE_BUILD_FAILED", "cannot build package", 500); }
+        } catch (IOException e) { throw packageError("cannot build V3 package"); }
     }
-    private void safe(String path) {
-        if (path.startsWith("/") || path.contains("\\") || path.contains("..") || path.isEmpty()) throw new ServiceException("PACKAGE_BUILD_FAILED", "unsafe package path", 500);
+    private boolean safe(String path) {
+        if (path == null || path.isEmpty() || path.startsWith("/") || path.contains("\\")) return false;
+        for (String part : path.split("/")) if (part.isEmpty() || ".".equals(part) || "..".equals(part)) return false;
+        return true;
     }
+    private V3Exception packageError(String message) { return new V3Exception("PACKAGE_BUILD_FAILED", message, 500); }
 }

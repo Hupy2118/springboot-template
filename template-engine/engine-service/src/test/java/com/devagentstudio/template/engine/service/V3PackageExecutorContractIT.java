@@ -1,6 +1,6 @@
 package com.devagentstudio.template.engine.service;
 
-import com.devagentstudio.template.engine.core.v2.StateDigest;
+import com.devagentstudio.template.engine.core.common.StateDigest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -100,14 +100,14 @@ class V3PackageExecutorContractIT {
     private byte[] generate(MockMvc mvc, Map<String, Object> capabilities) throws Exception {
         Map<String, Object> config = new LinkedHashMap<String, Object>(); config.put("capabilities", capabilities);
         Map<String, Object> request = new LinkedHashMap<String, Object>(); request.put("requestedConfig", config);
-        return mvc.perform(post("/v1/generate-next").contentType(MediaType.APPLICATION_JSON).accept("application/zip")
+        return mvc.perform(post("/v1/generate").contentType(MediaType.APPLICATION_JSON).accept("application/zip")
                         .content(JSON.writeValueAsBytes(request))).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
     }
     private byte[] update(MockMvc mvc, JsonNode state, Map<String, Object> capabilities) throws Exception {
         Map<String, Object> config = new LinkedHashMap<String, Object>(); config.put("capabilities", capabilities);
         Map<String, Object> request = new LinkedHashMap<String, Object>(); request.put("protocolVersion", "3"); request.put("currentTemplateState", JSON.convertValue(state, Map.class));
         request.put("requestedConfig", config); request.put("mode", "APPLY");
-        return mvc.perform(post("/v1/update-next").contentType(MediaType.APPLICATION_JSON).accept("application/zip")
+        return mvc.perform(post("/v1/update").contentType(MediaType.APPLICATION_JSON).accept("application/zip")
                         .content(JSON.writeValueAsBytes(request))).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
     }
     private Map<String, Object> capabilities(String id) {

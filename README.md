@@ -1,14 +1,13 @@
 # Spring Boot Template Engine
 
-本仓库在迁移期并行提供 Legacy V2 与 Extension V3 Preview。两个引擎均为无状态计算服务，只读取各自的 Runtime Source 并返回确定性 ZIP；它们不管理调用方工程、数据库、Project 或 ChangeSet 状态机。
+本仓库提供单一的 V3 Template Engine：无状态计算服务只读取 Runtime Source 并返回确定性 ZIP；它不管理调用方工程、数据库、Project 或 ChangeSet 状态机。
 
 ## 模块
 
-- `template-source/base/`、`template-source/capabilities/`：Legacy V2 Runtime Source。
-- `template-source/code/frontend/`、`template-source/code/backend/`：Extension V3 Preview 的双端 Base + Extension Runtime Source。
+- `template-source/code/frontend/`、`template-source/code/backend/`：双端 Base + Extension Runtime Source。
 - `template-engine/engine-core/`：不依赖 Spring 的模板装载、Capability/Extension Resolve、Materialization 和 Update Planning Core。
 - `template-engine/engine-service/`：无状态 HTTP API 和 ZIP Package Builder。本地模式固定监听 Loopback，不做应用层认证。
-- `scripts/ci/`：Legacy V2 与 Extension V3 独立 Revision Gate，以及 Base Frontend 构建检查。
+- `scripts/ci/`：V3 Revision Gate 与 Base Frontend 构建检查。
 
 ## 构建与测试
 
@@ -28,7 +27,6 @@ template-engine/engine-service/target/engine-service-1.0.0-SNAPSHOT.jar
 Template Source 的发布门禁使用当前分支的共同基线执行：
 
 ```sh
-./scripts/ci/verify-template-release-revision.sh origin/main
 ./scripts/ci/verify-code-template-release-revision.sh origin/main
 ```
 
@@ -112,13 +110,14 @@ Tomcat 默认会在文件名中加入日期，例如 `access.2026-09-09.log`，�
 
 ```json
 {
-  "protocolVersion": "2",
+  "protocolVersion": "3",
   "currentTemplateState": {
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "templateRevision": "...",
     "requested": {},
     "effective": {},
-    "appliedAdditions": {}
+    "installedArtifacts": {},
+    "managedContributions": {}
   },
   "requestedConfig": {
     "capabilities": {
@@ -129,21 +128,12 @@ Tomcat 默认会在文件名中加入日期，例如 `access.2026-09-09.log`，�
 }
 ```
 
-当配置改变时，预期 `200 application/zip`，ZIP 仅包含 `strategy-update-package.json` 与可选 `payload/`。将该文件的 `nextTemplateState` 与同一 RequestedConfig 再次提交，预期 `204 No Content`。
+当配置改变时，预期 `200 application/zip`，ZIP 包含 `extension-update-package.json` 与可选 `payload/`。将该文件的 `nextTemplateState` 与同一 RequestedConfig 再次提交，预期 `204 No Content`。
 
 完整验收契约见 [docs/REFACTOR.md](docs/REFACTOR.md)。
 
-## Extension V3 Preview
+## Template Engine 契约
 
-迁移期间接口与源码保持隔离：
+`/v1/generate` 和 `/v1/update` 仅使用 V3 协议及 `template-source/code/` Runtime Source。V3 Semantic Contract 见 [docs/v3.md](docs/v3.md)。HTTP 契约以 OpenAPI 为准，Update ZIP 内部 JSON 以 `template-engine/engine-service/src/main/resources/contracts/v3/` 中的 JSON Schema 为准。Revision 使用 `template-source/code/template-revision.txt`。
 
-| API | Engine | Runtime Source |
-| --- | --- | --- |
-| `/v1/generate`、`/v1/update` | Legacy V2 | `template-source/base`、`template-source/capabilities` |
-| `/v1/generate-next`、`/v1/update-next` | Extension V3 Preview | `template-source/code/frontend`、`template-source/code/backend` |
-
-V3 Semantic Contract 见 [docs/v3.md](docs/v3.md)。HTTP 契约以 OpenAPI 为准，Update ZIP 内部 JSON 以 `template-engine/engine-service/src/main/resources/contracts/v3/` 中的 JSON Schema 为准。V3 Revision 独立使用 `template-source/code/template-revision.txt`。
-
-## Capability Authoring
-
-新增 Capability 的本地工作流是 `./capability init`、开发 `.workbench/<id>/project`、可选 `./capability status`、再执行 `./capability build`。完整约束、Draft 所有权和高级调试命令见 [docs/Capability_Authoring_Guide.md](docs/Capability_Authoring_Guide.md)。
+将模板适配到行内环境、判断是否需要新增 Extension 注册点，以及迁移已有工程的操作建议，见[行内模板移植与维护指南](docs/INTERNAL_MIGRATION_GUIDE.md)。

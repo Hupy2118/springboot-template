@@ -1,6 +1,5 @@
 package com.devagentstudio.template.engine.service;
 
-import com.devagentstudio.template.engine.source.TemplateSourceException;
 import com.devagentstudio.template.engine.core.v3.V3Exception;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -19,13 +18,6 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(V3Exception.class)
     ResponseEntity<Map<String, Object>> v3(V3Exception exception) { return response(exception.code(), exception.getMessage(), exception.status()); }
-
-    @ExceptionHandler(TemplateSourceException.class)
-    ResponseEntity<Map<String, Object>> core(TemplateSourceException exception) {
-        String message = exception.getMessage() == null ? "template source failure" : exception.getMessage();
-        String code = message.contains(":") ? message.substring(0, message.indexOf(':')) : "TEMPLATE_SOURCE_INVALID";
-        return response(code, message, "RECONCILE_STATE_CHANGE_REQUIRED".equals(code) ? 409 : 400);
-    }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ResponseEntity<Map<String, Object>> malformed(HttpMessageNotReadableException exception) { return response("BAD_REQUEST", "request body must be valid JSON", 400); }
