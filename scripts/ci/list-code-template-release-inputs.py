@@ -62,12 +62,16 @@ def extension_directories(root, relative_root):
 
 
 def collect_inputs(template_source):
+    """枚举双端源码与路由契约，供当前发布输入和 Revision 校验使用。"""
     root = pathlib.Path(template_source).resolve()
     if not root.is_dir() or root.name != "template-source":
         fail("expected a template-source directory, got %s" % root)
 
     result = set()
     code = pathlib.Path("code")
+    # 将恢复的根目录路由契约纳入发布输入与 Revision 检查。
+    if (root / code / "contracts").exists() or (root / code / "contracts").is_symlink():
+        add_tree(root, code / "contracts", result)
     add_tree(root, code / "frontend" / "base", result)
     add_tree(root, code / "backend" / "base", result)
 

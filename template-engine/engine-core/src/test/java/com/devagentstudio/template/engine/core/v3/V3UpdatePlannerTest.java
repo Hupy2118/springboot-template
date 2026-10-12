@@ -127,9 +127,10 @@ class V3UpdatePlannerTest {
     private Path codeRoot() { return repositoryRoot().resolve("template-source/code"); }
     private void writeRevision(Path root, String revision) throws Exception { Files.write(root.resolve("template-revision.txt"), (revision + "\n").getBytes(StandardCharsets.UTF_8)); }
     private String read(Path path) throws Exception { return new String(Files.readAllBytes(path), StandardCharsets.UTF_8); }
+    /** 为更新测试复制完整的当前 Runtime Source，包括根目录路由契约。 */
     private void copyRuntime(Path source, Path target) throws Exception {
         Files.createDirectories(target);
-        for (String relative : Arrays.asList("frontend/base", "frontend/extensions", "backend/base", "backend/extensions")) copyDirectory(source.resolve(relative), target.resolve(relative));
+        for (String relative : Arrays.asList("contracts", "frontend/base", "frontend/extensions", "backend/base", "backend/extensions")) copyDirectory(source.resolve(relative), target.resolve(relative));
         Files.copy(source.resolve("template-revision.txt"), target.resolve("template-revision.txt"));
     }
     private void copyDirectory(Path source, Path target) throws Exception {

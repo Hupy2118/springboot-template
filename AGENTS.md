@@ -10,6 +10,7 @@ Engine Service 是无状态计算入口，不是 Project Registry、Workspace Ma
 
 ## 目录职责
 
+- `template-source/code/contracts/`：根目录 Route Projector 契约，生成时交付到 `.devagentstudio/template-contracts/`，属于 V3 Runtime Release Inputs。
 - `template-source/code/frontend/base/`、`template-source/code/frontend/extensions/`、`template-source/code/backend/base/`、`template-source/code/backend/extensions/`：V3 Runtime Source。以双端 `extension.yaml` 和 `template-source/code/template-revision.txt` 为契约。
 - `template-source/code/frontend/assembly/`、`template-source/code/backend/assembly/`、两端 workspace、profiles、maintenance package 与开发文档：V3 Maintenance-only，不属于 Engine Runtime Release Inputs。
 - `template-engine/engine-core/`：纯 Java Core；不得引入 Spring MVC、HTTP、持久化或 ZIP 打包依赖。V3 逻辑放在独立 `core/v3`、`source/v3` 包中。

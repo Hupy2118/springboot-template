@@ -22,6 +22,10 @@ OpenAPI 是 HTTP 契约的唯一权威：`template-engine/engine-service/src/mai
 
 ## 维护与验证
 
+`template-source/code/contracts/` 保存从旧 Base 恢复的 Route Projector Descriptor 和输入/输出 Schema，生成时交付到根目录 `.devagentstudio/template-contracts/`；页面身份向量仍随前端 Base 交付。四份文件内容沿用旧模板，不改变路由协议或执行逻辑。
+
+Route Projector 输入继续使用 `pageId/name/resourceKey?`，写入当前模板 `PAGE_ROUTES` 时映射为 `path/label/resourceKey?`。`path` 保留 snake_case 页面身份，由现有 Runtime 推导 URL 和组件目录。
+
 Base 和 Extension 只在 `template-source/code/frontend/` 和 `template-source/code/backend/` 中维护。Assembly、workspace、profiles 与维护文档不属于 Runtime Release 输入。
 
 完成 Source 或 Core 改动后执行：

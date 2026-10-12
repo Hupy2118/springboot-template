@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Route Projector v2 output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "requestedPageIds", "appliedPageIds", "skippedPageIds"],
+  "properties": {
+    "status": { "const": "applied" },
+    "requestedPageIds": { "$ref": "#/$defs/pageIds" },
+    "appliedPageIds": { "$ref": "#/$defs/pageIds" },
+    "skippedPageIds": { "$ref": "#/$defs/pageIds" }
+  },
+  "$defs": {
+    "pageIds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "pattern": "^[a-z0-9]+(?:_[a-z0-9]+)*$" }
+    }
+  }
+}

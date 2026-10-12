@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { closeSync, existsSync, fsyncSync, lstatSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const PROTOCOL = 'route-projector.v2';
 const PAGE_ID_PATTERN = /^[a-z0-9]+(?:_[a-z0-9]+)*$/;
@@ -99,9 +100,11 @@ function requireRegularFile(path, label) {
   }
 }
 
+/** 将页面业务输入映射为当前模板路由表的 path/label 字段。 */
 export function renderBusinessRoutes(pages, eol = '\n') {
   return pages.flatMap((page) => {
-    const fields = [`    name: ${JSON.stringify(page.name)},`, `    pageId: ${JSON.stringify(page.pageId)},`];
+    // path 保留 snake_case 身份，URL 与组件目录继续由运行时统一推导。
+    const fields = [`    path: ${JSON.stringify(page.pageId)},`, `    label: ${JSON.stringify(page.name)},`];
     if (page.resourceKey !== undefined) fields.push(`    resourceKey: ${JSON.stringify(page.resourceKey)},`);
     return ['  {', ...fields, '  },'];
   }).join(eol);
@@ -182,13 +185,19 @@ export function apply(workspace, inputText) {
   };
 }
 
+/** 读取标准输入并输出唯一的路由投影 JSON 结果。 */
 function main() {
   if (process.argv.length !== 3 || process.argv[2] !== 'apply') fail('用法：route-projector.mjs apply');
   const result = apply(process.cwd(), readFileSync(0, 'utf8'));
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === resolve(new URL(import.meta.url).pathname)) {
+// 将模块 URL 转为系统路径，兼容 Windows 盘符以及空格、中文路径。
+const currentScriptPath = fileURLToPath(import.meta.url);
+const launchedScriptPath = process.argv[1];
+
+// 仅直接执行脚本时调用入口；导入脚本进行测试时不读取标准输入。
+if (launchedScriptPath && resolve(launchedScriptPath) === resolve(currentScriptPath)) {
   try { main(); } catch (error) {
     process.stderr.write(`${error.message}\n`);
     process.exitCode = 1;

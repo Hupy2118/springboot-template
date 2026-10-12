@@ -37,8 +37,11 @@ public final class V3ProjectMaterializer {
 
     public V3ProjectMaterializer(CodeTemplateRelease release) { this.release = release; }
 
+    /** 按固定路径组装当前双端源码、扩展注册表和路由契约。 */
     public Map<String, byte[]> materialize(ExtensionResolver.ResolvedExtensions resolved) {
         Map<String, byte[]> files = new LinkedHashMap<String, byte[]>();
+        // 契约沿用既有工作区路径，供调用方在 Build 收尾读取。
+        add(files, ".devagentstudio/template-contracts/", release.contracts());
         add(files, "frontend/", release.frontendBase());
         add(files, "backend/", release.backendBase());
         for (String id : resolved.order()) {

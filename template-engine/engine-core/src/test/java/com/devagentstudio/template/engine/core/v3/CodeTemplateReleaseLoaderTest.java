@@ -18,11 +18,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CodeTemplateReleaseLoaderTest {
+    /** 验证 V3 源码装载、权限依赖与恢复的路由契约交付。 */
     @Test
     void loadsV3ReleaseAndResolvesAuthorizationClosureDeterministically() throws Exception {
         Path root = repositoryRoot();
         CodeTemplateRelease release = new CodeTemplateReleaseLoader(root.resolve("template-source/code")).load();
-        assertEquals("2026.09.23.4", release.revision());
+        assertEquals("2026.10.10.1", release.revision());
         assertTrue(release.extensions().containsKey("login"));
         assertTrue(release.extensions().containsKey("authorization"));
 
@@ -49,6 +50,13 @@ class CodeTemplateReleaseLoaderTest {
 
         ResolvedExtensions base = new ExtensionResolver(release).resolve(Collections.<String, Object>emptyMap());
         Map<String, byte[]> baseProject = new V3ProjectMaterializer(release).materialize(base);
+        // 验证恢复的四份原文件随 Base 交付，契约位于工作区根目录。
+        for (String name : java.util.Arrays.asList("route-projector.json", "route-projector-input.schema.json", "route-projector-output.schema.json")) {
+            assertEquals(utf8(Files.readAllBytes(root.resolve("template-source/code/contracts/" + name))),
+                    utf8(baseProject.get(".devagentstudio/template-contracts/" + name)));
+        }
+        assertTrue(baseProject.containsKey("frontend/src/utils/pageIdentity.vectors.json"));
+        assertFalse(baseProject.containsKey("frontend/.devagentstudio/template-contracts/route-projector.json"));
         assertFalse(baseProject.containsKey("frontend/src/pages/Login/index.tsx"));
         assertFalse(utf8(baseProject.get("backend/pom.xml")).contains("bee-starter-auth"));
     }

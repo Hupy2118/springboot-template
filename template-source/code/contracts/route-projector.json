@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "route-projector-contract.v2",
+  "protocol": "route-projector.v2",
+  "inputSchema": "route-projector-input.schema.json",
+  "outputSchema": "route-projector-output.schema.json",
+  "command": [
+    "node",
+    "frontend/scripts/devagentstudio/route-projector.mjs",
+    "apply"
+  ]
+}

@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
-const script = resolve(dirname(new URL(import.meta.url).pathname), 'route-projector.mjs');
+const script = resolve(dirname(fileURLToPath(import.meta.url)), 'route-projector.mjs');
 const routesTemplate = `import type { PageRouteDefinition } from '@/typings/routes';
 
 export const PAGE_ROUTES: PageRouteDefinition[] = [
-  { name: '欢迎页', pageId: 'welcome' },
+  { path: 'home', label: '首页' },
   // DEVAGENTSTUDIO_BUSINESS_ROUTES_START
   // DEVAGENTSTUDIO_BUSINESS_ROUTES_END
 ];
@@ -31,8 +32,9 @@ function workspace(pageIds = [], routesText = routesTemplate) {
   return root;
 }
 
-function apply(root, pages, protocol = 'route-projector.v2') {
-  return spawnSync(process.execPath, [script, 'apply'], {
+/** 在测试工作区直接执行 Projector，校验标准输入与输出契约。 */
+function apply(root, pages, protocol = 'route-projector.v2', scriptPath = script) {
+  return spawnSync(process.execPath, [scriptPath, 'apply'], {
     cwd: root,
     input: JSON.stringify({ protocol, pages }),
     encoding: 'utf8',
@@ -66,8 +68,26 @@ test('v2 输出按输入顺序报告 requested、applied 与 skipped', () => {
       appliedPageIds: ['portal_home', 'asset_list'],
       skippedPageIds: ['report_center'],
     });
-    assert.match(routes(root), /name: "门户首页",\n    pageId: "portal_home",/);
+    assert.match(routes(root), /path: "portal_home",\n    label: "门户首页",/);
+    assert.doesNotMatch(routes(root), /\b(?:pageId|name):/);
     assert.match(routes(root), /resourceKey: "PAGE\.ASSET_LIST",/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('脚本位于中文及空格路径时仍执行入口并输出 JSON', () => {
+  const root = workspace(['asset_list']);
+  try {
+    // 使用独立脚本副本覆盖 file URL 编码路径，同时保留原相对依赖布局。
+    const sourceRoot = resolve(realpathSync(root), '模板 空格');
+    const scriptPath = resolve(sourceRoot, 'scripts/devagentstudio/route-projector.mjs');
+    mkdirSync(dirname(scriptPath), { recursive: true });
+    mkdirSync(resolve(sourceRoot, 'src/utils'), { recursive: true });
+    writeFileSync(scriptPath, readFileSync(script));
+    writeFileSync(resolve(sourceRoot, 'src/utils/pageIdentity.vectors.json'),
+      readFileSync(new URL('../../src/utils/pageIdentity.vectors.json', import.meta.url)));
+    const result = output(apply(root, [{ pageId: 'asset_list', name: '资产管理' }], 'route-projector.v2', scriptPath));
+    assert.deepEqual(result.appliedPageIds, ['asset_list']);
+    assert.match(routes(root), /path: "asset_list"/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

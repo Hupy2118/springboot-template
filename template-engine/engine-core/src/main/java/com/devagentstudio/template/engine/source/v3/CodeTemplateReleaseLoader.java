@@ -44,10 +44,13 @@ public final class CodeTemplateReleaseLoader {
 
     public CodeTemplateReleaseLoader(Path codeRoot) { this.codeRoot = codeRoot.toAbsolutePath().normalize(); }
 
+    /** 装载当前 V3 双端源码与随项目交付的路由契约。 */
     public CodeTemplateRelease load() {
         try {
             String revision = readUtf8(codeRoot.resolve("template-revision.txt")).trim();
             RevisionVersion.parse(revision);
+            // 恢复旧模板已交付的根目录路由契约，不改变 Projector 业务行为。
+            Map<String, byte[]> contracts = readTree(codeRoot.resolve("contracts"), "contracts");
             Map<String, byte[]> frontendBase = readTree(codeRoot.resolve("frontend/base"), "frontend/base");
             Map<String, byte[]> backendBase = readTree(codeRoot.resolve("backend/base"), "backend/base");
             for (String path : frontendBase.keySet()) if (REGISTRIES.contains(path)) sourceError("Base may not own generated registry " + path);
@@ -60,7 +63,7 @@ public final class CodeTemplateReleaseLoader {
             validateGraph(extensions);
             validateGlobalContracts(extensions);
             validateBaseAndExtensionCollisions(frontendBase, backendBase, extensions);
-            return new CodeTemplateRelease(revision, frontendBase, backendBase, extensions);
+            return new CodeTemplateRelease(revision, contracts, frontendBase, backendBase, extensions);
         } catch (V3Exception e) {
             throw e;
         } catch (Exception e) {

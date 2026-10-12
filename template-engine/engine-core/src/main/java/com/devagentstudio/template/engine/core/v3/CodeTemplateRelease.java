@@ -7,13 +7,16 @@ import java.util.Map;
 /** Immutable V3 Runtime Source snapshot. */
 public final class CodeTemplateRelease {
     private final String revision;
+    private final Map<String, byte[]> contracts;
     private final Map<String, byte[]> frontendBase;
     private final Map<String, byte[]> backendBase;
     private final Map<String, ExtensionRelease> extensions;
 
-    public CodeTemplateRelease(String revision, Map<String, byte[]> frontendBase, Map<String, byte[]> backendBase,
+    /** 保存模板根目录契约与双端源码的不可变快照。 */
+    public CodeTemplateRelease(String revision, Map<String, byte[]> contracts, Map<String, byte[]> frontendBase, Map<String, byte[]> backendBase,
                                Map<String, ExtensionRelease> extensions) {
         this.revision = revision;
+        this.contracts = copyBytes(contracts);
         this.frontendBase = copyBytes(frontendBase);
         this.backendBase = copyBytes(backendBase);
         this.extensions = Collections.unmodifiableMap(new LinkedHashMap<String, ExtensionRelease>(extensions));
@@ -23,6 +26,8 @@ public final class CodeTemplateRelease {
         for (Map.Entry<String, byte[]> entry : source.entrySet()) result.put(entry.getKey(), entry.getValue().clone());
         return Collections.unmodifiableMap(result);
     }
+    /** 返回随生成工程交付的路由契约文件。 */
+    public Map<String, byte[]> contracts() { return copyBytes(contracts); }
     public String revision() { return revision; }
     public Map<String, byte[]> frontendBase() { return copyBytes(frontendBase); }
     public Map<String, byte[]> backendBase() { return copyBytes(backendBase); }
