@@ -15,7 +15,7 @@ public final class ExtensionManifestLoader {
     private final Map<String, Manifest> manifests = new LinkedHashMap<String, Manifest>();
     public ExtensionManifestLoader(Path extensions) {
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(extensions)) {
-            for (Path root : stream) if (Files.isDirectory(root)) load(root);
+            for (Path root : stream) if (Files.isDirectory(root) && !"node_modules".equals(root.getFileName().toString())) load(root);
         } catch (Exception e) { throw new TemplateException("INVALID_EXTENSION_DEFINITION", e.getMessage()); }
         for (Manifest manifest : manifests.values()) for (String required : manifest.requires)
             if (!manifests.containsKey(required)) throw new TemplateException("MISSING_EXTENSION_DEPENDENCY", manifest.id + " requires " + required);

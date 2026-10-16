@@ -4,6 +4,7 @@ import com.devagentstudio.template.engine.core.v3.ExtensionResolver.ResolvedExte
 import com.devagentstudio.template.engine.core.v3.V3ProjectMaterializer;
 import com.devagentstudio.template.engine.source.v3.CodeTemplateReleaseLoader;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -18,6 +19,28 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CodeTemplateReleaseLoaderTest {
+    @Test
+    void ignoresMachineMetadataAndInstalledDependenciesInsideRuntimeSource(@TempDir Path temporary) throws Exception {
+        Path code = temporary.resolve("code");
+        write(code.resolve("template-revision.txt"), "2026.10.16.1\n");
+        write(code.resolve("contracts/route-projector.json"), "{}\n");
+        write(code.resolve("frontend/base/src/index.tsx"), "export {};\n");
+        Files.write(code.resolve("frontend/base/.DS_Store"), new byte[] {0, 1});
+        Files.createDirectories(code.resolve("frontend/base/node_modules/pkg"));
+        Files.write(code.resolve("frontend/base/node_modules/pkg/index.js"), new byte[] {0, 1});
+        write(code.resolve("backend/base/src/Application.java"), "class Application {}\n");
+        Files.createDirectories(code.resolve("frontend/extensions"));
+        Files.createDirectories(code.resolve("backend/extensions"));
+        Files.write(code.resolve("backend/extensions/.DS_Store"), new byte[] {0, 1});
+        Files.createDirectories(code.resolve("backend/extensions/node_modules/pkg"));
+
+        CodeTemplateRelease release = new CodeTemplateReleaseLoader(code).load();
+
+        assertTrue(release.frontendBase().containsKey("src/index.tsx"));
+        assertFalse(release.frontendBase().containsKey(".DS_Store"));
+        assertFalse(release.frontendBase().containsKey("node_modules/pkg/index.js"));
+    }
+
     /** 验证 V3 源码装载、权限依赖与恢复的路由契约交付。 */
     @Test
     void loadsV3ReleaseAndResolvesAuthorizationClosureDeterministically() throws Exception {
@@ -69,6 +92,10 @@ class CodeTemplateReleaseLoaderTest {
     private java.util.List<String> owners(Map<String, Object> value) { return (java.util.List<String>) value.get("owners"); }
     private int occurrences(String source, String token) { return (source.length() - source.replace(token, "").length()) / token.length(); }
     private String utf8(byte[] value) { return new String(value, StandardCharsets.UTF_8); }
+    private void write(Path path, String value) throws Exception {
+        Files.createDirectories(path.getParent());
+        Files.write(path, value.getBytes(StandardCharsets.UTF_8));
+    }
     private Path repositoryRoot() {
         Path current = Paths.get(System.getProperty("user.dir")).toAbsolutePath();
         while (current != null && !Files.isDirectory(current.resolve("template-source"))) current = current.getParent();

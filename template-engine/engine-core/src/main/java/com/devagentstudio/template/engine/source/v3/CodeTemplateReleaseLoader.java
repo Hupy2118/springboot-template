@@ -10,9 +10,12 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -77,6 +80,7 @@ public final class CodeTemplateReleaseLoader {
         try (java.util.stream.Stream<Path> stream = Files.list(parent)) { stream.forEach(children::add); }
         Collections.sort(children, Comparator.comparing(path -> path.getFileName().toString()));
         for (Path directory : children) {
+            if (isIgnoredRuntimeEntry(directory)) continue;
             if (Files.isSymbolicLink(directory)) sourceError("symlink is not allowed: " + relative(directory));
             if (!Files.isDirectory(directory)) {
                 if (!".gitkeep".equals(directory.getFileName().toString())) sourceError("unexpected extensions entry: " + relative(directory));
@@ -203,6 +207,7 @@ public final class CodeTemplateReleaseLoader {
         try (java.util.stream.Stream<Path> stream = Files.list(directory)) {
             for (Path child : (Iterable<Path>) stream::iterator) {
                 String name = child.getFileName().toString();
+                if (isIgnoredRuntimeEntry(child)) continue;
                 if (Files.isSymbolicLink(child)) sourceError("symlink is not allowed: " + relative(child));
                 if ("extension.yaml".equals(name)) continue;
                 if (frontend && "src".equals(name) || !frontend && Arrays.asList("src", "docs", "migrations").contains(name)) {
@@ -271,22 +276,36 @@ public final class CodeTemplateReleaseLoader {
     private Map<String, byte[]> readTree(Path directory, String label) throws IOException {
         requireDirectory(directory, label);
         Map<String, byte[]> files = new TreeMap<String, byte[]>();
-        try (java.util.stream.Stream<Path> stream = Files.walk(directory)) {
-            List<Path> paths = new ArrayList<Path>(); stream.forEach(paths::add);
-            Collections.sort(paths, Comparator.comparing(path -> directory.relativize(path).toString()));
-            for (Path path : paths) {
-                if (path.equals(directory)) continue;
-                if (Files.isSymbolicLink(path)) sourceError("symlink is not allowed: " + relative(path));
-                if (Files.isDirectory(path)) continue;
-                if (!Files.isRegularFile(path)) sourceError("unsupported Runtime Source entry: " + relative(path));
-                byte[] bytes = Files.readAllBytes(path);
-                if (containsNul(bytes)) sourceError("binary Runtime Source is not allowed: " + relative(path));
-                decode(bytes, relative(path));
-                files.put(directory.relativize(path).toString().replace('\\', '/'), bytes);
+        List<Path> paths = new ArrayList<Path>();
+        Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
+            @Override public FileVisitResult preVisitDirectory(Path path, BasicFileAttributes attributes) {
+                return path.equals(directory) || !isIgnoredRuntimeDirectory(path)
+                        ? FileVisitResult.CONTINUE : FileVisitResult.SKIP_SUBTREE;
             }
+
+            @Override public FileVisitResult visitFile(Path path, BasicFileAttributes attributes) {
+                if (!isIgnoredRuntimeFile(path)) paths.add(path);
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        Collections.sort(paths, Comparator.comparing(path -> directory.relativize(path).toString()));
+        for (Path path : paths) {
+            if (Files.isSymbolicLink(path)) sourceError("symlink is not allowed: " + relative(path));
+            if (!Files.isRegularFile(path)) sourceError("unsupported Runtime Source entry: " + relative(path));
+            byte[] bytes = Files.readAllBytes(path);
+            if (containsNul(bytes)) sourceError("binary Runtime Source is not allowed: " + relative(path));
+            decode(bytes, relative(path));
+            files.put(directory.relativize(path).toString().replace('\\', '/'), bytes);
         }
         return files;
     }
+
+    /** Machine-local metadata and installed dependencies are never Runtime Source inputs. */
+    private boolean isIgnoredRuntimeEntry(Path path) {
+        return isIgnoredRuntimeDirectory(path) || isIgnoredRuntimeFile(path);
+    }
+    private boolean isIgnoredRuntimeDirectory(Path path) { return "node_modules".equals(path.getFileName().toString()); }
+    private boolean isIgnoredRuntimeFile(Path path) { return ".DS_Store".equals(path.getFileName().toString()); }
 
     private JsonNode readDocument(Path path) throws IOException {
         if (Files.isSymbolicLink(path) || !Files.isRegularFile(path)) sourceError("missing or unsafe extension manifest: " + relative(path));

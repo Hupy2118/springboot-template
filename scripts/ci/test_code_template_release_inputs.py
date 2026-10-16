@@ -61,6 +61,23 @@ class CodeTemplateReleaseInputsTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "symlink"):
                 MODULE.collect_inputs(root)
 
+    def test_ignores_machine_metadata_and_installed_dependencies_inside_runtime_source(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = self.root(pathlib.Path(temporary))
+            touch(root, "code/frontend/base/src/index.tsx")
+            metadata = root / "code/frontend/base/.DS_Store"
+            metadata.write_bytes(b"\x00metadata")
+            installed = root / "code/frontend/base/node_modules/pkg/index.js"
+            installed.parent.mkdir(parents=True, exist_ok=True)
+            installed.write_bytes(b"\x00dependency")
+            (root / "code/backend/extensions/.DS_Store").write_bytes(b"\x00metadata")
+            (root / "code/backend/extensions/node_modules/pkg").mkdir(parents=True, exist_ok=True)
+
+            inputs = MODULE.collect_inputs(root)
+
+            self.assertIn("template-source/code/frontend/base/src/index.tsx", inputs)
+            self.assertFalse(any(".DS_Store" in item or "/node_modules/" in item for item in inputs))
+
     def test_rejects_binary_runtime_input(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = self.root(pathlib.Path(temporary))

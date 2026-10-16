@@ -2,6 +2,7 @@
 """List and validate the Extension V3 Template Runtime inputs."""
 
 import argparse
+import os
 import pathlib
 import sys
 
@@ -14,21 +15,29 @@ def add_tree(root, relative_root, result):
     source = root / relative_root
     if not source.is_dir() or source.is_symlink():
         fail("missing or unsafe Runtime Source directory: %s" % relative_root.as_posix())
-    for path in sorted(source.rglob("*")):
-        if path.is_symlink():
-            fail("symlink is not allowed in Runtime Source: %s" % path.relative_to(root).as_posix())
-        if path.is_dir():
-            continue
-        if not path.is_file():
-            fail("unsupported Runtime Source entry: %s" % path.relative_to(root).as_posix())
-        data = path.read_bytes()
-        if b"\x00" in data:
-            fail("binary Runtime Source is not allowed: %s" % path.relative_to(root).as_posix())
-        try:
-            data.decode("utf-8")
-        except UnicodeDecodeError:
-            fail("Runtime Source must be UTF-8 text: %s" % path.relative_to(root).as_posix())
-        result.add(path.relative_to(root.parent).as_posix())
+    for current, directories, filenames in os.walk(str(source), topdown=True, followlinks=False):
+        current_path = pathlib.Path(current)
+        directories[:] = sorted(name for name in directories if name != "node_modules")
+        for name in directories:
+            path = current_path / name
+            if path.is_symlink():
+                fail("symlink is not allowed in Runtime Source: %s" % path.relative_to(root).as_posix())
+        for name in sorted(filenames):
+            if name == ".DS_Store":
+                continue
+            path = current_path / name
+            if path.is_symlink():
+                fail("symlink is not allowed in Runtime Source: %s" % path.relative_to(root).as_posix())
+            if not path.is_file():
+                fail("unsupported Runtime Source entry: %s" % path.relative_to(root).as_posix())
+            data = path.read_bytes()
+            if b"\x00" in data:
+                fail("binary Runtime Source is not allowed: %s" % path.relative_to(root).as_posix())
+            try:
+                data.decode("utf-8")
+            except UnicodeDecodeError:
+                fail("Runtime Source must be UTF-8 text: %s" % path.relative_to(root).as_posix())
+            result.add(path.relative_to(root.parent).as_posix())
 
 
 def add_file(root, relative, result):
@@ -52,6 +61,8 @@ def extension_directories(root, relative_root):
     children = sorted(parent.iterdir(), key=lambda item: item.name)
     directories = []
     for child in children:
+        if child.name in (".DS_Store", "node_modules"):
+            continue
         if child.is_symlink():
             fail("symlink is not allowed in Runtime Source: %s" % child.relative_to(root).as_posix())
         if child.is_dir():

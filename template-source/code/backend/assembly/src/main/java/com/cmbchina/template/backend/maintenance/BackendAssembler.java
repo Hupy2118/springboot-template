@@ -32,8 +32,12 @@ public final class BackendAssembler {
     }
     private void copyTree(final Path from, final Path to, final String owner, final WorkspaceState state) {
         try { Files.walkFileTree(from, new SimpleFileVisitor<Path>() {
-            @Override public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException { Files.createDirectories(to.resolve(from.relativize(dir))); return FileVisitResult.CONTINUE; }
+            @Override public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                if (!dir.equals(from) && "node_modules".equals(dir.getFileName().toString())) return FileVisitResult.SKIP_SUBTREE;
+                Files.createDirectories(to.resolve(from.relativize(dir))); return FileVisitResult.CONTINUE;
+            }
             @Override public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                if (".DS_Store".equals(file.getFileName().toString())) return FileVisitResult.CONTINUE;
                 Path relative = from.relativize(file); Path destination = to.resolve(relative); String key = root.resolve("workspace").relativize(destination).toString().replace('\\','/');
                 if (state.owners.containsKey(key)) throw new TemplateException("FILE_COLLISION", key + " owned by " + state.owners.get(key) + " and " + owner);
                 Files.copy(file, destination); state.owners.put(key, owner); return FileVisitResult.CONTINUE;
