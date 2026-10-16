@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cmbchina.backend.auth.infrastructure.mapper.RoleResourceMapper">
 
     <select id="findResourceKeysByRoleId" resultType="string">
@@ -10,14 +10,13 @@
         ORDER BY rr.`resource_key`
     </select>
 
-    <select id="findEffectiveResourceKeys" resultType="string">
-        SELECT DISTINCT rr.`resource_key`
-        FROM `role_member` rm
-        JOIN `role` r ON r.`role_id` = rm.`role_id` AND r.`enable` = 1 AND r.`is_deleted` = 0
-        JOIN `role_resource` rr ON rr.`role_id` = r.`role_id`
-        JOIN `resource` res ON res.`key` = rr.`resource_key`
-        WHERE rm.`member_id` = #{memberId}
-        ORDER BY rr.`resource_key`
+    <select id="findResourceKeysByRoleIds" resultType="string">
+        SELECT `resource_key`
+        FROM `role_resource`
+        WHERE `role_id` IN
+        <foreach collection="roleIds" item="roleId" separator="," open="(" close=")">
+            #{roleId}
+        </foreach>
     </select>
 
     <delete id="deleteBatch">
@@ -37,7 +36,7 @@
     </insert>
 
     <select id="countActiveManagers" resultType="long">
-        SELECT COUNT(DISTINCT rm.`member_id`)
+        SELECT COUNT(rm.`member_id`)
         FROM `role_member` rm
         JOIN `role` r ON r.`role_id` = rm.`role_id` AND r.`enable` = 1 AND r.`is_deleted` = 0
         JOIN `role_resource` rr ON rr.`role_id` = r.`role_id`

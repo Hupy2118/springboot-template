@@ -1,9 +1,15 @@
 package com.cmbchina.backend.auth.application.service;
 
+import com.cmb.bee.commons.exceptions.BizException;
+import com.cmb.oa.one.account.oauth.client.login.context.TokenContextHolder;
+import com.cmb.oa.one.account.oauth.client.login.model.LocalToken;
 import com.cmbchina.backend.auth.application.assembler.RoleAssembler;
-import com.cmbchina.backend.auth.application.dto.*;
-import com.cmbchina.backend.auth.common.context.BaseUserData;
-import com.cmbchina.backend.auth.common.context.BaseUserDataThreadHodler;
+import com.cmbchina.backend.auth.application.dto.MemberDTO;
+import com.cmbchina.backend.auth.application.dto.RoleDTO;
+import com.cmbchina.backend.auth.application.dto.RoleMembersDTO;
+import com.cmbchina.backend.auth.application.dto.RoleResourcesDTO;
+import com.cmbchina.backend.auth.application.dto.RoleStatusDTO;
+import com.cmbchina.backend.auth.application.dto.RoleUpsertDTO;
 import com.cmbchina.backend.auth.domain.constant.AuthConstants;
 import com.cmbchina.backend.auth.domain.entity.Role;
 import com.cmbchina.backend.auth.domain.entity.RoleMember;
@@ -13,15 +19,19 @@ import com.cmbchina.backend.auth.domain.repository.ResourceRepository;
 import com.cmbchina.backend.auth.domain.repository.RoleMemberRepository;
 import com.cmbchina.backend.auth.domain.repository.RoleRepository;
 import com.cmbchina.backend.auth.domain.repository.RoleResourceRepository;
-import com.cmbchina.backend.common.exception.BizException;
-import com.cmbchina.backend.common.page.PageParam;
-import com.cmbchina.backend.common.page.PageResult;
+import com.cmbchina.backend.common.entity.page.PageParam;
+import com.cmbchina.backend.common.entity.page.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -200,11 +210,11 @@ public class RoleApplicationService {
     }
 
     private String currentActor() {
-        BaseUserData userData = BaseUserDataThreadHodler.get();
-        if (userData == null) {
+        LocalToken userToken = TokenContextHolder.get();
+        if (userToken == null) {
             throw new BizException(AuthErrorCode.UNAUTHENTICATED);
         }
-        String actor = userData.getMemberId();
+        String actor = userToken.getSapId();
         if (actor == null || actor.trim().isEmpty() || actor.length() > 32) {
             throw new BizException(AuthErrorCode.INVALID_ACTOR);
         }

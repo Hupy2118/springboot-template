@@ -1,6 +1,7 @@
 import { useCallback, useMemo, type PropsWithChildren } from 'react';
 import { useRequest } from 'ahooks';
-import { AuthorizationApiError, getMyResources } from '@/apis/authorization';
+import { ServiceResponseError } from '@/apis/service';
+import { getMyResources } from '@/apis/authorization';
 import { AccessContext, type AccessState } from '@/platform/access/AccessContext';
 
 const statusOf = (error: unknown) => (error as { response?: { status?: number } })?.response?.status;
@@ -8,7 +9,7 @@ const statusOf = (error: unknown) => (error as { response?: { status?: number } 
 export function AuthorizationProvider({ children }: PropsWithChildren) {
   const { data, loading, error, refreshAsync } = useRequest(getMyResources);
   const permissions = useMemo(() => new Set(data?.resourceKeys ?? []), [data]);
-  const returnCode = error instanceof AuthorizationApiError ? error.returnCode : undefined;
+  const returnCode = error instanceof ServiceResponseError ? error.returnCode : undefined;
   const state: AccessState = loading
     ? 'loading'
     : error

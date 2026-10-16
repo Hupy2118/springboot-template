@@ -6,6 +6,3 @@ export function loginApi(code: string) {
   return service.get<Identity>(`/api/sso/login?code=${encodeURIComponent(code)}`);
 }
 
-export function logoutApi() {
-  return service.post('/logout');
-}

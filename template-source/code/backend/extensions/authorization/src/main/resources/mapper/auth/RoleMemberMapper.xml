@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.cmbchina.backend.auth.infrastructure.mapper.RoleMemberMapper">
+
     <resultMap id="RoleMemberMap" type="com.cmbchina.backend.auth.infrastructure.po.RoleMemberPO">
         <result column="role_id" property="roleId"/>
         <result column="member_id" property="memberId"/>
@@ -9,32 +10,11 @@
         <result column="created_by" property="createdBy"/>
     </resultMap>
 
-    <select id="listMembers" resultMap="RoleMemberMap">
-        SELECT MIN(rm.`role_id`) AS role_id, rm.`member_id`, MIN(rm.`member_name`) AS member_name,
-               MIN(rm.`created_at`) AS created_at, MIN(rm.`created_by`) AS created_by
-        FROM `role_member` rm
-        JOIN `role` r ON r.`role_id` = rm.`role_id` AND r.`is_deleted` = 0
-        GROUP BY rm.`member_id` ORDER BY rm.`member_id` LIMIT #{offset}, #{pageSize}
-    </select>
-
-    <select id="countMembers" resultType="long">
-        SELECT COUNT(DISTINCT rm.`member_id`)
-        FROM `role_member` rm
-        JOIN `role` r ON r.`role_id` = rm.`role_id` AND r.`is_deleted` = 0
-    </select>
-
     <select id="findByRoleId" resultMap="RoleMemberMap">
         SELECT rm.`role_id`, rm.`member_id`, rm.`member_name`, rm.`created_at`, rm.`created_by`
         FROM `role_member` rm
         JOIN `role` r ON r.`role_id` = rm.`role_id` AND r.`is_deleted` = 0
         WHERE rm.`role_id` = #{roleId} ORDER BY rm.`member_id`
-    </select>
-
-    <select id="findByMemberId" resultMap="RoleMemberMap">
-        SELECT rm.`role_id`, rm.`member_id`, rm.`member_name`, rm.`created_at`, rm.`created_by`
-        FROM `role_member` rm
-        JOIN `role` r ON r.`role_id` = rm.`role_id` AND r.`is_deleted` = 0
-        WHERE rm.`member_id` = #{memberId} ORDER BY rm.`role_id`
     </select>
 
     <insert id="insertBatch">
@@ -52,4 +32,11 @@
             #{memberId}
         </foreach>
     </delete>
+
+    <select id="findEffectiveRoleIdsByMemberId" resultType="string">
+        SELECT r.`role_id`
+        FROM `role` r
+        JOIN `role_member` rm ON r.`role_id` = rm.`role_id` AND r.`enable` = 1 AND r.`is_deleted` = 0
+        WHERE rm.`member_id` = #{memberId}
+    </select>
 </mapper>

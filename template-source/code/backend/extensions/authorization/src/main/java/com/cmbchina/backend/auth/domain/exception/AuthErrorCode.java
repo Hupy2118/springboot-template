@@ -1,6 +1,7 @@
 package com.cmbchina.backend.auth.domain.exception;
 
-import com.cmbchina.backend.common.exception.IBizErrorCode;
+
+import com.cmb.bee.commons.errorcodes.IBizErrorCode;
 
 /**
  * 权限模块稳定业务错误码。

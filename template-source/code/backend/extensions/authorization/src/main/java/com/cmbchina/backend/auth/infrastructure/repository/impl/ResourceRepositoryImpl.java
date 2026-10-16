@@ -7,7 +7,7 @@ import com.cmbchina.backend.auth.domain.repository.ResourceRepository;
 import com.cmbchina.backend.auth.infrastructure.mapper.ResourceMapper;
 import com.cmbchina.backend.auth.infrastructure.po.ResourcePO;
 import com.cmbchina.backend.auth.infrastructure.repository.converter.ResourceConverter;
-import com.cmbchina.backend.common.page.PageResult;
+import com.cmbchina.backend.common.entity.page.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -25,14 +25,12 @@ public class ResourceRepositoryImpl implements ResourceRepository {
         Page<ResourcePO> page = new Page<>(current, pageSize);
         LambdaQueryWrapper<ResourcePO> query = new LambdaQueryWrapper<ResourcePO>().orderByAsc(ResourcePO::getId);
         Page<ResourcePO> result = mapper.selectPage(page, query);
-        return PageResult.of(result.getTotal(), (int) result.getCurrent(),
-                (int) result.getSize(), result.getRecords(), converter::toEntity);
+        return PageResult.of(result.getTotal(), (int)result.getCurrent(), (int)result.getSize(), result.getRecords(), converter::toEntity);
     }
 
     @Override
     public Resource findByKey(String resourceKey) {
-        LambdaQueryWrapper<ResourcePO> query =
-                new LambdaQueryWrapper<ResourcePO>().eq(ResourcePO::getKey, resourceKey);
+        LambdaQueryWrapper<ResourcePO> query = new LambdaQueryWrapper<ResourcePO>().eq(ResourcePO::getKey, resourceKey);
         ResourcePO resource = mapper.selectOne(query);
         return converter.toEntity(resource);
     }

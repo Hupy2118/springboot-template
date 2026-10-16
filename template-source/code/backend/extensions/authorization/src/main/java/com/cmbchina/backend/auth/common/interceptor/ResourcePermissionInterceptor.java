@@ -1,12 +1,13 @@
 package com.cmbchina.backend.auth.common.interceptor;
 
+import com.cmb.bee.commons.exceptions.BizException;
+import com.cmb.oa.one.account.oauth.client.login.context.TokenContextHolder;
+import com.cmb.oa.one.account.oauth.client.login.model.LocalToken;
 import com.cmbchina.backend.auth.application.dto.MemberResourcesDTO;
 import com.cmbchina.backend.auth.application.service.ResourceApplicationService;
 import com.cmbchina.backend.auth.common.annotation.RequireAnyResource;
-import com.cmbchina.backend.auth.common.context.BaseUserData;
-import com.cmbchina.backend.auth.common.context.BaseUserDataThreadHodler;
 import com.cmbchina.backend.auth.domain.exception.AuthErrorCode;
-import com.cmbchina.backend.common.exception.BizException;
+import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.stereotype.Component;
@@ -24,14 +25,12 @@ import java.util.Set;
 /**
  * 执行 {@link RequireAnyResource} 声明的任一资源点校验。
  */
+
 @Component
+@RequiredArgsConstructor
 public class ResourcePermissionInterceptor implements HandlerInterceptor {
 
     private final ResourceApplicationService resourceService;
-
-    public ResourcePermissionInterceptor(ResourceApplicationService resourceService) {
-        this.resourceService = resourceService;
-    }
 
     @Override
     public boolean preHandle(@NotNull HttpServletRequest request,
@@ -41,21 +40,20 @@ public class ResourcePermissionInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        HandlerMethod handlerMethod = (HandlerMethod) handler;
+        HandlerMethod handlerMethod = (HandlerMethod)handler;
         RequireAnyResource permission = findPermission(handlerMethod);
         if (permission == null) {
             return true;
         }
 
-        BaseUserData currentUser = BaseUserDataThreadHodler.get();
+        LocalToken currentUser = TokenContextHolder.get();
         if (currentUser == null) {
             throw new BizException(AuthErrorCode.UNAUTHENTICATED);
         }
 
-        MemberResourcesDTO memberResources = resourceService.getMemberResources(currentUser.getMemberId());
+        MemberResourcesDTO memberResources = resourceService.getMemberResources(currentUser.getSapId());
         List<String> resourceKeys = memberResources == null ? null : memberResources.getResourceKeys();
-        Set<String> ownedResources = resourceKeys == null
-                ? Collections.emptySet() : new HashSet<>(resourceKeys);
+        Set<String> ownedResources = resourceKeys == null ? Collections.emptySet() : new HashSet<>(resourceKeys);
         for (String requiredResource : permission.value()) {
             if (StringUtils.hasText(requiredResource) && ownedResources.contains(requiredResource)) {
                 return true;
@@ -70,7 +68,6 @@ public class ResourcePermissionInterceptor implements HandlerInterceptor {
         if (methodPermission != null) {
             return methodPermission;
         }
-        return AnnotatedElementUtils.findMergedAnnotation(
-                handlerMethod.getBeanType(), RequireAnyResource.class);
+        return AnnotatedElementUtils.findMergedAnnotation(handlerMethod.getBeanType(), RequireAnyResource.class);
     }
 }

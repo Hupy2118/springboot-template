@@ -2,4 +2,4 @@
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 cd "$ROOT"
-exec "$ROOT/mvnw" -q -f "$ROOT/assembly/pom.xml" exec:java -Dexec.mainClass=com.cmbchina.template.backend.maintenance.BackendTemplateCli -Dexec.args="$*"
+exec "$ROOT/mvnw" -q -f "$ROOT/assembly/pom.xml" compile exec:java -Dexec.mainClass=com.cmbchina.template.backend.maintenance.BackendTemplateCli -Dexec.args="$*"

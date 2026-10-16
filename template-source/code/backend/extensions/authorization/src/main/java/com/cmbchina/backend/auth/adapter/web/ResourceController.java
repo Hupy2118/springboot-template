@@ -1,15 +1,19 @@
 package com.cmbchina.backend.auth.adapter.web;
 
+import com.cmb.bee.web.entity.BeeResponseEntity;
 import com.cmbchina.backend.auth.application.dto.MemberResourcesDTO;
 import com.cmbchina.backend.auth.application.dto.ResourceDTO;
 import com.cmbchina.backend.auth.application.service.ResourceApplicationService;
 import com.cmbchina.backend.auth.common.annotation.RequireAnyResource;
 import com.cmbchina.backend.auth.domain.constant.AuthConstants;
-import com.cmbchina.backend.common.page.PageParam;
-import com.cmbchina.backend.common.page.PageResult;
-import com.cmbchina.backend.common.response.ResponseEntity;
+import com.cmbchina.backend.common.entity.page.PageParam;
+import com.cmbchina.backend.common.entity.page.PageResult;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
@@ -20,18 +24,18 @@ public class ResourceController {
 
     @GetMapping("/resources")
     @RequireAnyResource(AuthConstants.SYSTEM_MANAGEMENT_RESOURCE)
-    public ResponseEntity<PageResult<ResourceDTO>> list(@ModelAttribute PageParam query) {
-        return ResponseEntity.success(resourceService.listResources(query));
+    public BeeResponseEntity<PageResult<ResourceDTO>> list(@ModelAttribute PageParam query) {
+        return BeeResponseEntity.success(resourceService.listResources(query));
     }
 
     @GetMapping("/resources/{resourceKey}")
     @RequireAnyResource(AuthConstants.SYSTEM_MANAGEMENT_RESOURCE)
-    public ResponseEntity<ResourceDTO> get(@PathVariable String resourceKey) {
-        return ResponseEntity.success(resourceService.getResource(resourceKey));
+    public BeeResponseEntity<ResourceDTO> get(@PathVariable String resourceKey) {
+        return BeeResponseEntity.success(resourceService.getResource(resourceKey));
     }
 
     @GetMapping("/me/resources")
-    public ResponseEntity<MemberResourcesDTO> getMyResources() {
-        return ResponseEntity.success(resourceService.getCurrentMemberResources());
+    public BeeResponseEntity<MemberResourcesDTO> getMyResources() {
+        return BeeResponseEntity.success(resourceService.getCurrentMemberResources());
     }
 }

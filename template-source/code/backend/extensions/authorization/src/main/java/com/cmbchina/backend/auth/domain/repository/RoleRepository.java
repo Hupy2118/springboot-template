@@ -1,7 +1,7 @@
 package com.cmbchina.backend.auth.domain.repository;
 
 import com.cmbchina.backend.auth.domain.entity.Role;
-import com.cmbchina.backend.common.page.PageResult;
+import com.cmbchina.backend.common.entity.page.PageResult;
 
 public interface RoleRepository {
     PageResult<Role> page(int current, int pageSize);

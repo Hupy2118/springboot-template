@@ -23,7 +23,7 @@ class CodeTemplateReleaseLoaderTest {
     void loadsV3ReleaseAndResolvesAuthorizationClosureDeterministically() throws Exception {
         Path root = repositoryRoot();
         CodeTemplateRelease release = new CodeTemplateReleaseLoader(root.resolve("template-source/code")).load();
-        assertEquals("2026.10.10.1", release.revision());
+        assertEquals("2026.10.16.1", release.revision());
         assertTrue(release.extensions().containsKey("login"));
         assertTrue(release.extensions().containsKey("authorization"));
 
@@ -44,6 +44,9 @@ class CodeTemplateReleaseLoaderTest {
         assertEquals(1, occurrences(application, "@EnableAuthClient"));
         assertEquals(1, occurrences(application, "import com.cmb.bee.auth.client.config.EnableAuthClient;"));
         assertTrue(pom.contains("<artifactId>bee-starter-auth</artifactId>"));
+        String backendYaml = utf8(project.get("backend/src/main/resources/application.yml"));
+        assertTrue(backendYaml.contains("BEE_AUTH_CLIENT_ID"));
+        assertTrue(backendYaml.contains("mapper-locations"));
         assertTrue(pageRoutes.contains("authorization_management"));
         assertTrue(project.containsKey("frontend/src/extensions/providers.ts"));
         assertEquals(java.util.Arrays.asList("login"), owners(resolved.managedContributions().get("maven:ZA21:bee-starter-auth")));
@@ -59,6 +62,7 @@ class CodeTemplateReleaseLoaderTest {
         assertFalse(baseProject.containsKey("frontend/.devagentstudio/template-contracts/route-projector.json"));
         assertFalse(baseProject.containsKey("frontend/src/pages/Login/index.tsx"));
         assertFalse(utf8(baseProject.get("backend/pom.xml")).contains("bee-starter-auth"));
+        assertFalse(utf8(baseProject.get("backend/src/main/resources/application.yml")).contains("BEE_AUTH_CLIENT_ID"));
     }
 
     @SuppressWarnings("unchecked")

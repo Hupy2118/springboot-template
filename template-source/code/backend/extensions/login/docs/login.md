@@ -1,16 +1,14 @@
 # Login 后端能力
 
-本文件仅在 Login Capability 启用时生成。它与 `com.cmbchina.backend.auth` 下的登录代码和 `CapabilityWebMvcConfiguration` 中的 Login 拦截器受管块属于同一能力边界。
+本文件仅在 Login Capability 启用时生成。它提供 Bee Auth Client 的启动注解、Maven 依赖和受管认证配置。
 
 ## 注入内容
 
-- `POST /api/login/mock` 接收 `memberId` 和 `memberName`，签发 HttpOnly Cookie，并返回当前模拟用户。
-- `MockJwtService` 创建和解析本地模拟 JWT；`MockLoginProperties` 使用 `devagentstudio.login.mock-login` 前缀配置 Cookie、签发方、TTL 与密钥。
-- `UserWebMvcInterceptor` 从 Cookie 恢复当前用户到 `BaseUserDataThreadHodler`，并在请求结束后清理上下文。
-- 引擎将该拦截器以顺序 100 注册到受管 Web MVC 扩展面，且排除 `/api/login/mock`。
+- 引擎向 Application 注入 `@EnableAuthClient`，并向 Maven POM 注入 `ZA21:bee-starter-auth`。
+- 认证配置由受管 `application.yml` 贡献提供；客户端标识、密钥和认证中心地址通过 `BEE_AUTH_*` 环境变量覆盖。
 
 ## 维护边界
 
-这是本地联调登录能力，不替代生产身份提供方。共享环境必须通过外部配置替换默认模拟密钥；不要把真实密钥写入源码或文档。
+这是认证客户端集成能力，不生成本地模拟登录、JWT 或 Web 拦截器。不要把真实密钥写入源码或文档。
 
-登录上下文是 Authorization Capability 的前置条件。业务接口如需当前用户，应使用该能力提供的上下文；不要自行解析 Cookie 或重复注册拦截器。
+Login 是 Authorization Capability 的前置条件。业务接口的身份上下文由 Bee Auth Client 提供。

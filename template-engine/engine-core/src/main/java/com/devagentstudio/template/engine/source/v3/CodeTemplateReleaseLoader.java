@@ -193,6 +193,10 @@ public final class CodeTemplateReleaseLoader {
             item.put("scope", scope);
             partial.dependencies.add(item);
         }
+        JsonNode applicationYaml = contributes.path("applicationYaml");
+        if (applicationYaml.isMissingNode()) applicationYaml = yaml.createObjectNode();
+        if (!applicationYaml.isObject()) sourceError(partial.id + ".contributes.applicationYaml must be an object");
+        partial.applicationYaml = objectMap(applicationYaml);
     }
 
     private void validateExtensionRoot(Path directory, boolean frontend) throws IOException {
@@ -367,6 +371,7 @@ public final class CodeTemplateReleaseLoader {
         private final Map<String, List<Map<String, Object>>> frontendContributions = new HashMap<String, List<Map<String, Object>>>();
         private final List<String> annotations = new ArrayList<String>();
         private final List<Map<String, Object>> dependencies = new ArrayList<Map<String, Object>>();
+        private Map<String, Object> applicationYaml = Collections.emptyMap();
         private PartialExtension(String id) { this.id = id; }
         private ExtensionRelease finish() {
             List<String> deps = requires == null ? Collections.<String>emptyList() : requires;
@@ -376,7 +381,7 @@ public final class CodeTemplateReleaseLoader {
                     frontendContributions.containsKey("pageRoutes") ? frontendContributions.get("pageRoutes") : Collections.<Map<String, Object>>emptyList(),
                     frontendContributions.containsKey("initializers") ? frontendContributions.get("initializers") : Collections.<Map<String, Object>>emptyList(),
                     frontendContributions.containsKey("errorReporters") ? frontendContributions.get("errorReporters") : Collections.<Map<String, Object>>emptyList(),
-                    annotations, dependencies);
+                    annotations, dependencies, applicationYaml);
         }
     }
 }

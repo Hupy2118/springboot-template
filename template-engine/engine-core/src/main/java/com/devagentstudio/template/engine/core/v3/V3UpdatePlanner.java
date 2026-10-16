@@ -56,7 +56,9 @@ public final class V3UpdatePlanner {
             if (stateChanged) throw new V3Exception("RECONCILE_STATE_CHANGE_REQUIRED", "RECONCILE cannot change TemplateState", 409);
             List<OperationDraft> repair = new ArrayList<OperationDraft>();
             for (String target : REGISTRIES) repair.add(OperationDraft.replace(target, registryBytes(resolved, target)));
-            for (Map.Entry<String, Map<String, Object>> item : currentContributions.entrySet()) repair.add(ensure(item.getKey(), item.getValue()));
+            if (hasYamlContributions(currentContributions)) repair.add(OperationDraft.replace("backend/src/main/resources/application.yml", applicationYamlBytes(resolved)));
+            for (Map.Entry<String, Map<String, Object>> item : currentContributions.entrySet())
+                if (!"APPLICATION_YAML".equals(item.getValue().get("type"))) repair.add(ensure(item.getKey(), item.getValue()));
             return compile(current, current, mode, repair);
         }
 
@@ -64,6 +66,8 @@ public final class V3UpdatePlanner {
         List<OperationDraft> operations = new ArrayList<OperationDraft>();
         operations.addAll(diffContributions(currentContributions, targetContributions));
         operations.addAll(adds);
+        if (yamlContributionsChanged(currentContributions, targetContributions))
+            operations.add(OperationDraft.replace("backend/src/main/resources/application.yml", applicationYamlBytes(resolved)));
         boolean projectionChanged = releaseChanged || !currentEffective.keySet().equals(resolved.effective().keySet());
         if (projectionChanged) for (String target : REGISTRIES) operations.add(OperationDraft.replace(target, registryBytes(resolved, target)));
         return compile(current, nextState, mode, operations);
@@ -99,10 +103,12 @@ public final class V3UpdatePlanner {
                                                    Map<String, Map<String, Object>> target) {
         List<OperationDraft> result = new ArrayList<OperationDraft>();
         for (Map.Entry<String, Map<String, Object>> old : current.entrySet()) {
+            if ("APPLICATION_YAML".equals(old.getValue().get("type"))) continue;
             Map<String, Object> next = target.get(old.getKey());
             if (next == null || !sameSpec(old.getValue(), next)) result.add(remove(old.getKey(), old.getValue()));
         }
         for (Map.Entry<String, Map<String, Object>> next : target.entrySet()) {
+            if ("APPLICATION_YAML".equals(next.getValue().get("type"))) continue;
             Map<String, Object> old = current.get(next.getKey());
             if (old == null || !sameSpec(old, next.getValue())) result.add(ensure(next.getKey(), next.getValue()));
         }
@@ -133,6 +139,23 @@ public final class V3UpdatePlanner {
         if (!left.keySet().equals(right.keySet())) return false;
         for (String key : left.keySet()) if (!left.get(key).equals(right.get(key))) return false;
         return true;
+    }
+    private boolean hasYamlContributions(Map<String, Map<String, Object>> values) {
+        for (Map<String, Object> value : values.values()) if ("APPLICATION_YAML".equals(value.get("type"))) return true;
+        return false;
+    }
+    private boolean yamlContributionsChanged(Map<String, Map<String, Object>> left, Map<String, Map<String, Object>> right) {
+        Map<String, Map<String, Object>> leftYaml = yamlContributions(left);
+        Map<String, Map<String, Object>> rightYaml = yamlContributions(right);
+        if (!leftYaml.keySet().equals(rightYaml.keySet())) return true;
+        for (String key : leftYaml.keySet()) if (!sameSpec(leftYaml.get(key), rightYaml.get(key))) return true;
+        return false;
+    }
+    private Map<String, Map<String, Object>> yamlContributions(Map<String, Map<String, Object>> values) {
+        Map<String, Map<String, Object>> result = new TreeMap<String, Map<String, Object>>();
+        for (Map.Entry<String, Map<String, Object>> item : values.entrySet())
+            if ("APPLICATION_YAML".equals(item.getValue().get("type"))) result.put(item.getKey(), item.getValue());
+        return result;
     }
     private boolean sameKeys(Map<String, Map<String, Object>> left, Map<String, Map<String, Object>> right) { return left.keySet().equals(right.keySet()); }
 
@@ -190,6 +213,11 @@ public final class V3UpdatePlanner {
         Map<String, byte[]> project = new V3ProjectMaterializer(release).materialize(resolved);
         byte[] bytes = project.get(projectTarget);
         if (bytes == null) throw packageError("managed registry source missing: " + target);
+        return bytes;
+    }
+    private byte[] applicationYamlBytes(ExtensionResolver.ResolvedExtensions resolved) {
+        byte[] bytes = new V3ProjectMaterializer(release).materialize(resolved).get("backend/src/main/resources/application.yml");
+        if (bytes == null) throw packageError("managed application.yml source missing");
         return bytes;
     }
     private V3Exception packageError(String message) { return new V3Exception("PACKAGE_BUILD_FAILED", message, 500); }

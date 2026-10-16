@@ -146,6 +146,12 @@ final class EngineMapper {
                 if (version != null && !(version instanceof String)) invalidState("Maven version must be string or null");
                 if (scope != null && (!(scope instanceof String) || !Arrays.asList("compile", "provided", "runtime", "test", "system").contains(scope))) invalidState("Maven scope is invalid");
                 normalizedSpec.put("groupId", groupId); normalizedSpec.put("artifactId", artifactId); normalizedSpec.put("version", version); normalizedSpec.put("scope", scope);
+            } else if ("APPLICATION_YAML".equals(type)) {
+                if (!"backend/src/main/resources/application.yml".equals(target)) invalidState("Application YAML target is invalid");
+                exact(spec, new TreeSet<String>(Arrays.asList("path", "value")), "TEMPLATE_STATE_INVALID", "Application YAML spec fields are invalid", 400);
+                String path = string(spec.get("path"), "Application YAML path");
+                if (!path.matches("[A-Za-z0-9_.-]+") || !entry.getKey().equals("yaml:" + path)) invalidState("Application YAML resource key is invalid");
+                normalizedSpec.put("path", path); normalizedSpec.put("value", spec.get("value"));
             } else invalidState("managed Contribution type is unsupported");
             Map<String, Object> normalized = new LinkedHashMap<String, Object>(); normalized.put("type", type); normalized.put("target", target);
             normalized.put("owners", owners); normalized.put("spec", normalizedSpec); normalized.put("appliedRevision", appliedRevision);

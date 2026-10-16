@@ -1,27 +1,61 @@
-import type { components } from './generated/authorizationApiTypes';
+export interface PermissionResource {
+  resourceKey: string;
+  name: string;
+  description?: string | null;
+  origin: 'system' | 'business';
+  type: 'system' | 'page' | 'operation';
+  targetResourceRef?: string | null;
+}
 
-type Schemas = components['schemas'];
-export type ResponseEnvelope = Schemas['ResponseEnvelope'];
-export type ErrorResponse = Schemas['ErrorResponse'];
-export type EmptyEnvelope = Schemas['EmptyEnvelope'];
-export type MockLoginRequest = Schemas['MockLoginRequest'];
-export type MemberEnvelope = Schemas['MemberEnvelope'];
-export type MemberResourcesEnvelope = Schemas['MemberResourcesEnvelope'];
-export type PermissionResourceEnvelope = Schemas['PermissionResourceEnvelope'];
-export type ResourceListEnvelope = Schemas['ResourceListEnvelope'];
-export type RoleEnvelope = Schemas['RoleEnvelope'];
-export type RoleListEnvelope = Schemas['RoleListEnvelope'];
-export type RoleResourcesEnvelope = Schemas['RoleResourcesEnvelope'];
-export type RoleMembersEnvelope = Schemas['RoleMembersEnvelope'];
-export type MemberListEnvelope = Schemas['MemberListEnvelope'];
-export type PermissionResource = Schemas['PermissionResource'];
-export type Role = Schemas['Role'];
-export type Member = Schemas['Member'];
-export type MemberResources = Schemas['MemberResources'];
-export type RoleUpsertRequest = Schemas['RoleUpsertRequest'];
-export type RoleStatusRequest = Schemas['RoleStatusRequest'];
-export type RoleResources = Schemas['RoleResources'];
-export type RoleMembers = Schemas['RoleMembers'];
-export type ResourceList = Schemas['ResourceList'];
-export type RoleList = Schemas['RoleList'];
-export type MemberList = Schemas['MemberList'];
+export interface Role {
+  roleId: string;
+  name: string;
+  description?: string | null;
+  enable: boolean;
+  readonly system: boolean;
+}
+
+export interface Member {
+  memberId: string;
+  memberName: string;
+}
+
+export interface MockLoginRequest {
+  memberId: string;
+}
+
+export interface MemberResources {
+  memberId: string;
+  resourceKeys: string[];
+}
+
+export interface RoleUpsertRequest {
+  name: string;
+  description?: string | null;
+}
+
+export interface RoleStatusRequest {
+  enable: boolean;
+}
+
+export interface RoleResources {
+  roleId: string;
+  resourceKeys: string[];
+}
+
+export interface RoleMembers {
+  roleId: string;
+  members: Member[];
+}
+
+interface PageResult<T> {
+  total: number;
+  list: T[];
+  current: number;
+  pageSize: number;
+  totalPage: number;
+}
+
+export type ResourceList = PageResult<PermissionResource>;
+export type RoleList = PageResult<Role>;
+export type MemberList = PageResult<Member>;

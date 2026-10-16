@@ -1,5 +1,19 @@
 import axios, { AxiosInstance, AxiosError, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { AUTHORIZATION_KEY } from '@/constants';
+
+/** 后端统一响应格式。Service 成功时只向业务代码返回 body。 */
+export interface ResponseEnvelope<T> {
+  returnCode: string;
+  errorMsg: string | null;
+  body: T;
+}
+
+export class ServiceResponseError extends Error {
+  constructor(public readonly returnCode: string, message: string | null) {
+    super(message || '服务请求失败');
+  }
+}
+
 export type DataType = string | number | Object;
 export type ReqFulfilledType = (config: InternalAxiosRequestConfig) => InternalAxiosRequestConfig;
 export type ResFulfilledType = (response: AxiosResponse) => AxiosResponse['data'];
@@ -24,7 +38,11 @@ const defaultResFulfilled: ResFulfilledType = (response) => {
   if(response.headers?.[AUTHORIZATION_KEY]) {
     sessionStorage.setItem(AUTHORIZATION_KEY, response.headers?.authorization);
   }
-  return response.data;
+  const envelope = response.data as ResponseEnvelope<unknown>;
+  if (envelope.returnCode !== 'SUC0000') {
+    throw new ServiceResponseError(envelope.returnCode, envelope.errorMsg);
+  }
+  return envelope.body;
 };
 
 // 响应错误处理

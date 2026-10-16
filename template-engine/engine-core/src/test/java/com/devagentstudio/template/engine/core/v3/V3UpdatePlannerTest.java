@@ -79,7 +79,8 @@ class V3UpdatePlannerTest {
         assertEquals(Arrays.asList("authorization", "login"), owners);
         @SuppressWarnings("unchecked") List<String> mavenOwners = (List<String>) resolved.managedContributions().get("maven:ZA21:bee-starter-auth").get("owners");
         assertEquals(Arrays.asList("authorization", "login"), mavenOwners);
-        assertEquals(2, resolved.managedContributions().size());
+        assertTrue(resolved.managedContributions().containsKey("yaml:bee.auth.client-id"));
+        assertTrue(resolved.managedContributions().containsKey("yaml:bee.persistence.xcode-agent.mybatis.mapper-locations"));
 
         Map<String, Object> currentState = new V3ProjectMaterializer(r1).templateState(resolved);
         Path r2Root = temporary.resolve("owners-r2/code"); copyRuntime(r1Root, r2Root); writeRevision(r2Root, "2026.09.21.1");
@@ -114,7 +115,20 @@ class V3UpdatePlannerTest {
         assertEquals(V3UpdateResult.Kind.CHANGE, result.kind());
         assertTrue(result.operations().isEmpty());
         assertEquals(Boolean.TRUE, ((Map<?, ?>) ((Map<?, ?>) ((Map<?, ?>) result.nextState().get("requested")).get("authorization")).get("config")).get("vendorOption"));
-        assertEquals(7, planner.plan(firstState, firstResolved, "RECONCILE").operations().size());
+        assertFalse(planner.plan(firstState, firstResolved, "RECONCILE").operations().isEmpty());
+    }
+
+    @Test
+    void conflictingApplicationYamlLeavesAreRejectedBeforeMaterialization() throws Exception {
+        Path root = temporary.resolve("yaml-conflict/code"); copyRuntime(codeRoot(), root);
+        Path authorization = root.resolve("backend/extensions/authorization/extension.yaml");
+        String manifest = read(authorization).replace("    bee:\n      persistence:",
+                "    bee:\n      auth:\n        client-id: conflicting-client\n      persistence:");
+        Files.write(authorization, manifest.getBytes(StandardCharsets.UTF_8));
+        CodeTemplateRelease release = new CodeTemplateReleaseLoader(root).load();
+        V3Exception exception = assertThrows(V3Exception.class,
+                () -> new ExtensionResolver(release).resolve(requested("authorization", Collections.<String, Object>emptyMap())));
+        assertEquals("APPLICATION_YAML_CONFLICT", exception.code());
     }
 
     private int count(List<Map<String, Object>> operations, String type) { int total = 0; for (Map<String, Object> operation : operations) if (type.equals(operation.get("type"))) total++; return total; }

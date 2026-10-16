@@ -3,3 +3,9 @@ requires:
   - login
 contributes:
   applicationAnnotations: []
+  applicationYaml:
+    bee:
+      persistence:
+        xcode-agent:
+          mybatis:
+            mapper-locations: classpath:mapper/**/*.xml

@@ -9,8 +9,8 @@ import java.util.regex.Pattern;
 public final class ExtensionManifestLoader {
     private static final Pattern FQCN = Pattern.compile("[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)+");
     public static final class Manifest {
-        public final String id; public final List<String> requires; public final List<String> annotations; public final List<MavenDependency> dependencies; public final Path root;
-        Manifest(String id, List<String> requires, List<String> annotations, List<MavenDependency> dependencies, Path root) { this.id=id; this.requires=requires; this.annotations=annotations; this.dependencies=dependencies; this.root=root; }
+        public final String id; public final List<String> requires; public final List<String> annotations; public final List<MavenDependency> dependencies; public final Map<String,Object> applicationYaml; public final Path root;
+        Manifest(String id, List<String> requires, List<String> annotations, List<MavenDependency> dependencies, Map<String,Object> applicationYaml, Path root) { this.id=id; this.requires=requires; this.annotations=annotations; this.dependencies=dependencies; this.applicationYaml=applicationYaml; this.root=root; }
     }
     private final Map<String, Manifest> manifests = new LinkedHashMap<String, Manifest>();
     public ExtensionManifestLoader(Path extensions) {
@@ -49,7 +49,13 @@ public final class ExtensionManifestLoader {
                 dependencies.add(new MavenDependency(groupId, artifactId, version, scope));
             }
         }
-        manifests.put(id, new Manifest(id, requires, annotations, dependencies, root));
+        Map<String,Object> applicationYaml = new LinkedHashMap<String,Object>();
+        if (contributes instanceof Map) {
+            Object yaml = ((Map<String,Object>) contributes).get("applicationYaml");
+            if (yaml != null && !(yaml instanceof Map)) throw new TemplateException("INVALID_EXTENSION_DEFINITION", "applicationYaml must be an object in " + id);
+            if (yaml instanceof Map) applicationYaml.putAll((Map<String,Object>) yaml);
+        }
+        manifests.put(id, new Manifest(id, requires, annotations, dependencies, applicationYaml, root));
     }
     private String string(Object value) { String result=optional(value); if(result==null || result.length()==0) throw new TemplateException("INVALID_EXTENSION_DEFINITION", "missing dependency coordinate"); return result; }
     private String optional(Object value) { return value == null ? null : String.valueOf(value).trim(); }

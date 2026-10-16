@@ -1,10 +1,10 @@
 package com.cmbchina.backend.auth.application.service;
 
+import com.cmb.bee.commons.exceptions.BizException;
 import com.cmbchina.backend.auth.application.dto.MemberDTO;
 import com.cmbchina.backend.auth.domain.exception.AuthErrorCode;
-import com.cmbchina.backend.common.exception.BizException;
-import com.cmbchina.backend.common.page.PageParam;
-import com.cmbchina.backend.common.page.PageResult;
+import com.cmbchina.backend.common.entity.page.PageParam;
+import com.cmbchina.backend.common.entity.page.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

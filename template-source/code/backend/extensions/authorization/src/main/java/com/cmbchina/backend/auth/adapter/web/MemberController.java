@@ -1,12 +1,10 @@
 package com.cmbchina.backend.auth.adapter.web;
 
+import com.cmb.bee.web.entity.BeeResponseEntity;
 import com.cmbchina.backend.auth.application.dto.MemberDTO;
 import com.cmbchina.backend.auth.application.service.MemberApplicationService;
-import com.cmbchina.backend.auth.common.annotation.RequireAnyResource;
-import com.cmbchina.backend.auth.domain.constant.AuthConstants;
-import com.cmbchina.backend.common.page.PageParam;
-import com.cmbchina.backend.common.page.PageResult;
-import com.cmbchina.backend.common.response.ResponseEntity;
+import com.cmbchina.backend.common.entity.page.PageParam;
+import com.cmbchina.backend.common.entity.page.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -21,8 +19,8 @@ public class MemberController {
     private final MemberApplicationService memberService;
 
     @GetMapping
-    public ResponseEntity<PageResult<MemberDTO>> list(@ModelAttribute PageParam query) {
-        return ResponseEntity.success(memberService.listMembers(query));
+    public BeeResponseEntity<PageResult<MemberDTO>> list(@ModelAttribute PageParam query) {
+        return BeeResponseEntity.success(memberService.listMembers(query));
     }
 
 }

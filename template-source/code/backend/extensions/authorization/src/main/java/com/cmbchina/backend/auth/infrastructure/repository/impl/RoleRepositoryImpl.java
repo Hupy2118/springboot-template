@@ -8,7 +8,7 @@ import com.cmbchina.backend.auth.domain.repository.RoleRepository;
 import com.cmbchina.backend.auth.infrastructure.mapper.RoleMapper;
 import com.cmbchina.backend.auth.infrastructure.po.RolePO;
 import com.cmbchina.backend.auth.infrastructure.repository.converter.RoleConverter;
-import com.cmbchina.backend.common.page.PageResult;
+import com.cmbchina.backend.common.entity.page.PageResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -23,17 +23,14 @@ public class RoleRepositoryImpl implements RoleRepository {
     @Override
     public PageResult<Role> page(int current, int pageSize) {
         Page<RolePO> page = new Page<>(current, pageSize);
-        LambdaQueryWrapper<RolePO> query = new LambdaQueryWrapper<RolePO>()
-                .orderByAsc(RolePO::getId);
+        LambdaQueryWrapper<RolePO> query = new LambdaQueryWrapper<RolePO>().orderByAsc(RolePO::getId);
         Page<RolePO> result = roleMapper.selectPage(page, query);
-        return PageResult.of(result.getTotal(), (int) result.getCurrent(), (int) result.getSize(),
-                result.getRecords(), converter::toEntity);
+        return PageResult.of(result.getTotal(), (int)result.getCurrent(), (int)result.getSize(), result.getRecords(), converter::toEntity);
     }
 
     @Override
     public Role findByRoleId(String roleId) {
-        RolePO role = roleMapper.selectOne(new LambdaQueryWrapper<RolePO>()
-                .eq(RolePO::getRoleId, roleId));
+        RolePO role = roleMapper.selectOne(new LambdaQueryWrapper<RolePO>().eq(RolePO::getRoleId, roleId));
         return converter.toEntity(role);
     }
 

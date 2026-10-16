@@ -102,8 +102,8 @@ class EngineServiceIT {
         byte[] reconcile = postZip(mvc, "/v1/update", updateRequest(JSON.readTree(targetState), capabilities("authorization", true), "RECONCILE"), 200);
         JsonNode repair = zipJson(reconcile, "extension-update-package.json");
         assertEquals(targetState, JSON.writeValueAsString(repair.path("nextTemplateState")));
-        assertEquals(7, repair.path("operations").size());
-        assertEquals(5, countOperation(repair.path("operations"), "REPLACE_MANAGED_FILE"));
+        assertEquals(8, repair.path("operations").size());
+        assertEquals(6, countOperation(repair.path("operations"), "REPLACE_MANAGED_FILE"));
         assertEquals(1, countOperation(repair.path("operations"), "ENSURE_JAVA_ANNOTATION"));
         assertEquals(1, countOperation(repair.path("operations"), "ENSURE_MAVEN_DEPENDENCY"));
     }

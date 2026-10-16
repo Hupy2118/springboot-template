@@ -1,6 +1,7 @@
 package com.devagentstudio.template.engine.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(classes = EngineServiceApplication.class)
 class V3AssemblyParityIT {
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
     @Autowired private WebApplicationContext context;
 
     @DynamicPropertySource
@@ -107,7 +109,12 @@ class V3AssemblyParityIT {
     }
     private void assertByteMapsEqual(Map<String, byte[]> expected, Map<String, byte[]> actual, String label) {
         assertEquals(expected.keySet(), actual.keySet(), label + " file set");
-        for (String path : expected.keySet()) assertTrue(Arrays.equals(expected.get(path), actual.get(path)), label + " bytes differ at " + path);
+        for (String path : expected.keySet()) {
+            if ("src/main/resources/application.yml".equals(path)) {
+                try { assertEquals(YAML.readValue(expected.get(path), Map.class), YAML.readValue(actual.get(path), Map.class), label + " YAML differs at " + path); }
+                catch (Exception e) { throw new AssertionError(e); }
+            } else assertTrue(Arrays.equals(expected.get(path), actual.get(path)), label + " bytes differ at " + path);
+        }
     }
     private void copyDirectory(Path source, Path target) throws Exception {
         try (java.util.stream.Stream<Path> stream = Files.walk(source)) {

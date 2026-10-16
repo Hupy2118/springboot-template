@@ -17,9 +17,9 @@ public final class BackendAssembler {
         List<ExtensionManifestLoader.Manifest> manifests = new ExtensionManifestLoader(root.resolve("extensions")).resolve(profile.requested);
         WorkspaceState state = new WorkspaceState(); state.profile = profile.name; state.editTarget = profile.editTarget;
         copyTree(root.resolve("base"), workspace, "base", state);
-        List<String> annotations = new ArrayList<String>(); List<MavenDependency> dependencies = new ArrayList<MavenDependency>();
+        List<String> annotations = new ArrayList<String>(); List<MavenDependency> dependencies = new ArrayList<MavenDependency>(); List<Map<String,Object>> yamlContributions = new ArrayList<Map<String,Object>>();
         for (ExtensionManifestLoader.Manifest manifest : manifests) {
-            state.extensions.add(manifest.id); annotations.addAll(manifest.annotations); dependencies.addAll(manifest.dependencies);
+            state.extensions.add(manifest.id); annotations.addAll(manifest.annotations); dependencies.addAll(manifest.dependencies); yamlContributions.add(manifest.applicationYaml);
             for (String directory : Arrays.asList("src", "docs", "migrations")) if (Files.exists(manifest.root.resolve(directory)))
                 copyTree(manifest.root.resolve(directory), workspace.resolve(directory), manifest.id, state);
         }
@@ -27,6 +27,7 @@ public final class BackendAssembler {
         state.mavenDependencies = new ArrayList<MavenDependency>(new LinkedHashSet<MavenDependency>(dependencies));
         ApplicationAnnotationCompiler.apply(workspace.resolve("src/main/java/com/cmbchina/backend/Application.java"), state.applicationAnnotations);
         PomDependencyCompiler.apply(workspace.resolve("pom.xml"), state.mavenDependencies);
+        ApplicationYamlCompiler.apply(workspace.resolve("src/main/resources/application.yml"), yamlContributions);
         state.write(workspace); AssemblyContract.verify(workspace); return state;
     }
     private void copyTree(final Path from, final Path to, final String owner, final WorkspaceState state) {

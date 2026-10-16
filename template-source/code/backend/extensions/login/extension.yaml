@@ -6,3 +6,15 @@ contributes:
   mavenDependencies:
     - groupId: ZA21
       artifactId: bee-starter-auth
+  applicationYaml:
+    bee:
+      auth:
+        client-id: ${BEE_AUTH_CLIENT_ID:development-client-id}
+        private-key: ${BEE_AUTH_PRIVATE_KEY:}
+        public-key: ${BEE_AUTH_PUBLIC_KEY:}
+        center-public-key: ${BEE_AUTH_CENTER_PUBLIC_KEY:}
+        center-uri: ${BEE_AUTH_CENTER_URI:http://localhost:8081/auth-server}
+        login:
+          authorize-uri: ${BEE_AUTH_AUTHORIZE_URI:http://localhost:8081/auth-server/auth}
+          redirect-uri: ${BEE_AUTH_REDIRECT_URI:http://localhost/login}
+          filter-patterns: /*

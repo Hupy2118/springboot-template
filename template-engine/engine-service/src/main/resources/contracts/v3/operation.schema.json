@@ -21,7 +21,7 @@
     },
     {
       "if": { "properties": { "type": { "const": "REPLACE_MANAGED_FILE" } }, "required": ["type"] },
-      "then": { "properties": { "parameters": { "const": {} }, "payloadRef": { "type": "string", "pattern": "^payload/.+$" }, "target": { "enum": ["frontend/src/extensions/providers.ts", "frontend/src/extensions/rootRoutes.tsx", "frontend/src/extensions/systemPageRoutes.ts", "frontend/src/extensions/initializers.ts", "frontend/src/extensions/errorReporters.ts"] } } }
+      "then": { "properties": { "parameters": { "const": {} }, "payloadRef": { "type": "string", "pattern": "^payload/.+$" }, "target": { "enum": ["frontend/src/extensions/providers.ts", "frontend/src/extensions/rootRoutes.tsx", "frontend/src/extensions/systemPageRoutes.ts", "frontend/src/extensions/initializers.ts", "frontend/src/extensions/errorReporters.ts", "backend/src/main/resources/application.yml"] } } }
     },
     {
       "if": { "properties": { "type": { "enum": ["ENSURE_JAVA_ANNOTATION", "REMOVE_JAVA_ANNOTATION"] } }, "required": ["type"] },
