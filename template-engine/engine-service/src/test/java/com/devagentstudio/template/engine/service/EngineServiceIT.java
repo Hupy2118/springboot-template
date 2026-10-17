@@ -58,6 +58,7 @@ class EngineServiceIT {
         assertEquals(0, baseState.path("installedArtifacts").size());
         assertEquals(0, baseState.path("managedContributions").size());
         assertTrue(hasZipEntry(base, "frontend/src/extensions/providers.ts"));
+        assertTrue(hasZipEntry(base, "frontend/src/config/app.generated.ts"));
 
         byte[] auth = generate(mvc, capabilities("authorization", true));
         assertArrayEquals(auth, generate(mvc, capabilities("authorization", true)));
