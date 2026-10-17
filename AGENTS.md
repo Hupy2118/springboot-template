@@ -16,7 +16,7 @@ Engine Service 是无状态计算入口，不是 Project Registry、Workspace Ma
 - `template-engine/engine-core/`：纯 Java Core；不得引入 Spring MVC、HTTP、持久化或 ZIP 打包依赖。V3 逻辑放在独立 `core/v3`、`source/v3` 包中。
 - `template-engine/engine-service/`：Spring HTTP、认证、Core 映射、错误映射和 Package Builder。不得实现业务 Capability 逻辑。
 - `scripts/ci/`：可重复使用的 CI Gate 与 Template Source 构建检查；脚本必须自行定位仓库根目录。
-- `docs/REFACTOR.md`：V3 收敛记录与契约索引。任何新增 State 字段、Operation、Package 字段、错误码、HTTP 参数或 Capability 协议，必须先更新权威 Schema/OpenAPI、Fixture 与契约测试。
+- `docs/DEVELOPMENT_GUIDE.md`：项目架构与前后端模板的唯一维护开发指南。协议变更必须同步权威 OpenAPI / JSON Schema、Fixture 及契约测试。
 
 ## 修改规则
 
@@ -53,4 +53,4 @@ python3 scripts/ci/check-protected-surfaces.py
 ./scripts/ci/verify-code-template-release-revision.sh <base-ref>
 ```
 
-涉及 HTTP、ZIP 或启动配置时，使用 `template-engine/engine-service/config/application-local.yml` 进行真实 JAR 启动验收。该配置要求显式传入绝对 `TEMPLATE_ENGINE_SOURCE_ROOT`，并固定监听 `127.0.0.1`；详情见 `README.md` 和 `docs/REFACTOR.md`。
+涉及 HTTP、ZIP 或启动配置时，使用 `template-engine/engine-service/config/application-local.yml` 进行真实 JAR 启动验收。该配置要求显式传入绝对 `TEMPLATE_ENGINE_SOURCE_ROOT`，并固定监听 `127.0.0.1`；详情见 `README.md` 和 `docs/DEVELOPMENT_GUIDE.md`。

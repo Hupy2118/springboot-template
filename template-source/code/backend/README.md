@@ -11,4 +11,4 @@ Profiles are `base`, `login`, `authorization`, and `full`. `authorization`
 automatically includes `login`; `full` is integration-only and cannot sync new
 files because it has no edit target.
 
-For the complete maintainer workflow, see [docs/development-guide.md](docs/development-guide.md).
+For the complete maintainer workflow, see [项目开发指南](../../../docs/DEVELOPMENT_GUIDE.md).
