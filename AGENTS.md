@@ -28,6 +28,14 @@ Engine Service 是无状态计算入口，不是 Project Registry、Workspace Ma
 6. ZIP entry 必须使用相对安全路径、固定排序和固定 timestamp。V3 Update Package 仅为 ADD_FILE / REPLACE_MANAGED_FILE 创建 payload。
 7. 保持 Java 8 编译兼容；Spring Boot 2.7 运行依赖与 Jackson YAML/SnakeYAML 版本必须保持兼容，不要单独升级其中一个。
 
+## XCodeAgent 工作流关键面保护
+
+以下内容是 XCodeAgent 工作流的跨端集成点：Route Projector 及其输入/输出契约、Element Inspector 通道、页面身份映射和业务路由受管标记、Authorization Bootstrap、Extension Registry，以及 V3 TemplateState 的生成和 Schema。
+
+- 未经任务中的明确要求，不得删除、重命名或移除这些关键文件、导出函数、协议字符串、受管区域标记或对外 Schema 字段。
+- 需要演进关键面时，必须保留兼容入口，或者在同一变更中明确更新受影响的契约、调用方和 `scripts/ci/check-protected-surfaces.py` 锚点清单；不得以删除检查或绕过 CI 的方式完成变更。
+- 该保护仅覆盖上述工作流面，不覆盖普通业务页面、业务接口或一般实现细节。普通业务优化不应为此受到限制。
+
 ## 验证要求
 
 完成 Engine Service 相关改动后至少执行：
@@ -41,6 +49,7 @@ git diff --check
 
 ```sh
 mvn -f template-engine/pom.xml verify
+python3 scripts/ci/check-protected-surfaces.py
 ./scripts/ci/verify-code-template-release-revision.sh <base-ref>
 ```
 

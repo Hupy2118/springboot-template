@@ -7,6 +7,7 @@ import importlib.util
 import pathlib
 import re
 import subprocess
+import sys
 import tarfile
 import tempfile
 
@@ -16,6 +17,7 @@ CODE_RELEASE_INPUTS = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CODE_RELEASE_INPUTS)
 REVISION_RE = re.compile(r"^(\d{4})\.(\d{2})\.(\d{2})\.([1-9]\d*)$")
 REVISION_PATH = "template-source/code/template-revision.txt"
+PROTECTED_SURFACES_CHECK = SCRIPT_DIR / "check-protected-surfaces.py"
 
 
 def fail(message):
@@ -50,6 +52,17 @@ def revision_at(root, revision):
     return git(root, "show", "%s:%s" % (revision, REVISION_PATH)).stdout.strip()
 
 
+def check_protected_surfaces(root):
+    """Run the independent workflow-surface gate on every revision-gate invocation."""
+    if PROTECTED_SURFACES_CHECK.is_symlink() or not PROTECTED_SURFACES_CHECK.is_file():
+        fail("required protected-surfaces CI gate is missing or unsafe: %s" % PROTECTED_SURFACES_CHECK.name)
+    completed = subprocess.run([sys.executable, str(PROTECTED_SURFACES_CHECK)], cwd=str(root),
+                               text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if completed.returncode:
+        detail = (completed.stdout + completed.stderr).strip()
+        fail("protected-surfaces CI gate failed%s" % (":\n" + detail if detail else ""))
+
+
 def export_revision(root, revision, destination):
     archive = subprocess.run(["git", "archive", "--format=tar", revision], cwd=str(root),
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -67,6 +80,10 @@ def main():
     parser.add_argument("base_ref")
     args = parser.parse_args()
     root = SCRIPT_DIR.parent.parent
+
+    # This fixed call means deleting the checker or a protected surface blocks the
+    # existing release-revision CI gate before it can approve a Runtime change.
+    check_protected_surfaces(root)
 
     revision_path = root / REVISION_PATH
     if revision_path.is_symlink() or not revision_path.is_file():
