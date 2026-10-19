@@ -1,15 +1,26 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import type { RouteObject } from 'react-router-dom';
-import type { ResolvedPageRoute } from '@/utils/pageRouteTree';
+import { normalizePageModuleImportPath, type ResolvedPageRoute } from '@/utils/pageRouteTree';
 
 export type PageElementWrapper = (element: ReactNode, item: ResolvedPageRoute) => ReactNode;
 
-// 使用 Vite 的 import.meta.glob 预扫描所有业务页面（编译时静态分析）。
-const pageModules = import.meta.glob([
-  '@/pages/**/index.tsx',
-  '!@/pages/Login/**/index.tsx',
-  '!@/pages/Logout/**/index.tsx',
-]) as Record<string, () => Promise<{ default: React.ComponentType<any> }>>;
+type PageModule = { default: React.ComponentType<any> };
+
+// Rspack 在编译期发现页面；lazy 保持每个业务页面按需加载。
+const pageContext = import.meta.webpackContext<PageModule>('../pages', {
+  recursive: true,
+  regExp: /\/index\.tsx$/,
+  mode: 'lazy',
+});
+
+const pageModules = Object.fromEntries(
+  pageContext.keys()
+    .filter((request) => !/^\.\/(?:Login|Logout)\//.test(request))
+    .map((request) => [
+      normalizePageModuleImportPath(`src/pages/${request.replace(/^\.\//, '')}`),
+      () => pageContext(request),
+    ]),
+) as Record<string, () => Promise<PageModule>>;
 /** 从标准化页面树生成 React Router 路由。 */
 export function createPageRoutes(
   items: ResolvedPageRoute[],

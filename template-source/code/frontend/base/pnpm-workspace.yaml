@@ -1,6 +1,7 @@
 packages:
   - '.'
 allowBuilds:
+  core-js: false
   esbuild: true
 
 # Fail installation when a newly introduced dependency requires an

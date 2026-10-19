@@ -75,7 +75,7 @@ springboot-template/
 
 ### 3.1 源码分工
 
-- `frontend/base/`：完整可组装的 React + Ant Design/Vite 工程，负责应用入口、Layout、路由运行时、菜单、通用 Access/Identity 抽象、API Client、页面加载及开发预览能力。
+- `frontend/base/`：完整可组装的 React + Ant Design/Rsbuild 工程，负责应用入口、Layout、路由运行时、菜单、通用 Access/Identity 抽象、API Client、页面加载及开发预览能力。
 - `frontend/extensions/login/src/`：登录页面、Provider、API 和 Guard。
 - `frontend/extensions/authorization/src/`：权限管理页面、Provider、权限组件、Hooks 和 API。
 - `frontend/extensions/<id>/extension.yaml`：能力依赖及 Provider、Root Route、Page Route、Initializer、Error Reporter 的 Contribution 声明。
@@ -157,9 +157,9 @@ node frontend/scripts/devagentstudio/route-projector.mjs apply
 }
 ```
 
-执行输出包含 `status`、`requestedPageIds`、`appliedPageIds`、`skippedPageIds`。Projector 全量 reconcile `frontend/src/constants/routes.tsx` 中的 `DEVAGENTSTUDIO_BUSINESS_ROUTES_START/END` 受管区域，只注册 `pageId/name/resourceKey` 对应的路由字段，不生成组件 import。页面身份转换保持一致：`asset_list` → `src/pages/AssetList/index.tsx` → `/page/asset-list`；Runtime 通过 `import.meta.glob` 装载页面。必须保留 Projector、Descriptor/Schema、两个 Marker、`pageIdentity.vectors.json` 以及动态发现机制。
+执行输出包含 `status`、`requestedPageIds`、`appliedPageIds`、`skippedPageIds`。Projector 全量 reconcile `frontend/src/constants/routes.tsx` 中的 `DEVAGENTSTUDIO_BUSINESS_ROUTES_START/END` 受管区域，只注册 `pageId/name/resourceKey` 对应的路由字段，不生成组件 import。页面身份转换保持一致：`asset_list` → `src/pages/AssetList/index.tsx` → `/page/asset-list`；Runtime 通过 Rsbuild/Rspack 上下文模块装载页面。必须保留 Projector、Descriptor/Schema、两个 Marker、`pageIdentity.vectors.json` 以及动态发现机制。
 
-**Element Inspector**：开发模式下 `frontend/base/src/index.tsx` 加载 `devtools/elementInspector.ts`，`scripts/sourcePathPlugin.mjs` / Vite 配置注入 `data-path`，通过 `devagentstudio:element-inspector`、`ready` / `set-active` / `element-selected` 和 `sourceLocation` 与父窗口通信。这组文件和消息字段不是可随意删除的调试代码。Rsbuild 需要另接 `sourcePathLoader.cjs`。
+**Element Inspector**：开发模式下 `frontend/base/src/index.tsx` 加载 `devtools/elementInspector.ts`，`scripts/sourcePathPlugin.mjs` / Rsbuild 配置注入 `data-path`，通过 `devagentstudio:element-inspector`、`ready` / `set-active` / `element-selected` 和 `sourceLocation` 与父窗口通信。这组文件和消息字段不是可随意删除的调试代码。Rsbuild 通过 `sourcePathLoader.cjs` 复用既有转换。
 
 **页面/权限入口**：`PAGE_ROUTES` 经 `pageRegistry`、`pageRouteTree` 和 `pageRoutes` 生成业务路由；同一数据经 `usePageMenus` 生成菜单。启用 Authorization 时，`resourceKey` 由 Access Runtime 和扩展 Provider 处理。禁止维护第二套业务菜单事实。
 
@@ -302,7 +302,7 @@ java -jar template-engine/engine-service/target/engine-service-1.0.0-SNAPSHOT.ja
 | 保护面 | 当前关键文件 / 约束 |
 | --- | --- |
 | 页面投影 | `code/contracts/route-projector*.json`、`frontend/base/scripts/devagentstudio/route-projector.mjs`、`frontend/base/src/constants/routes.tsx` 的 Marker |
-| 页面发现 | `frontend/base/src/utils/pageIdentity.ts`、`pageIdentity.vectors.json`、`pageRouteTree.ts`、`pageRoutes.tsx`；保持 `import.meta.glob` Key 与映射一致 |
+| 页面发现 | `frontend/base/src/utils/pageIdentity.ts`、`pageIdentity.vectors.json`、`pageRouteTree.ts`、`pageRoutes.tsx`；保持 Rsbuild 上下文 Key 与映射一致 |
 | 可视化源码定位 | `frontend/base/devtools/elementInspector.ts`、`scripts/sourcePathPlugin.mjs`、`sourcePathLoader.cjs`、`src/index.tsx` 的开发态初始化 |
 | 前端 Extension | Loader/Materializer 中五个 Registry 固定目标以及 Base 中对它们的引用 |
 | 后端 Contribution | `backend/base/.../Application.java`、`backend/base/pom.xml`、相关 `extension.yaml` |
@@ -311,7 +311,7 @@ java -jar template-engine/engine-service/target/engine-service-1.0.0-SNAPSHOT.ja
 
 以下属于**当前已知的检查点**，不要把它们写成“已解决”：
 
-- 页面模块的 `import.meta.glob` Key 在不同打包/别名配置下可能与 `moduleImportPath` 的前导 `/` 不一致；页面投影测试应包含实际加载检查。
+- 页面模块上下文 Key 在不同打包路径下可能与 `moduleImportPath` 不一致；页面投影测试应包含实际加载检查。
 - 前端 Base 的 `AGENTS.md` 引用了不存在的前端 `docs/project-structure.md`；如需补齐，必须与生成工程中 Agent 指引同步修改。
 - 部分旧模块 README / 能力说明中提及 `CapabilityWebMvcConfiguration`；当前后端实际由 `LoginWebMvcConfiguration` 与 `AuthorizationWebMvcConfiguration` 注册拦截器。
 - 不要把 `backend/docs/development-guide.md` 中旧的“Engine 尚消费 Legacy 模板”结论继续传播；V3 当前只消费 `template-source/code/`。

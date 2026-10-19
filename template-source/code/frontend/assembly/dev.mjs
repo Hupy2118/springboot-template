@@ -72,5 +72,5 @@ if (profile === 'base') process.stdout.write('Workspace is editable. Run pnpm sy
 else if (profile === 'full') process.stdout.write('Full workspace is for integration verification. Do not use it as a source editing workspace.\n');
 else process.stdout.write(`Workspace is editable. Run pnpm sync:${profile} to persist changes.\n`);
 
-const vite = spawn('pnpm', ['exec', 'vite', '--port', '3000'], { cwd: destination, stdio: 'inherit' });
-vite.on('exit', (code) => process.exitCode = code ?? 0);
+const rsbuild = spawn('pnpm', ['exec', 'rsbuild', 'dev'], { cwd: destination, stdio: 'inherit' });
+rsbuild.on('exit', (code) => process.exitCode = code ?? 0);

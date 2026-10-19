@@ -21,6 +21,11 @@ export function isExternalPath(path: string) {
   return EXTERNAL_PATH_PATTERN.test(path);
 }
 
+/** 标准化页面模块标识，与 Rsbuild 上下文模块导出的 key 保持一致。 */
+export function normalizePageModuleImportPath(path: string) {
+  return `/${String(path || '').replace(/\\/g, '/').replace(/^\/+/, '')}`;
+}
+
 function toInternalPath(rootPath: string, segments: string[]) {
   return `/${[rootPath.replace(/^\/+|\/+$/g, ''), ...segments].join('/')}`;
 }
@@ -75,7 +80,7 @@ export function resolvePageRouteTree(
       internalPath,
       menuKey: internalPath,
       moduleImportPath: kind === 'page'
-        ? `/src/pages/${pageDirectoryFromPath(definition.path)}/index.tsx`
+        ? normalizePageModuleImportPath(`src/pages/${pageDirectoryFromPath(definition.path)}/index.tsx`)
         : undefined,
       requiredResourceKeys,
       visible,

@@ -19,7 +19,7 @@ try {
   await assemble('');
   assert.equal(await readFile(path.join(output, 'package.json'), 'utf8').then(() => true), true);
   assert.equal(await readFile(path.join(output, 'index.html'), 'utf8').then(() => true), true);
-  assert.equal(await readFile(path.join(output, 'vite.config.ts'), 'utf8').then(() => true), true);
+  assert.equal(await readFile(path.join(output, 'rsbuild.config.ts'), 'utf8').then(() => true), true);
   assert.equal(await readFile(path.join(output, 'public', 'favicon.svg'), 'utf8').then(() => true), true);
   let providers = await readFile(path.join(output, 'src', 'extensions', 'providers.ts'), 'utf8');
   let rootRoutes = await readFile(path.join(output, 'src', 'extensions', 'rootRoutes.tsx'), 'utf8');

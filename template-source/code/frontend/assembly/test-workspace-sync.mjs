@@ -22,19 +22,19 @@ try {
   await write(workspace, 'src/layout/index.tsx', 'new base');
   await write(workspace, 'src/providers/AppProviders.tsx', 'new host');
   await write(workspace, 'src/components/New/index.tsx', 'new component');
-  await write(workspace, 'vite.config.ts', 'new runtime config');
+  await write(workspace, 'rsbuild.config.ts', 'new runtime config');
   await write(workspace, 'src/extensions/providers.ts', 'must be ignored');
   await write(workspace, '.devagentstudio-template-workspace.json', 'must be ignored');
   const baseChanges = await syncWorkspace('base', { workspaceRoot: workspace, ownerRoots: owners, skipStateCheck: true });
   assert.deepEqual(baseChanges, [
+    'CREATE base/rsbuild.config.ts',
     'CREATE base/src/components/New/index.tsx',
     'UPDATE base/src/layout/index.tsx',
     'UPDATE base/src/providers/AppProviders.tsx',
     'DELETE base/src/utils/obsolete.ts',
-    'CREATE base/vite.config.ts',
   ]);
   assert.equal(await readFile(path.join(owners.base, 'src/providers/AppProviders.tsx'), 'utf8'), 'new host');
-  assert.equal(await readFile(path.join(owners.base, 'vite.config.ts'), 'utf8'), 'new runtime config');
+  assert.equal(await readFile(path.join(owners.base, 'rsbuild.config.ts'), 'utf8'), 'new runtime config');
   await assert.rejects(readFile(path.join(owners.base, 'src/extensions/providers.ts')));
   await assert.rejects(readFile(path.join(owners.base, '.devagentstudio-template-workspace.json')));
   assert.equal((await syncWorkspace('base', { workspaceRoot: workspace, ownerRoots: owners, skipStateCheck: true })).length, 0);
