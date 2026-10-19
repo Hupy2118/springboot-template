@@ -19,7 +19,7 @@ final class EngineMapper {
     private static final Pattern CAPABILITY_ID = Pattern.compile("^[a-z0-9][a-z0-9_-]*$");
     private static final Pattern JAVA_NAME = Pattern.compile("^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)+$");
     private static final Pattern COORDINATE = Pattern.compile("^[A-Za-z0-9_.-]+$");
-    private static final Set<String> STATE_FIELDS = new TreeSet<String>(Arrays.asList("schemaVersion", "templateRevision", "requested", "effective", "installedArtifacts", "managedContributions"));
+    private static final Set<String> STATE_FIELDS = new TreeSet<String>(Arrays.asList("schemaVersion", "templateRevision", "requested", "effective", "installedArtifacts", "managedContributions", "managedConfiguration"));
     private static final Set<String> ARTIFACT_FIELDS = new TreeSet<String>(Arrays.asList("capabilityId", "target", "installedRevision"));
     private static final Set<String> CONTRIBUTION_FIELDS = new TreeSet<String>(Arrays.asList("type", "target", "owners", "spec", "appliedRevision"));
 
@@ -28,7 +28,7 @@ final class EngineMapper {
     @SuppressWarnings("unchecked")
     static Map<String, Object> requestedConfig(Object raw) {
         Map<String, Object> config = requireMap(raw, "BAD_REQUEST", "requestedConfig must be an object", 400);
-        exact(config, Collections.singleton("capabilities"), "BAD_REQUEST", "requestedConfig fields are invalid", 400);
+        if (!config.containsKey("capabilities") || config.size() > 2 || (config.size() == 2 && !config.containsKey("applicationConfig"))) throw bad("requestedConfig fields are invalid");
         Map<String, Object> capabilities = requireMap(config.get("capabilities"), "BAD_REQUEST", "requestedConfig.capabilities must be an object", 400);
         Map<String, Object> result = new TreeMap<String, Object>();
         for (Map.Entry<String, Object> entry : capabilities.entrySet()) {
@@ -43,6 +43,7 @@ final class EngineMapper {
             normalized.put("enabled", enabled); normalized.put("config", deep(capabilityConfig));
             result.put(id, normalized);
         }
+        if (config.containsKey("applicationConfig")) result.put("applicationConfig", requireMap(config.get("applicationConfig"), "BAD_REQUEST", "requestedConfig.applicationConfig must be an object", 400));
         return result;
     }
 
@@ -52,7 +53,9 @@ final class EngineMapper {
         if (!integer(schemaVersion)) throw bad("currentTemplateState.schemaVersion must be an integer");
         if (new java.math.BigDecimal(schemaVersion.toString()).compareTo(java.math.BigDecimal.valueOf(3L)) != 0)
             throw new V3Exception("TEMPLATE_STATE_SCHEMA_UNSUPPORTED", "currentTemplateState.schemaVersion must be 3", 400);
-        exact(state, STATE_FIELDS, "TEMPLATE_STATE_INVALID", "TemplateState fields are invalid", 400);
+        Set<String> supplied = new TreeSet<String>(state.keySet()); supplied.remove("managedConfiguration");
+        Set<String> required = new TreeSet<String>(STATE_FIELDS); required.remove("managedConfiguration");
+        if (!supplied.equals(required)) invalidState("TemplateState fields are invalid");
         String revision = state.get("templateRevision") instanceof String ? (String) state.get("templateRevision") : null;
         if (revision == null) invalidState("templateRevision must be a string");
         try { RevisionVersion.parse(revision); } catch (IllegalArgumentException e) { invalidState("templateRevision is invalid"); }
@@ -67,6 +70,7 @@ final class EngineMapper {
         normalized.put("schemaVersion", 3); normalized.put("templateRevision", revision);
         normalized.put("requested", requested); normalized.put("effective", effective);
         normalized.put("installedArtifacts", artifacts); normalized.put("managedContributions", contributions);
+        if (state.containsKey("managedConfiguration")) normalized.put("managedConfiguration", requireMap(state.get("managedConfiguration"), "TEMPLATE_STATE_INVALID", "managedConfiguration must be an object", 400));
         return normalized;
     }
 

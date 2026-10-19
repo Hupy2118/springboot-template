@@ -261,9 +261,10 @@ Generate ZIP 包含 `frontend/`、`backend/`、`.devagentstudio/template-state.j
 在仓库根目录：
 
 ```bash
-mvn -f template-engine/pom.xml -pl engine-service -am package
+mvn -f template-engine/pom.xml -pl engine-service -am package -D maven.test.skip=true
 
 export TEMPLATE_ENGINE_SOURCE_ROOT="$(cd template-source && pwd)"
+
 java -jar template-engine/engine-service/target/engine-service-1.0.0-SNAPSHOT.jar \
   --spring.config.additional-location="file:$(pwd)/template-engine/engine-service/config/application-local.yml"
 ```

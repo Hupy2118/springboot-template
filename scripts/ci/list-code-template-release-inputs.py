@@ -15,6 +15,8 @@ def add_tree(root, relative_root, result):
     if not source.is_dir() or source.is_symlink():
         fail("missing or unsafe Runtime Source directory: %s" % relative_root.as_posix())
     for path in sorted(source.rglob("*")):
+        if ignored_runtime_entry(path, source):
+            continue
         if path.is_symlink():
             fail("symlink is not allowed in Runtime Source: %s" % path.relative_to(root).as_posix())
         if path.is_dir():
@@ -52,6 +54,8 @@ def extension_directories(root, relative_root):
     children = sorted(parent.iterdir(), key=lambda item: item.name)
     directories = []
     for child in children:
+        if ignored_runtime_entry(child, parent):
+            continue
         if child.is_symlink():
             fail("symlink is not allowed in Runtime Source: %s" % child.relative_to(root).as_posix())
         if child.is_dir():
@@ -59,6 +63,11 @@ def extension_directories(root, relative_root):
         elif child.name != ".gitkeep":
             fail("unexpected file in extensions directory: %s" % child.relative_to(root).as_posix())
     return directories
+
+
+def ignored_runtime_entry(path, root):
+    """Dependency installations and Finder metadata are not V3 Runtime Source."""
+    return path.name == ".DS_Store" or "node_modules" in path.relative_to(root).parts
 
 
 def collect_inputs(template_source):

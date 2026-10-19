@@ -48,6 +48,33 @@ components:
         capabilities:
           type: object
           additionalProperties: { $ref: '#/components/schemas/CapabilityRequest' }
+        applicationConfig:
+          $ref: '#/components/schemas/ApplicationConfig'
+    ApplicationConfig:
+      type: object
+      required: [appName, appIcon, theme]
+      additionalProperties: false
+      properties:
+        appName: { type: string, minLength: 1, maxLength: 128 }
+        appIcon: { type: string, minLength: 1, maxLength: 128 }
+        theme: { type: object, required: [primaryColor], additionalProperties: false, properties: { primaryColor: { type: string, pattern: '^#[0-9A-Fa-f]{6}$' } } }
+        auth:
+          type: object
+          nullable: true
+          required: [enable, authnSource, yht]
+          additionalProperties: false
+          properties:
+            enable: { type: boolean }
+            authnSource: { type: string, minLength: 1, maxLength: 32 }
+            yht:
+              type: object
+              required: [clientId, privateKey, publicKey, centerPublicKey]
+              additionalProperties: false
+              properties:
+                clientId: { type: string, minLength: 1, maxLength: 256 }
+                privateKey: { type: string, minLength: 1, maxLength: 16384 }
+                publicKey: { type: string, minLength: 1, maxLength: 16384 }
+                centerPublicKey: { type: string, minLength: 1, maxLength: 16384 }
     CapabilityRequest:
       type: object
       required: [enabled, config]
@@ -120,6 +147,7 @@ components:
         effective: { type: object, additionalProperties: { $ref: '#/components/schemas/CapabilityState' } }
         installedArtifacts: { type: object, additionalProperties: { $ref: '#/components/schemas/InstalledArtifactState' } }
         managedContributions: { type: object, additionalProperties: { $ref: '#/components/schemas/ManagedContributionState' } }
+        managedConfiguration: { type: object, additionalProperties: true }
     Error:
       type: object
       required: [code, message, details, traceId]
@@ -127,7 +155,7 @@ components:
       properties:
         code:
           type: string
-          enum: [BAD_REQUEST, PROTOCOL_VERSION_UNSUPPORTED, TEMPLATE_STATE_SCHEMA_UNSUPPORTED, TEMPLATE_STATE_INVALID, CAPABILITY_UNKNOWN, CAPABILITY_REMOVAL_UNSUPPORTED, RECONCILE_STATE_CHANGE_REQUIRED, TEMPLATE_RELEASE_DOWNGRADE_UNSUPPORTED, TEMPLATE_SOURCE_INVALID, EXTENSION_CONTRACT_MISMATCH, MAVEN_DEPENDENCY_CONFLICT, PACKAGE_BUILD_FAILED]
+          enum: [BAD_REQUEST, PROTOCOL_VERSION_UNSUPPORTED, TEMPLATE_STATE_SCHEMA_UNSUPPORTED, TEMPLATE_STATE_INVALID, CAPABILITY_UNKNOWN, CAPABILITY_REMOVAL_UNSUPPORTED, RECONCILE_STATE_CHANGE_REQUIRED, TEMPLATE_RELEASE_DOWNGRADE_UNSUPPORTED, TEMPLATE_SOURCE_INVALID, EXTENSION_CONTRACT_MISMATCH, MAVEN_DEPENDENCY_CONFLICT, PACKAGE_BUILD_FAILED, CONFIG_TARGET_CONFLICT]
         message: { type: string }
         details: { type: object }
         traceId: { type: string }

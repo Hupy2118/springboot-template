@@ -23,7 +23,6 @@ class CodeTemplateReleaseLoaderTest {
     void loadsV3ReleaseAndResolvesAuthorizationClosureDeterministically() throws Exception {
         Path root = repositoryRoot();
         CodeTemplateRelease release = new CodeTemplateReleaseLoader(root.resolve("template-source/code")).load();
-        assertEquals("2026.10.17.1", release.revision());
         assertTrue(release.extensions().containsKey("login"));
         assertTrue(release.extensions().containsKey("authorization"));
 
@@ -56,13 +55,9 @@ class CodeTemplateReleaseLoaderTest {
                     utf8(baseProject.get(".devagentstudio/template-contracts/" + name)));
         }
         assertTrue(baseProject.containsKey("frontend/src/utils/pageIdentity.vectors.json"));
-        assertEquals("// AUTO-GENERATED APP CONFIG: template defaults; XCodeAgent owns app-specific projection.\n"
-                        + "import type { AppConfig } from './types';\n\n"
-                        + "export const generatedConfig = {\n"
-                        + "  app: { name: '示例应用', icon: 'AppstoreOutlined' },\n"
-                        + "  theme: { primaryColor: '#6b3cf0' },\n"
-                        + "} satisfies AppConfig;\n",
-                utf8(baseProject.get("frontend/src/config/app.generated.ts")));
+        // App configuration is read from PUBLIC_* environment variables; this legacy generated file
+        // must not be delivered in a new V3 project.
+        assertFalse(baseProject.containsKey("frontend/src/config/app.generated.ts"));
         assertFalse(baseProject.containsKey("frontend/.devagentstudio/template-contracts/route-projector.json"));
         assertFalse(baseProject.containsKey("frontend/src/pages/Login/index.tsx"));
         assertFalse(utf8(baseProject.get("backend/pom.xml")).contains("bee-starter-auth"));

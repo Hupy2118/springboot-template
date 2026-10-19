@@ -70,6 +70,15 @@ class CodeTemplateReleaseInputsTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "binary"):
                 MODULE.collect_inputs(root)
 
+    def test_ignores_os_metadata_and_dependency_symlinks(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = self.root(pathlib.Path(temporary))
+            touch(root, "code/frontend/base/src/index.tsx")
+            touch(root, "code/backend/extensions/.DS_Store")
+            dependency = touch(root, "code/frontend/base/node_modules/pkg/index.js")
+            (dependency.parent / "linked").symlink_to(dependency)
+            self.assertIn("template-source/code/frontend/base/src/index.tsx", MODULE.collect_inputs(root))
+
 
 if __name__ == "__main__":
     unittest.main()

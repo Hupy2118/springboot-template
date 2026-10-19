@@ -58,7 +58,7 @@ class EngineServiceIT {
         assertEquals(0, baseState.path("installedArtifacts").size());
         assertEquals(0, baseState.path("managedContributions").size());
         assertTrue(hasZipEntry(base, "frontend/src/extensions/providers.ts"));
-        assertTrue(hasZipEntry(base, "frontend/src/config/app.generated.ts"));
+        assertFalse(hasZipEntry(base, "frontend/src/config/app.generated.ts"));
 
         byte[] auth = generate(mvc, capabilities("authorization", true));
         assertArrayEquals(auth, generate(mvc, capabilities("authorization", true)));
@@ -73,6 +73,28 @@ class EngineServiceIT {
         JsonNode maven = authState.path("managedContributions").path("maven:ZA21:bee-starter-auth");
         assertEquals("MAVEN_DEPENDENCY", maven.path("type").asText());
         assertEquals(Arrays.asList("login"), JSON.convertValue(maven.path("owners"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)));
+    }
+
+    @Test
+    void applicationConfigurationIsKeptSeparateFromCapabilityResolution() throws Exception {
+        MockMvc mvc = mvc();
+        Map<String, Object> requestedConfig = config(capabilities("login", true));
+        requestedConfig.put("applicationConfig", applicationConfig("人员管理"));
+        Map<String, Object> generateRequest = new LinkedHashMap<String, Object>();
+        generateRequest.put("requestedConfig", requestedConfig);
+
+        byte[] generated = postZip(mvc, "/v1/generate", generateRequest, 200);
+        JsonNode state = zipJson(generated, ".devagentstudio/template-state.json");
+        assertEquals("人员管理", state.path("managedConfiguration").path("appName").asText());
+        assertEquals("111", state.path("managedConfiguration").path("privateKey").asText());
+        assertTrue(hasZipEntry(generated, "frontend/.env"));
+        assertTrue(new String(zipBytes(generated, "backend/src/main/resources/application.yml"), StandardCharsets.UTF_8)
+                .contains("private-key: \"111\""));
+
+        Map<String, Object> updateRequest = updateRequest(state, capabilities("login", true), "APPLY");
+        ((Map<String, Object>) updateRequest.get("requestedConfig")).put("applicationConfig", applicationConfig("人员管理"));
+        mvc.perform(post("/v1/update").contentType(MediaType.APPLICATION_JSON).content(JSON.writeValueAsBytes(updateRequest)))
+                .andExpect(status().isNoContent());
     }
 
     @Test
@@ -155,6 +177,16 @@ class EngineServiceIT {
     }
     private Map<String, Object> config(Map<String, Object> capabilities) {
         Map<String, Object> result = new LinkedHashMap<String, Object>(); result.put("capabilities", capabilities); return result;
+    }
+    private Map<String, Object> applicationConfig(String appName) {
+        Map<String, Object> theme = new LinkedHashMap<String, Object>(); theme.put("primaryColor", "#6b3cf0");
+        Map<String, Object> yht = new LinkedHashMap<String, Object>();
+        yht.put("clientId", "000"); yht.put("privateKey", "111"); yht.put("publicKey", "123"); yht.put("centerPublicKey", "456");
+        Map<String, Object> auth = new LinkedHashMap<String, Object>();
+        auth.put("enable", true); auth.put("authnSource", "yst"); auth.put("yht", yht);
+        Map<String, Object> result = new LinkedHashMap<String, Object>();
+        result.put("appName", appName); result.put("appIcon", "AppstoreOutlined"); result.put("theme", theme); result.put("auth", auth);
+        return result;
     }
     private Map<String, Object> capabilities() { return new LinkedHashMap<String, Object>(); }
     private Map<String, Object> capabilities(String id, boolean enabled) {

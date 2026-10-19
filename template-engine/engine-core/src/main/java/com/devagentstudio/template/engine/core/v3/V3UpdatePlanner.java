@@ -20,6 +20,11 @@ public final class V3UpdatePlanner {
 
     @SuppressWarnings("unchecked")
     public V3UpdateResult plan(Map<String, Object> current, ExtensionResolver.ResolvedExtensions resolved, String mode) {
+        return plan(current, resolved, mode, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    public V3UpdateResult plan(Map<String, Object> current, ExtensionResolver.ResolvedExtensions resolved, String mode, Map<String, Object> applicationConfig) {
         RevisionVersion currentRevision = RevisionVersion.parse((String) current.get("templateRevision"));
         RevisionVersion releaseRevision = RevisionVersion.parse(release.revision());
         if (currentRevision.compareTo(releaseRevision) > 0)
@@ -44,19 +49,22 @@ public final class V3UpdatePlanner {
         }
 
         Map<String, Map<String, Object>> targetContributions = deepContributions(resolved.managedContributions());
-        Map<String, Object> nextState = state(resolved, nextArtifacts, targetContributions);
+        Map<String, Object> currentApplication = (Map<String, Object>) current.get("managedConfiguration");
+        Map<String, Object> nextState = state(resolved, nextArtifacts, targetContributions, applicationConfig);
         boolean releaseChanged = !release.revision().equals(current.get("templateRevision"));
         boolean requestedChanged = !currentRequested.equals(resolved.requested());
         boolean effectiveChanged = !currentEffective.equals(resolved.effective());
         boolean artifactsChanged = !sameKeys(currentArtifacts, nextArtifacts);
         boolean contributionsChanged = !sameContributionState(currentContributions, targetContributions);
-        boolean stateChanged = releaseChanged || requestedChanged || effectiveChanged || artifactsChanged || contributionsChanged;
+        boolean configurationChanged = !sameNullable(currentApplication, applicationConfig);
+        boolean stateChanged = releaseChanged || requestedChanged || effectiveChanged || artifactsChanged || contributionsChanged || configurationChanged;
 
         if ("RECONCILE".equals(mode)) {
             if (stateChanged) throw new V3Exception("RECONCILE_STATE_CHANGE_REQUIRED", "RECONCILE cannot change TemplateState", 409);
             List<OperationDraft> repair = new ArrayList<OperationDraft>();
             for (String target : REGISTRIES) repair.add(OperationDraft.replace(target, registryBytes(resolved, target)));
             for (Map.Entry<String, Map<String, Object>> item : currentContributions.entrySet()) repair.add(ensure(item.getKey(), item.getValue()));
+            repair.addAll(configOperations(currentApplication));
             return compile(current, current, mode, repair);
         }
 
@@ -66,6 +74,7 @@ public final class V3UpdatePlanner {
         operations.addAll(adds);
         boolean projectionChanged = releaseChanged || !currentEffective.keySet().equals(resolved.effective().keySet());
         if (projectionChanged) for (String target : REGISTRIES) operations.add(OperationDraft.replace(target, registryBytes(resolved, target)));
+        if (configurationChanged) operations.addAll(configOperations(applicationConfig));
         return compile(current, nextState, mode, operations);
     }
 
@@ -153,11 +162,19 @@ public final class V3UpdatePlanner {
         return result;
     }
     private Map<String, Object> state(ExtensionResolver.ResolvedExtensions resolved, Map<String, Map<String, Object>> artifacts,
-                                      Map<String, Map<String, Object>> contributions) {
+                                      Map<String, Map<String, Object>> contributions, Map<String, Object> applicationConfig) {
         Map<String, Object> result = new LinkedHashMap<String, Object>();
         result.put("schemaVersion", 3); result.put("templateRevision", release.revision());
         result.put("requested", resolved.requested()); result.put("effective", resolved.effective());
         result.put("installedArtifacts", artifacts); result.put("managedContributions", contributions);
+        if (applicationConfig != null) result.put("managedConfiguration", deep(applicationConfig));
+        return result;
+    }
+    private boolean sameNullable(Object left, Object right) { return left == null ? right == null : left.equals(right); }
+    private List<OperationDraft> configOperations(Map<String, Object> applicationConfig) {
+        List<OperationDraft> result = new ArrayList<OperationDraft>();
+        for (Map.Entry<String, byte[]> item : ApplicationConfigProjector.project(Collections.<String, byte[]>emptyMap(), applicationConfig).entrySet())
+            result.add(OperationDraft.config(item.getKey(), item.getKey().equals(ApplicationConfigProjector.FRONTEND_TARGET) ? "app-frontend" : "login-auth", item.getValue()));
         return result;
     }
 
@@ -212,6 +229,10 @@ public final class V3UpdatePlanner {
         private static OperationDraft contribution(String type, String id, String target, Map<String, Object> parameters) {
             int phase = type.startsWith("REMOVE_") ? 0 : "ENSURE_MAVEN_DEPENDENCY".equals(type) ? 2 : 3;
             return new OperationDraft(type, id, target, phase, new LinkedHashMap<String, Object>(parameters), null);
+        }
+        private static OperationDraft config(String target, String blockId, byte[] payload) {
+            Map<String, Object> parameters = new LinkedHashMap<String, Object>(); parameters.put("blockId", blockId);
+            return new OperationDraft("UPSERT_MANAGED_CONFIG_BLOCK", "upsert-config:" + target, target, 4, parameters, payload);
         }
     }
 }

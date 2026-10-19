@@ -38,7 +38,8 @@ public final class V3ProjectMaterializer {
     public V3ProjectMaterializer(CodeTemplateRelease release) { this.release = release; }
 
     /** 按固定路径组装当前双端源码、扩展注册表和路由契约。 */
-    public Map<String, byte[]> materialize(ExtensionResolver.ResolvedExtensions resolved) {
+    public Map<String, byte[]> materialize(ExtensionResolver.ResolvedExtensions resolved) { return materialize(resolved, null); }
+    public Map<String, byte[]> materialize(ExtensionResolver.ResolvedExtensions resolved, Map<String, Object> applicationConfig) {
         Map<String, byte[]> files = new LinkedHashMap<String, byte[]>();
         // 契约沿用既有工作区路径，供调用方在 Build 收尾读取。
         add(files, ".devagentstudio/template-contracts/", release.contracts());
@@ -52,10 +53,12 @@ public final class V3ProjectMaterializer {
         for (Map.Entry<String, byte[]> registry : registries(resolved).entrySet()) files.put(registry.getKey(), registry.getValue());
         projectAnnotations(files, resolved.order());
         projectMavenDependencies(files, resolved.order());
+        ApplicationConfigProjector.applyToProject(files, applicationConfig);
         return files;
     }
 
-    public Map<String, Object> templateState(ExtensionResolver.ResolvedExtensions resolved) {
+    public Map<String, Object> templateState(ExtensionResolver.ResolvedExtensions resolved) { return templateState(resolved, null); }
+    public Map<String, Object> templateState(ExtensionResolver.ResolvedExtensions resolved, Map<String, Object> applicationConfig) {
         Map<String, Map<String, Object>> artifacts = new java.util.TreeMap<String, Map<String, Object>>();
         for (String id : resolved.order()) {
             ExtensionRelease extension = release.extensions().get(id);
@@ -66,6 +69,7 @@ public final class V3ProjectMaterializer {
         state.put("schemaVersion", 3); state.put("templateRevision", release.revision());
         state.put("requested", resolved.requested()); state.put("effective", resolved.effective());
         state.put("installedArtifacts", artifacts); state.put("managedContributions", resolved.managedContributions());
+        if (applicationConfig != null) state.put("managedConfiguration", applicationConfig);
         return state;
     }
 

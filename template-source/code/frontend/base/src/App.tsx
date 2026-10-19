@@ -15,7 +15,15 @@ const App: React.FC = () => {
     <BrowserRouter>
       <ErrorBoundary>
         <StyleProvider layer>
-          <ConfigProvider theme={{ token: { colorPrimary: appConfig.theme.primaryColor } }}>
+          <ConfigProvider
+            theme={{
+              token: {
+                colorPrimary: appConfig.theme.primaryColor,
+                // Ant Design keeps link color as a separate alias token.
+                colorLink: appConfig.theme.primaryColor,
+              },
+            }}
+          >
             <AppProviders>
               <Routes />
             </AppProviders>

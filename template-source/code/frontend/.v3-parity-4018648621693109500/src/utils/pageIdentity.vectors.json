@@ -1,0 +1,8 @@
+{
+  "valid": [
+    { "pageId": "asset_list", "pageDirectory": "AssetList", "routeSegment": "asset-list" },
+    { "pageId": "order_detail", "pageDirectory": "OrderDetail", "routeSegment": "order-detail" },
+    { "pageId": "portal_home", "pageDirectory": "PortalHome", "routeSegment": "portal-home" }
+  ],
+  "invalid": ["AssetList", "asset-list", "asset list", "", "_asset", "asset_"]
+}

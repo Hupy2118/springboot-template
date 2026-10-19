@@ -9,7 +9,7 @@ const sourcePathLoader = fileURLToPath(
 );
 
 const clientDefines = {
-  'process.env.WORKS_ENV': JSON.stringify('local'),
+  'process.env.WORKS_ENV': JSON.stringify(process.env.WORKS_ENV ?? 'local'),
   'process.env.TRACKING_UPLOAD_ID': JSON.stringify('MNYZJDGEDCFIDA@ST'),
   'process.env.TRACKING_API_HOST': JSON.stringify('https://lf12-32-gateway-st.paasst.cmbchina.cn/front-rest-log/v2/encrypt_upload'),
   'process.env.TRACKING_API_TRACK_HOST': JSON.stringify('http://lf12-32-gateway-st.paasst.cmbchina.cn/front-rest-log/v3/trace'),

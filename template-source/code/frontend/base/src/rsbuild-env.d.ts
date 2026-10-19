@@ -22,4 +22,8 @@ interface ImportMetaEnv {
   readonly DEV: boolean;
   readonly PROD: boolean;
   readonly MODE: string;
+  readonly PUBLIC_APP_NAME: string;
+  readonly PUBLIC_APP_ICON: string;
+  readonly PUBLIC_THEME_PRIMARY_COLOR: string;
+  readonly PUBLIC_YHT_CLIENT_ID: string;
 }

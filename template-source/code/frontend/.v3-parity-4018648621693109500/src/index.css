@@ -1,0 +1,37 @@
+@import "tailwindcss" important;
+@layer antd, antd-pro;
+
+/* 注入tailwind主题色 */
+@theme inline {
+  --color-primary: var(--app-primary-color);
+  --color-primary-1: color-mix(in srgb, var(--app-primary-color) 4%, transparent);
+  --color-primary-2: color-mix(in srgb, var(--app-primary-color) 8%, transparent);
+}
+
+:root {
+  --xc-primary-1: color-mix(in srgb, var(--app-primary-color) 4%, white);
+  --xc-primary-2: color-mix(in srgb, var(--app-primary-color) 12%, white);
+  --xc-primary-3: color-mix(in srgb, var(--app-primary-color) 20%, white);
+  --xc-primary-4: color-mix(in srgb, var(--app-primary-color) 32%, white);
+  --xc-primary-5: color-mix(in srgb, var(--app-primary-color) 55%, white);
+  --xc-primary-6: var(--app-primary-color);
+  --xc-primary-7: color-mix(in srgb, var(--app-primary-color) 90%, black);
+  --xc-primary-8: color-mix(in srgb, var(--app-primary-color) 78%, black);
+  --xc-primary-9: color-mix(in srgb, var(--app-primary-color) 66%, black);
+  --xc-primary-10: color-mix(in srgb, var(--app-primary-color) 54%, black);
+  --xc-primary-color: var(--app-primary-color);
+  --xc-layout-sider-bg: var(--app-primary-color);
+  --xc-layout-sider-menu-selected-bg: color-mix(in srgb, var(--app-primary-color) 88%, black);
+  --xc-layout-sider-color: #fff;
+  --xc-layout-sider-menu-selected-color: #fff;
+}
+ .authorization-page { min-height: 100%; padding: 24px; background: var(--ant-color-bg-layout, #f5f7fb); color: var(--ant-color-text, #1f1f1f); }
+ .authorization-hero { margin-bottom: 16px; border: 1px solid var(--ant-color-border-secondary, #f0f0f0); background: var(--ant-color-bg-container, #fff); }
+ .authorization-hero .ant-card-body { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+ .authorization-hero h2 { margin: 0 !important; }
+ .authorization-alert { margin-bottom: 16px; }
+.authorization-state { min-height: 50vh; display: flex; align-items: center; justify-content: center; }
+.authorization-login-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--ant-color-bg-layout, #f5f7fb); }
+.authorization-login-card { width: min(400px, 100%); border: 1px solid var(--ant-color-border-secondary, #f0f0f0); }
+.authorization-login-card .ant-alert { margin-bottom: 16px; }
+ @media (max-width: 640px) { .authorization-page { padding: 12px; } .authorization-hero .ant-card-body { align-items: flex-start; flex-direction: column; } }

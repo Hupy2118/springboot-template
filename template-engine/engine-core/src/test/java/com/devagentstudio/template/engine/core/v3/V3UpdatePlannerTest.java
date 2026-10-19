@@ -6,9 +6,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -134,12 +137,22 @@ class V3UpdatePlannerTest {
         Files.copy(source.resolve("template-revision.txt"), target.resolve("template-revision.txt"));
     }
     private void copyDirectory(Path source, Path target) throws Exception {
-        try (java.util.stream.Stream<Path> paths = Files.walk(source)) {
-            for (Path path : (Iterable<Path>) paths::iterator) {
+        Files.walkFileTree(source, new SimpleFileVisitor<Path>() {
+            @Override public FileVisitResult preVisitDirectory(Path path, BasicFileAttributes attributes) throws java.io.IOException {
+                if (!path.equals(source) && ignoredFixtureEntry(path, source)) return FileVisitResult.SKIP_SUBTREE;
                 Path destination = target.resolve(source.relativize(path));
-                if (Files.isDirectory(path)) Files.createDirectories(destination); else Files.copy(path, destination);
+                Files.createDirectories(destination);
+                return FileVisitResult.CONTINUE;
             }
-        }
+            @Override public FileVisitResult visitFile(Path path, BasicFileAttributes attributes) throws java.io.IOException {
+                if (!ignoredFixtureEntry(path, source)) Files.copy(path, target.resolve(source.relativize(path)));
+                return FileVisitResult.CONTINUE;
+            }
+        });
+    }
+    private boolean ignoredFixtureEntry(Path path, Path root) {
+        for (Path segment : root.relativize(path)) if ("node_modules".equals(segment.toString())) return true;
+        return ".DS_Store".equals(path.getFileName().toString());
     }
     private static Path repositoryRoot() { Path path = Paths.get(System.getProperty("user.dir")).toAbsolutePath(); while (path != null && !Files.isDirectory(path.resolve("template-source"))) path = path.getParent(); if (path == null) throw new AssertionError("repository root not found"); return path; }
 }

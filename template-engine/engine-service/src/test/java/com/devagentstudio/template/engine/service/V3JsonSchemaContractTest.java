@@ -27,7 +27,7 @@ class V3JsonSchemaContractTest {
     }
 
     @Test
-    void stateUsesResourceOwnershipAndOperationSchemaFreezesSixTypes() throws Exception {
+    void stateUsesResourceOwnershipAndOperationSchemaFreezesSevenTypes() throws Exception {
         JsonNode state = read("template-state.schema.json");
         List<String> stateFields = Arrays.asList("schemaVersion", "templateRevision", "requested", "effective", "installedArtifacts", "managedContributions");
         for (String field : stateFields) assertTrue(contains(state.path("required"), field), field);
@@ -40,8 +40,8 @@ class V3JsonSchemaContractTest {
 
         JsonNode operation = read("operation.schema.json");
         JsonNode types = operation.at("/properties/type/enum");
-        assertEquals(6, types.size());
-        for (String expected : Arrays.asList("ADD_FILE", "REPLACE_MANAGED_FILE", "ENSURE_JAVA_ANNOTATION",
+        assertEquals(7, types.size());
+        for (String expected : Arrays.asList("ADD_FILE", "REPLACE_MANAGED_FILE", "UPSERT_MANAGED_CONFIG_BLOCK", "ENSURE_JAVA_ANNOTATION",
                 "REMOVE_JAVA_ANNOTATION", "ENSURE_MAVEN_DEPENDENCY", "REMOVE_MAVEN_DEPENDENCY")) {
             assertTrue(contains(types, expected), expected);
         }

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="32px" height="32px" viewBox="0 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg">
+    <g id="页面-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="图标切图" transform="translate(-487.000000, -184.000000)" fill="currentColor" fill-rule="nonzero">
+            <g id="编组-32" transform="translate(155.000000, 72.000000)">
+                <g id="编组备份-8" transform="translate(324.000000, 104.000000)">
+                    <g id="编组" transform="translate(8.000000, 8.000000)">
+                        <path d="M15,8 L15,17 L24,17 C24,21.9705627 19.9705627,26 15,26 C10.0294373,26 6,21.9705627 6,17 C6,12.1181973 9.88681368,8.14420858 14.7346377,8.00383711 L15,8 Z M17,6 C21.9705627,6 26,10.0294373 26,15 L26,15 L17,15 Z" id="icon-资源管理"></path>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

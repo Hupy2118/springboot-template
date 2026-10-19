@@ -6,6 +6,7 @@ import com.devagentstudio.template.engine.core.v3.V3Exception;
 import com.devagentstudio.template.engine.core.v3.V3ProjectMaterializer;
 import com.devagentstudio.template.engine.core.v3.V3UpdatePlanner;
 import com.devagentstudio.template.engine.core.v3.V3UpdateResult;
+import com.devagentstudio.template.engine.core.v3.ApplicationConfigProjector;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -41,9 +42,11 @@ public class EngineController {
     public ResponseEntity<byte[]> generate(@RequestBody Map<String, Object> request) {
         requireOnly(request, GENERATE_FIELDS);
         Map<String, Object> requested = EngineMapper.requestedConfig(request.get("requestedConfig"));
+        @SuppressWarnings("unchecked") Map<String, Object> suppliedApplication = (Map<String, Object>) requested.remove("applicationConfig");
         ExtensionResolver.ResolvedExtensions resolved = resolver.resolve(requested);
-        Map<String, byte[]> project = materializer.materialize(resolved);
-        Map<String, Object> state = materializer.templateState(resolved);
+        Map<String, Object> application = ApplicationConfigProjector.resolve(suppliedApplication, resolved.requested());
+        Map<String, byte[]> project = materializer.materialize(resolved, application);
+        Map<String, Object> state = materializer.templateState(resolved, application);
         return zip(packages.generatedProject(project, state));
     }
 
@@ -58,8 +61,11 @@ public class EngineController {
         Object rawMode = request.get("mode");
         if (!(rawMode instanceof String) || !("APPLY".equals(rawMode) || "RECONCILE".equals(rawMode)))
             throw bad("mode must be APPLY or RECONCILE");
+        @SuppressWarnings("unchecked") Map<String, Object> suppliedApplication = (Map<String, Object>) requested.remove("applicationConfig");
         ExtensionResolver.ResolvedExtensions resolved = resolver.resolve(requested);
-        V3UpdateResult result = planner.plan(current, resolved, (String) rawMode);
+        @SuppressWarnings("unchecked") Map<String, Object> previousApplication = (Map<String, Object>) current.get("managedConfiguration");
+        Map<String, Object> application = suppliedApplication == null ? previousApplication : ApplicationConfigProjector.resolve(suppliedApplication, resolved.requested());
+        V3UpdateResult result = planner.plan(current, resolved, (String) rawMode, application);
         if (result.kind() == V3UpdateResult.Kind.NO_CHANGE) return ResponseEntity.noContent().build();
         return zip(packages.updatePackage(result));
     }
