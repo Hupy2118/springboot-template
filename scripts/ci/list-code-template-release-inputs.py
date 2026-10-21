@@ -67,7 +67,7 @@ def extension_directories(root, relative_root):
 
 def ignored_runtime_entry(path, root):
     """Dependency installations and Finder metadata are not V3 Runtime Source."""
-    return path.name == ".DS_Store" or "node_modules" in path.relative_to(root).parts
+    return path.name == ".DS_Store" or any(part in ("node_modules", "build") for part in path.relative_to(root).parts)
 
 
 def collect_inputs(template_source):

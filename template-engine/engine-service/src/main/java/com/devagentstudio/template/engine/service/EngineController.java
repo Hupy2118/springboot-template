@@ -55,9 +55,11 @@ public class EngineController {
         requireOnly(request, UPDATE_FIELDS);
         Object protocolVersion = request.get("protocolVersion");
         if (!(protocolVersion instanceof String)) throw bad("protocolVersion must be a string");
-        if (!"3".equals(protocolVersion)) throw new V3Exception("PROTOCOL_VERSION_UNSUPPORTED", "protocolVersion must be 3", 400);
+        if (!"3".equals(protocolVersion) && !"4".equals(protocolVersion)) throw new V3Exception("PROTOCOL_VERSION_UNSUPPORTED", "protocolVersion must be 3 or 4", 400);
         Map<String, Object> current = EngineMapper.templateState(request.get("currentTemplateState"));
         Map<String, Object> requested = EngineMapper.requestedConfig(request.get("requestedConfig"));
+        boolean v4 = "4".equals(protocolVersion);
+        if (v4 && requested.containsKey("applicationConfig")) throw bad("V4 requestedConfig cannot contain applicationConfig");
         Object rawMode = request.get("mode");
         if (!(rawMode instanceof String) || !("APPLY".equals(rawMode) || "RECONCILE".equals(rawMode)))
             throw bad("mode must be APPLY or RECONCILE");
@@ -65,9 +67,10 @@ public class EngineController {
         ExtensionResolver.ResolvedExtensions resolved = resolver.resolve(requested);
         @SuppressWarnings("unchecked") Map<String, Object> previousApplication = (Map<String, Object>) current.get("managedConfiguration");
         Map<String, Object> application = suppliedApplication == null ? previousApplication : ApplicationConfigProjector.resolve(suppliedApplication, resolved.requested());
-        V3UpdateResult result = planner.plan(current, resolved, (String) rawMode, application);
+        V3UpdateResult result = v4 ? planner.planCapabilities(current, resolved, (String) rawMode)
+                : planner.plan(current, resolved, (String) rawMode, application);
         if (result.kind() == V3UpdateResult.Kind.NO_CHANGE) return ResponseEntity.noContent().build();
-        return zip(packages.updatePackage(result));
+        return zip(v4 ? packages.updatePackageV4(result) : packages.updatePackage(result));
     }
 
     private void requireOnly(Map<String, Object> request, Set<String> fields) {

@@ -53,7 +53,7 @@ class EngineServiceIT {
         byte[] base = generate(mvc, capabilities());
         assertArrayEquals(base, generate(mvc, capabilities()));
         JsonNode baseState = zipJson(base, ".devagentstudio/template-state.json");
-        assertEquals(6, baseState.size());
+        assertEquals(7, baseState.size());
         assertEquals(3, baseState.path("schemaVersion").asInt());
         assertEquals(0, baseState.path("installedArtifacts").size());
         assertEquals(0, baseState.path("managedContributions").size());
@@ -85,16 +85,30 @@ class EngineServiceIT {
 
         byte[] generated = postZip(mvc, "/v1/generate", generateRequest, 200);
         JsonNode state = zipJson(generated, ".devagentstudio/template-state.json");
-        assertEquals("人员管理", state.path("managedConfiguration").path("appName").asText());
-        assertEquals("111", state.path("managedConfiguration").path("privateKey").asText());
+        assertFalse(state.has("managedConfiguration"));
+        assertFalse(state.toString().contains("111"));
         assertTrue(hasZipEntry(generated, "frontend/.env"));
-        assertTrue(new String(zipBytes(generated, "backend/src/main/resources/application.yml"), StandardCharsets.UTF_8)
-                .contains("private-key: \"111\""));
+        String backendYaml = new String(zipBytes(generated, "backend/src/main/resources/application.yml"), StandardCharsets.UTF_8);
+        assertTrue(backendYaml.contains("private-key: \"111\""));
+        assertEquals(1, backendYaml.split("(?m)^auth:$", -1).length - 1);
+        String frontendEnv = new String(zipBytes(generated, "frontend/.env"), StandardCharsets.UTF_8);
+        assertTrue(frontendEnv.contains("PUBLIC_APP_NAME=\"人员管理\""));
+        assertTrue(frontendEnv.contains("PUBLIC_YHT_CLIENT_ID=\"000\""));
+        assertFalse(frontendEnv.contains("111"));
 
         Map<String, Object> updateRequest = updateRequest(state, capabilities("login", true), "APPLY");
-        ((Map<String, Object>) updateRequest.get("requestedConfig")).put("applicationConfig", applicationConfig("人员管理"));
+        updateRequest.put("protocolVersion", "4");
         mvc.perform(post("/v1/update").contentType(MediaType.APPLICATION_JSON).content(JSON.writeValueAsBytes(updateRequest)))
                 .andExpect(status().isNoContent());
+
+        Map<String, Object> invalidConfig = applicationConfig("人员管理");
+        ((Map<String, Object>) ((Map<String, Object>) invalidConfig.get("auth")).get("yht")).remove("privateKey");
+        Map<String, Object> invalidRequested = config(capabilities("login", true));
+        invalidRequested.put("applicationConfig", invalidConfig);
+        Map<String, Object> invalidGenerate = new LinkedHashMap<String, Object>();
+        invalidGenerate.put("requestedConfig", invalidRequested);
+        mvc.perform(post("/v1/generate").contentType(MediaType.APPLICATION_JSON).content(JSON.writeValueAsBytes(invalidGenerate)))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -124,7 +138,7 @@ class EngineServiceIT {
 
         byte[] reconcile = postZip(mvc, "/v1/update", updateRequest(JSON.readTree(targetState), capabilities("authorization", true), "RECONCILE"), 200);
         JsonNode repair = zipJson(reconcile, "extension-update-package.json");
-        assertEquals(targetState, JSON.writeValueAsString(repair.path("nextTemplateState")));
+        assertEquals(JSON.readTree(targetState), repair.path("nextTemplateState"));
         assertEquals(7, repair.path("operations").size());
         assertEquals(5, countOperation(repair.path("operations"), "REPLACE_MANAGED_FILE"));
         assertEquals(1, countOperation(repair.path("operations"), "ENSURE_JAVA_ANNOTATION"));
@@ -153,6 +167,59 @@ class EngineServiceIT {
         ((Map<String, Object>) invalid.get("managedContributions")).put("wrong-key", ((Map<String, Object>) invalid.get("managedContributions")).values().iterator().next());
         request.put("currentTemplateState", invalid);
         assertError(mvc, request, 400, "TEMPLATE_STATE_INVALID");
+    }
+
+    @Test
+    void v4InstallsCapabilitiesWithoutConfigurationOrDigests() throws Exception {
+        MockMvc mvc = mvc();
+        JsonNode base = zipJson(generate(mvc, capabilities()), ".devagentstudio/template-state.json");
+        Map<String, Object> request = updateRequest(base, capabilities("authorization", true), "APPLY");
+        request.put("protocolVersion", "4");
+        JsonNode packageInfo = zipJson(postZip(mvc, "/v1/update", request, 200), "extension-update-package.json");
+        assertEquals("4", packageInfo.path("protocolVersion").asText());
+        assertEquals(base.path("templateRevision").asText(), packageInfo.path("sourceRevision").asText());
+        assertEquals(0, packageInfo.path("expectedStateSequence").asInt());
+        assertEquals(1, packageInfo.path("nextTemplateState").path("stateSequence").asInt());
+        assertFalse(packageInfo.has("currentStateDigest"));
+        assertFalse(packageInfo.has("nextStateDigest"));
+        assertFalse(packageInfo.path("nextTemplateState").has("managedConfiguration"));
+        for (JsonNode payload : packageInfo.path("payloadManifest")) assertEquals(1, payload.size());
+        for (JsonNode operation : packageInfo.path("operations"))
+            assertFalse("UPSERT_MANAGED_CONFIG_BLOCK".equals(operation.path("type").asText()));
+        byte[] fullProject = generate(mvc, capabilities("authorization", true));
+        byte[] updateZip = postZip(mvc, "/v1/update", request, 200);
+        for (JsonNode operation : packageInfo.path("operations")) {
+            String type = operation.path("type").asText();
+            if ("ADD_FILE".equals(type) || "REPLACE_MANAGED_FILE".equals(type)) {
+                String target = operation.path("target").asText();
+                assertArrayEquals(zipBytes(fullProject, target), zipBytes(updateZip, operation.path("payloadRef").asText()), target);
+            }
+        }
+
+        Map<String, Object> repeated = updateRequest(packageInfo.path("nextTemplateState"), capabilities("authorization", true), "APPLY");
+        repeated.put("protocolVersion", "4");
+        mvc.perform(post("/v1/update").contentType(MediaType.APPLICATION_JSON).content(JSON.writeValueAsBytes(repeated)))
+                .andExpect(status().isNoContent());
+        ((Map<String, Object>) request.get("requestedConfig")).put("applicationConfig", applicationConfig("blocked"));
+        assertError(mvc, request, 400, "BAD_REQUEST");
+
+        Map<String, Object> oldState = JSON.convertValue(base, Map.class);
+        oldState.remove("stateSequence");
+        oldState.put("managedConfiguration", applicationConfig("legacy"));
+        Map<String, Object> legacy = updateRequest(JSON.valueToTree(oldState), capabilities("login", true), "APPLY");
+        legacy.put("protocolVersion", "4");
+        JsonNode migrated = zipJson(postZip(mvc, "/v1/update", legacy, 200), "extension-update-package.json");
+        assertEquals(1, migrated.path("nextTemplateState").path("stateSequence").asInt());
+        assertFalse(migrated.path("nextTemplateState").has("managedConfiguration"));
+
+        JsonNode loginState = zipJson(generate(mvc, capabilities("login", true)), ".devagentstudio/template-state.json");
+        Map<String, Object> addAuthorization = updateRequest(loginState, capabilities("authorization", true), "APPLY");
+        addAuthorization.put("protocolVersion", "4");
+        JsonNode authorization = zipJson(postZip(mvc, "/v1/update", addAuthorization, 200), "extension-update-package.json");
+        for (JsonNode operation : authorization.path("operations")) {
+            if ("ADD_FILE".equals(operation.path("type").asText()))
+                assertTrue(operation.path("operationId").asText().contains("authorization"));
+        }
     }
 
     private MockMvc mvc() { return org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup(context).build(); }

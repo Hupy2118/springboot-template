@@ -293,7 +293,7 @@ public final class CodeTemplateReleaseLoader {
     /** Development dependency trees and macOS metadata are never Runtime Source or release inputs. */
     private boolean ignored(Path path, Path root) {
         Path relative = root.relativize(path);
-        for (Path segment : relative) if ("node_modules".equals(segment.toString())) return true;
+        for (Path segment : relative) if ("node_modules".equals(segment.toString()) || "build".equals(segment.toString())) return true;
         return ".DS_Store".equals(path.getFileName().toString());
     }
 

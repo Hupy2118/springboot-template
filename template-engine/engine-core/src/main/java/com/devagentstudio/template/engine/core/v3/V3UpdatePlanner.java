@@ -1,9 +1,6 @@
 package com.devagentstudio.template.engine.core.v3;
 
-import com.devagentstudio.template.engine.core.common.StateDigest;
-
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -17,6 +14,60 @@ public final class V3UpdatePlanner {
     private final CodeTemplateRelease release;
 
     public V3UpdatePlanner(CodeTemplateRelease release) { this.release = release; }
+
+    /** V4 only installs capabilities absent from the caller's state. Parameters and release refreshes are excluded. */
+    @SuppressWarnings("unchecked")
+    public V3UpdateResult planCapabilities(Map<String, Object> current, ExtensionResolver.ResolvedExtensions resolved, String mode) {
+        RevisionVersion currentRevision = RevisionVersion.parse((String) current.get("templateRevision"));
+        if (currentRevision.compareTo(RevisionVersion.parse(release.revision())) > 0)
+            throw new V3Exception("TEMPLATE_RELEASE_DOWNGRADE_UNSUPPORTED", "current TemplateState is newer than this server Release", 409);
+        Map<String, Map<String, Object>> effective = (Map<String, Map<String, Object>>) current.get("effective");
+        Map<String, Map<String, Object>> artifacts = (Map<String, Map<String, Object>>) current.get("installedArtifacts");
+        Map<String, Map<String, Object>> contributions = (Map<String, Map<String, Object>>) current.get("managedContributions");
+        for (String id : effective.keySet()) {
+            if (!resolved.effective().containsKey(id))
+                throw new V3Exception("CAPABILITY_REMOVAL_UNSUPPORTED", "removing capability is unsupported: " + id, 409);
+            if (!effective.get(id).equals(resolved.effective().get(id)))
+                throw new V3Exception("CAPABILITY_UPGRADE_UNSUPPORTED", "changing an installed capability is unsupported: " + id, 409);
+        }
+        if ("RECONCILE".equals(mode)) {
+            if (!effective.keySet().equals(resolved.effective().keySet()) || !release.revision().equals(current.get("templateRevision")))
+                throw new V3Exception("RECONCILE_STATE_CHANGE_REQUIRED", "RECONCILE cannot change TemplateState", 409);
+            List<OperationDraft> repair = new ArrayList<OperationDraft>();
+            for (String target : REGISTRIES) repair.add(OperationDraft.replace(target, registryBytes(resolved, target)));
+            for (Map.Entry<String, Map<String, Object>> item : contributions.entrySet()) repair.add(ensure(item.getKey(), item.getValue()));
+            Map<String, Object> repaired = new LinkedHashMap<String, Object>(current);
+            repaired.remove("managedConfiguration");
+            repaired.put("stateSequence", current.getOrDefault("stateSequence", 0));
+            return compile(current, repaired, mode, repair);
+        }
+        if (effective.keySet().equals(resolved.effective().keySet())) return V3UpdateResult.noChange(current);
+        Map<String, Map<String, Object>> nextArtifacts = new TreeMap<String, Map<String, Object>>(artifacts);
+        List<OperationDraft> operations = new ArrayList<OperationDraft>();
+        for (Map.Entry<String, Map<String, Object>> item : artifactStates(resolved.order()).entrySet()) {
+            if (artifacts.containsKey(item.getKey())) continue;
+            String target = (String) item.getValue().get("target");
+            for (Map<String, Object> prior : artifacts.values()) if (target.equals(prior.get("target")))
+                throw new V3Exception("TEMPLATE_STATE_INVALID", "new Artifact target conflicts with installed Artifact", 409);
+            nextArtifacts.put(item.getKey(), item.getValue());
+            operations.add(OperationDraft.add(item.getKey(), target, artifactBytes(item.getKey())));
+        }
+        Map<String, Map<String, Object>> nextContributions = deepContributions(resolved.managedContributions());
+        for (Map.Entry<String, Map<String, Object>> item : contributions.entrySet()) {
+            Map<String, Object> next = nextContributions.get(item.getKey());
+            if (next == null || !sameSpec(item.getValue(), next))
+                throw new V3Exception("CAPABILITY_UPGRADE_UNSUPPORTED", "installed Contribution changed: " + item.getKey(), 409);
+            next.put("appliedRevision", item.getValue().get("appliedRevision"));
+        }
+        for (Map.Entry<String, Map<String, Object>> item : nextContributions.entrySet())
+            if (!contributions.containsKey(item.getKey())) operations.add(ensure(item.getKey(), item.getValue()));
+        for (String target : REGISTRIES) operations.add(OperationDraft.replace(target, registryBytes(resolved, target)));
+        Map<String, Object> next = state(resolved, nextArtifacts, nextContributions, null);
+        long sequence = ((Number) current.getOrDefault("stateSequence", 0)).longValue();
+        if (sequence == Long.MAX_VALUE) throw new V3Exception("TEMPLATE_STATE_INVALID", "stateSequence is exhausted", 409);
+        next.put("stateSequence", sequence + 1);
+        return compile(current, next, mode, operations);
+    }
 
     @SuppressWarnings("unchecked")
     public V3UpdateResult plan(Map<String, Object> current, ExtensionResolver.ResolvedExtensions resolved, String mode) {
@@ -51,6 +102,7 @@ public final class V3UpdatePlanner {
         Map<String, Map<String, Object>> targetContributions = deepContributions(resolved.managedContributions());
         Map<String, Object> currentApplication = (Map<String, Object>) current.get("managedConfiguration");
         Map<String, Object> nextState = state(resolved, nextArtifacts, targetContributions, applicationConfig);
+        if (current.containsKey("stateSequence")) nextState.put("stateSequence", current.get("stateSequence"));
         boolean releaseChanged = !release.revision().equals(current.get("templateRevision"));
         boolean requestedChanged = !currentRequested.equals(resolved.requested());
         boolean effectiveChanged = !currentEffective.equals(resolved.effective());

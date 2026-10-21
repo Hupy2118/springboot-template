@@ -61,6 +61,14 @@ public final class ApplicationConfigProjector {
     private static String yaml(String value) { return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r") + "\""; }
     private static void requireKeys(Map<String,Object> map, String... keys) { if (map.size()!=keys.length) bad("applicationConfig fields are invalid"); for(String key:keys) if(!map.containsKey(key)) bad("applicationConfig fields are invalid"); }
     @SuppressWarnings("unchecked") private static Map<String,Object> map(Object value,String label) { if(!(value instanceof Map)) bad(label + " must be an object"); return (Map<String,Object>) value; }
-    private static String value(Object value,String label,int max) { if(!(value instanceof String) || ((String)value).isEmpty() || ((String)value).length()>max || ((String)value).contains("\n") || ((String)value).contains("\r")) bad(label + " is invalid"); return (String)value; }
+    private static String value(Object value,String label,int max) {
+        if (!(value instanceof String) || ((String) value).isEmpty() || ((String) value).length() > max) bad(label + " is invalid");
+        String text = (String) value;
+        for (int index = 0; index < text.length(); index++) {
+            char ch = text.charAt(index);
+            if (ch < 0x20 || ch == 0x7f || ch == 0x85 || ch == 0x2028 || ch == 0x2029) bad(label + " is invalid");
+        }
+        return text;
+    }
     private static void bad(String message) { throw new V3Exception("BAD_REQUEST", message, 400); }
 }

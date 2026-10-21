@@ -29,6 +29,31 @@ class V3UpdatePlannerTest {
     @TempDir Path temporary;
 
     @Test
+    void v4CapabilityPlanIgnoresReleaseOnlyChangesAndInstallsOnlyMissingExtensions() throws Exception {
+        Path r1Root = temporary.resolve("v4-r1/code"); copyRuntime(codeRoot(), r1Root); writeRevision(r1Root, "2026.09.20.1");
+        CodeTemplateRelease r1 = new CodeTemplateReleaseLoader(r1Root).load();
+        Map<String, Object> emptyState = new V3ProjectMaterializer(r1).templateState(new ExtensionResolver(r1).resolve(Collections.<String, Object>emptyMap()));
+        Path r2Root = temporary.resolve("v4-r2/code"); copyRuntime(r1Root, r2Root); writeRevision(r2Root, "2026.09.21.1");
+        CodeTemplateRelease r2 = new CodeTemplateReleaseLoader(r2Root).load();
+        V3UpdatePlanner planner = new V3UpdatePlanner(r2);
+        assertEquals(V3UpdateResult.Kind.NO_CHANGE, planner.planCapabilities(emptyState,
+                new ExtensionResolver(r2).resolve(Collections.<String, Object>emptyMap()), "APPLY").kind());
+        V3UpdateResult install = planner.planCapabilities(emptyState,
+                new ExtensionResolver(r2).resolve(requested("authorization", Collections.<String, Object>emptyMap())), "APPLY");
+        assertEquals(V3UpdateResult.Kind.CHANGE, install.kind());
+        assertEquals(1L, install.nextState().get("stateSequence"));
+        assertEquals("2026.09.21.1", install.nextState().get("templateRevision"));
+        assertFalse(install.nextState().containsKey("managedConfiguration"));
+        assertFalse(operationTypes(install.operations()).contains("UPSERT_MANAGED_CONFIG_BLOCK"));
+        assertEquals(5, count(install.operations(), "REPLACE_MANAGED_FILE"));
+        assertEquals(V3UpdateResult.Kind.NO_CHANGE, planner.planCapabilities(install.nextState(),
+                new ExtensionResolver(r2).resolve(requested("authorization", Collections.<String, Object>emptyMap())), "APPLY").kind());
+        V3Exception removal = assertThrows(V3Exception.class, () -> planner.planCapabilities(install.nextState(),
+                new ExtensionResolver(r2).resolve(Collections.<String, Object>emptyMap()), "APPLY"));
+        assertEquals("CAPABILITY_REMOVAL_UNSUPPORTED", removal.code());
+    }
+
+    @Test
     void releaseRefreshAddsOnlyNewArtifactsPreservesInstalledContentAndNeverDeletesRemovedArtifacts() throws Exception {
         Path r1Root = temporary.resolve("r1/code"); copyRuntime(codeRoot(), r1Root); writeRevision(r1Root, "2026.09.20.1");
         CodeTemplateRelease r1 = new CodeTemplateReleaseLoader(r1Root).load();

@@ -69,7 +69,7 @@ public final class V3ProjectMaterializer {
         state.put("schemaVersion", 3); state.put("templateRevision", release.revision());
         state.put("requested", resolved.requested()); state.put("effective", resolved.effective());
         state.put("installedArtifacts", artifacts); state.put("managedContributions", resolved.managedContributions());
-        if (applicationConfig != null) state.put("managedConfiguration", applicationConfig);
+        state.put("stateSequence", 0);
         return state;
     }
 

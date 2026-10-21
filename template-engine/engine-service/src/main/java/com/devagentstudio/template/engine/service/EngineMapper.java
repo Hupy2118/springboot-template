@@ -19,7 +19,7 @@ final class EngineMapper {
     private static final Pattern CAPABILITY_ID = Pattern.compile("^[a-z0-9][a-z0-9_-]*$");
     private static final Pattern JAVA_NAME = Pattern.compile("^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)+$");
     private static final Pattern COORDINATE = Pattern.compile("^[A-Za-z0-9_.-]+$");
-    private static final Set<String> STATE_FIELDS = new TreeSet<String>(Arrays.asList("schemaVersion", "templateRevision", "requested", "effective", "installedArtifacts", "managedContributions", "managedConfiguration"));
+    private static final Set<String> STATE_FIELDS = new TreeSet<String>(Arrays.asList("schemaVersion", "templateRevision", "requested", "effective", "installedArtifacts", "managedContributions"));
     private static final Set<String> ARTIFACT_FIELDS = new TreeSet<String>(Arrays.asList("capabilityId", "target", "installedRevision"));
     private static final Set<String> CONTRIBUTION_FIELDS = new TreeSet<String>(Arrays.asList("type", "target", "owners", "spec", "appliedRevision"));
 
@@ -53,9 +53,12 @@ final class EngineMapper {
         if (!integer(schemaVersion)) throw bad("currentTemplateState.schemaVersion must be an integer");
         if (new java.math.BigDecimal(schemaVersion.toString()).compareTo(java.math.BigDecimal.valueOf(3L)) != 0)
             throw new V3Exception("TEMPLATE_STATE_SCHEMA_UNSUPPORTED", "currentTemplateState.schemaVersion must be 3", 400);
-        Set<String> supplied = new TreeSet<String>(state.keySet()); supplied.remove("managedConfiguration");
-        Set<String> required = new TreeSet<String>(STATE_FIELDS); required.remove("managedConfiguration");
-        if (!supplied.equals(required)) invalidState("TemplateState fields are invalid");
+        Set<String> supplied = new TreeSet<String>(state.keySet()); supplied.remove("managedConfiguration"); supplied.remove("stateSequence");
+        if (!supplied.equals(STATE_FIELDS)) invalidState("TemplateState fields are invalid");
+        Object sequence = state.containsKey("stateSequence") ? state.get("stateSequence") : 0;
+        if (!integer(sequence) || new java.math.BigDecimal(sequence.toString()).compareTo(java.math.BigDecimal.ZERO) < 0
+                || new java.math.BigDecimal(sequence.toString()).compareTo(java.math.BigDecimal.valueOf(Long.MAX_VALUE)) > 0)
+            invalidState("stateSequence must be a nonnegative integer");
         String revision = state.get("templateRevision") instanceof String ? (String) state.get("templateRevision") : null;
         if (revision == null) invalidState("templateRevision must be a string");
         try { RevisionVersion.parse(revision); } catch (IllegalArgumentException e) { invalidState("templateRevision is invalid"); }
@@ -68,6 +71,7 @@ final class EngineMapper {
 
         Map<String, Object> normalized = new LinkedHashMap<String, Object>();
         normalized.put("schemaVersion", 3); normalized.put("templateRevision", revision);
+        if (state.containsKey("stateSequence")) normalized.put("stateSequence", Long.valueOf(sequence.toString()));
         normalized.put("requested", requested); normalized.put("effective", effective);
         normalized.put("installedArtifacts", artifacts); normalized.put("managedContributions", contributions);
         if (state.containsKey("managedConfiguration")) normalized.put("managedConfiguration", requireMap(state.get("managedConfiguration"), "TEMPLATE_STATE_INVALID", "managedConfiguration must be an object", 400));
