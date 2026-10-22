@@ -1,21 +1,21 @@
 :root:root {
-  --xc-primary-1: #f7f7f8;
-  --xc-primary-2: #eeeef2;
-  --xc-primary-3: #dedcea;
-  --xc-primary-4: #c7c1e1;
-  --xc-primary-5: #a194db;
-  --xc-primary-6: #725ae3;
-  --xc-primary-7: #5437dd;
-  --xc-primary-8: #4123ce;
-  --xc-primary-9: #351ab3;
-  --xc-primary-10: #2b139b;
+  --xc-primary-1: color-mix(in srgb, var(--app-primary-color) 4%, white);
+  --xc-primary-2: color-mix(in srgb, var(--app-primary-color) 12%, white);
+  --xc-primary-3: color-mix(in srgb, var(--app-primary-color) 20%, white);
+  --xc-primary-4: color-mix(in srgb, var(--app-primary-color) 32%, white);
+  --xc-primary-5: color-mix(in srgb, var(--app-primary-color) 55%, white);
+  --xc-primary-6: var(--app-primary-color);
+  --xc-primary-7: color-mix(in srgb, var(--app-primary-color) 90%, black);
+  --xc-primary-8: color-mix(in srgb, var(--app-primary-color) 78%, black);
+  --xc-primary-9: color-mix(in srgb, var(--app-primary-color) 66%, black);
+  --xc-primary-10: color-mix(in srgb, var(--app-primary-color) 54%, black);
   // 固定变量
   --xc-white: #fff;
   --xc-black: #000;
   --xc-layout-header-color: #000000d9;
-  --xc-layout-sider-bg: #725ae3;
+  --xc-layout-sider-bg: var(--app-primary-color);
   --xc-layout-sider-color: #fff;
-  --xc-layout-sider-menu-selected-bg: #5437dd;
+  --xc-layout-sider-menu-selected-bg: color-mix(in srgb, var(--app-primary-color) 88%, black);
   --xc-layout-sider-menu-selected-color: #fff;
-  --xc-primary-color: #725ae3;
+  --xc-primary-color: var(--app-primary-color);
 }

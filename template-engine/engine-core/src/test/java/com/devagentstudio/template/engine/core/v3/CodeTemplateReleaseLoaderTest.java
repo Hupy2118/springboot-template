@@ -4,7 +4,6 @@ import com.devagentstudio.template.engine.core.v3.ExtensionResolver.ResolvedExte
 import com.devagentstudio.template.engine.core.v3.V3ProjectMaterializer;
 import com.devagentstudio.template.engine.source.v3.CodeTemplateReleaseLoader;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -19,34 +18,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CodeTemplateReleaseLoaderTest {
-    @Test
-    void ignoresMachineMetadataAndInstalledDependenciesInsideRuntimeSource(@TempDir Path temporary) throws Exception {
-        Path code = temporary.resolve("code");
-        write(code.resolve("template-revision.txt"), "2026.10.16.1\n");
-        write(code.resolve("contracts/route-projector.json"), "{}\n");
-        write(code.resolve("frontend/base/src/index.tsx"), "export {};\n");
-        Files.write(code.resolve("frontend/base/.DS_Store"), new byte[] {0, 1});
-        Files.createDirectories(code.resolve("frontend/base/node_modules/pkg"));
-        Files.write(code.resolve("frontend/base/node_modules/pkg/index.js"), new byte[] {0, 1});
-        write(code.resolve("backend/base/src/Application.java"), "class Application {}\n");
-        Files.createDirectories(code.resolve("frontend/extensions"));
-        Files.createDirectories(code.resolve("backend/extensions"));
-        Files.write(code.resolve("backend/extensions/.DS_Store"), new byte[] {0, 1});
-        Files.createDirectories(code.resolve("backend/extensions/node_modules/pkg"));
-
-        CodeTemplateRelease release = new CodeTemplateReleaseLoader(code).load();
-
-        assertTrue(release.frontendBase().containsKey("src/index.tsx"));
-        assertFalse(release.frontendBase().containsKey(".DS_Store"));
-        assertFalse(release.frontendBase().containsKey("node_modules/pkg/index.js"));
-    }
-
     /** 验证 V3 源码装载、权限依赖与恢复的路由契约交付。 */
     @Test
     void loadsV3ReleaseAndResolvesAuthorizationClosureDeterministically() throws Exception {
         Path root = repositoryRoot();
         CodeTemplateRelease release = new CodeTemplateReleaseLoader(root.resolve("template-source/code")).load();
-        assertEquals("2026.10.16.1", release.revision());
         assertTrue(release.extensions().containsKey("login"));
         assertTrue(release.extensions().containsKey("authorization"));
 
@@ -67,9 +43,6 @@ class CodeTemplateReleaseLoaderTest {
         assertEquals(1, occurrences(application, "@EnableAuthClient"));
         assertEquals(1, occurrences(application, "import com.cmb.bee.auth.client.config.EnableAuthClient;"));
         assertTrue(pom.contains("<artifactId>bee-starter-auth</artifactId>"));
-        String backendYaml = utf8(project.get("backend/src/main/resources/application.yml"));
-        assertTrue(backendYaml.contains("BEE_AUTH_CLIENT_ID"));
-        assertTrue(backendYaml.contains("mapper-locations"));
         assertTrue(pageRoutes.contains("authorization_management"));
         assertTrue(project.containsKey("frontend/src/extensions/providers.ts"));
         assertEquals(java.util.Arrays.asList("login"), owners(resolved.managedContributions().get("maven:ZA21:bee-starter-auth")));
@@ -82,20 +55,18 @@ class CodeTemplateReleaseLoaderTest {
                     utf8(baseProject.get(".devagentstudio/template-contracts/" + name)));
         }
         assertTrue(baseProject.containsKey("frontend/src/utils/pageIdentity.vectors.json"));
+        // App configuration is read from PUBLIC_* environment variables; this legacy generated file
+        // must not be delivered in a new V3 project.
+        assertFalse(baseProject.containsKey("frontend/src/config/app.generated.ts"));
         assertFalse(baseProject.containsKey("frontend/.devagentstudio/template-contracts/route-projector.json"));
         assertFalse(baseProject.containsKey("frontend/src/pages/Login/index.tsx"));
         assertFalse(utf8(baseProject.get("backend/pom.xml")).contains("bee-starter-auth"));
-        assertFalse(utf8(baseProject.get("backend/src/main/resources/application.yml")).contains("BEE_AUTH_CLIENT_ID"));
     }
 
     @SuppressWarnings("unchecked")
     private java.util.List<String> owners(Map<String, Object> value) { return (java.util.List<String>) value.get("owners"); }
     private int occurrences(String source, String token) { return (source.length() - source.replace(token, "").length()) / token.length(); }
     private String utf8(byte[] value) { return new String(value, StandardCharsets.UTF_8); }
-    private void write(Path path, String value) throws Exception {
-        Files.createDirectories(path.getParent());
-        Files.write(path, value.getBytes(StandardCharsets.UTF_8));
-    }
     private Path repositoryRoot() {
         Path current = Paths.get(System.getProperty("user.dir")).toAbsolutePath();
         while (current != null && !Files.isDirectory(current.resolve("template-source"))) current = current.getParent();

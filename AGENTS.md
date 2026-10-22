@@ -16,7 +16,7 @@ Engine Service 是无状态计算入口，不是 Project Registry、Workspace Ma
 - `template-engine/engine-core/`：纯 Java Core；不得引入 Spring MVC、HTTP、持久化或 ZIP 打包依赖。V3 逻辑放在独立 `core/v3`、`source/v3` 包中。
 - `template-engine/engine-service/`：Spring HTTP、认证、Core 映射、错误映射和 Package Builder。不得实现业务 Capability 逻辑。
 - `scripts/ci/`：可重复使用的 CI Gate 与 Template Source 构建检查；脚本必须自行定位仓库根目录。
-- `docs/REFACTOR.md`：V3 收敛记录与契约索引。任何新增 State 字段、Operation、Package 字段、错误码、HTTP 参数或 Capability 协议，必须先更新权威 Schema/OpenAPI、Fixture 与契约测试。
+- `docs/DEVELOPMENT_GUIDE.md`：项目架构与前后端模板的唯一维护开发指南。协议变更必须同步权威 OpenAPI / JSON Schema、Fixture 及契约测试。
 
 ## 修改规则
 
@@ -27,6 +27,14 @@ Engine Service 是无状态计算入口，不是 Project Registry、Workspace Ma
 5. Local Service 固定监听 `127.0.0.1`，以 Loopback 作为网络暴露边界，不实施应用层认证。未来共享或远程部署时，认证应在 HTTP 接入层独立引入；日志中不得记录完整 Request Body 或完整受管文件内容。
 6. ZIP entry 必须使用相对安全路径、固定排序和固定 timestamp。V3 Update Package 仅为 ADD_FILE / REPLACE_MANAGED_FILE 创建 payload。
 7. 保持 Java 8 编译兼容；Spring Boot 2.7 运行依赖与 Jackson YAML/SnakeYAML 版本必须保持兼容，不要单独升级其中一个。
+
+## XCodeAgent 工作流关键面保护
+
+以下内容是 XCodeAgent 工作流的跨端集成点：Route Projector 及其输入/输出契约、Element Inspector 通道、页面身份映射和业务路由受管标记、Authorization Bootstrap、Extension Registry，以及 V3 TemplateState 的生成和 Schema。
+
+- 未经任务中的明确要求，不得删除、重命名或移除这些关键文件、导出函数、协议字符串、受管区域标记或对外 Schema 字段。
+- 需要演进关键面时，必须保留兼容入口，或者在同一变更中明确更新受影响的契约、调用方和 `scripts/ci/check-protected-surfaces.py` 锚点清单；不得以删除检查或绕过 CI 的方式完成变更。
+- 该保护仅覆盖上述工作流面，不覆盖普通业务页面、业务接口或一般实现细节。普通业务优化不应为此受到限制。
 
 ## 验证要求
 
@@ -41,7 +49,8 @@ git diff --check
 
 ```sh
 mvn -f template-engine/pom.xml verify
+python3 scripts/ci/check-protected-surfaces.py
 ./scripts/ci/verify-code-template-release-revision.sh <base-ref>
 ```
 
-涉及 HTTP、ZIP 或启动配置时，使用 `template-engine/engine-service/config/application-local.yml` 进行真实 JAR 启动验收。该配置要求显式传入绝对 `TEMPLATE_ENGINE_SOURCE_ROOT`，并固定监听 `127.0.0.1`；详情见 `README.md` 和 `docs/REFACTOR.md`。
+涉及 HTTP、ZIP 或启动配置时，使用 `template-engine/engine-service/config/application-local.yml` 进行真实 JAR 启动验收。该配置要求显式传入绝对 `TEMPLATE_ENGINE_SOURCE_ROOT`，并固定监听 `127.0.0.1`；详情见 `README.md` 和 `docs/DEVELOPMENT_GUIDE.md`。

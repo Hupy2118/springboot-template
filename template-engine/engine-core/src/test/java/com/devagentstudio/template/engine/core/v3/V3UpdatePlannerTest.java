@@ -6,9 +6,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -24,6 +27,31 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class V3UpdatePlannerTest {
     @TempDir Path temporary;
+
+    @Test
+    void v4CapabilityPlanIgnoresReleaseOnlyChangesAndInstallsOnlyMissingExtensions() throws Exception {
+        Path r1Root = temporary.resolve("v4-r1/code"); copyRuntime(codeRoot(), r1Root); writeRevision(r1Root, "2026.09.20.1");
+        CodeTemplateRelease r1 = new CodeTemplateReleaseLoader(r1Root).load();
+        Map<String, Object> emptyState = new V3ProjectMaterializer(r1).templateState(new ExtensionResolver(r1).resolve(Collections.<String, Object>emptyMap()));
+        Path r2Root = temporary.resolve("v4-r2/code"); copyRuntime(r1Root, r2Root); writeRevision(r2Root, "2026.09.21.1");
+        CodeTemplateRelease r2 = new CodeTemplateReleaseLoader(r2Root).load();
+        V3UpdatePlanner planner = new V3UpdatePlanner(r2);
+        assertEquals(V3UpdateResult.Kind.NO_CHANGE, planner.planCapabilities(emptyState,
+                new ExtensionResolver(r2).resolve(Collections.<String, Object>emptyMap()), "APPLY").kind());
+        V3UpdateResult install = planner.planCapabilities(emptyState,
+                new ExtensionResolver(r2).resolve(requested("authorization", Collections.<String, Object>emptyMap())), "APPLY");
+        assertEquals(V3UpdateResult.Kind.CHANGE, install.kind());
+        assertEquals(1L, install.nextState().get("stateSequence"));
+        assertEquals("2026.09.21.1", install.nextState().get("templateRevision"));
+        assertFalse(install.nextState().containsKey("managedConfiguration"));
+        assertFalse(operationTypes(install.operations()).contains("UPSERT_MANAGED_CONFIG_BLOCK"));
+        assertEquals(5, count(install.operations(), "REPLACE_MANAGED_FILE"));
+        assertEquals(V3UpdateResult.Kind.NO_CHANGE, planner.planCapabilities(install.nextState(),
+                new ExtensionResolver(r2).resolve(requested("authorization", Collections.<String, Object>emptyMap())), "APPLY").kind());
+        V3Exception removal = assertThrows(V3Exception.class, () -> planner.planCapabilities(install.nextState(),
+                new ExtensionResolver(r2).resolve(Collections.<String, Object>emptyMap()), "APPLY"));
+        assertEquals("CAPABILITY_REMOVAL_UNSUPPORTED", removal.code());
+    }
 
     @Test
     void releaseRefreshAddsOnlyNewArtifactsPreservesInstalledContentAndNeverDeletesRemovedArtifacts() throws Exception {
@@ -79,8 +107,7 @@ class V3UpdatePlannerTest {
         assertEquals(Arrays.asList("authorization", "login"), owners);
         @SuppressWarnings("unchecked") List<String> mavenOwners = (List<String>) resolved.managedContributions().get("maven:ZA21:bee-starter-auth").get("owners");
         assertEquals(Arrays.asList("authorization", "login"), mavenOwners);
-        assertTrue(resolved.managedContributions().containsKey("yaml:bee.auth.client-id"));
-        assertTrue(resolved.managedContributions().containsKey("yaml:bee.persistence.xcode-agent.mybatis.mapper-locations"));
+        assertEquals(2, resolved.managedContributions().size());
 
         Map<String, Object> currentState = new V3ProjectMaterializer(r1).templateState(resolved);
         Path r2Root = temporary.resolve("owners-r2/code"); copyRuntime(r1Root, r2Root); writeRevision(r2Root, "2026.09.21.1");
@@ -115,20 +142,7 @@ class V3UpdatePlannerTest {
         assertEquals(V3UpdateResult.Kind.CHANGE, result.kind());
         assertTrue(result.operations().isEmpty());
         assertEquals(Boolean.TRUE, ((Map<?, ?>) ((Map<?, ?>) ((Map<?, ?>) result.nextState().get("requested")).get("authorization")).get("config")).get("vendorOption"));
-        assertFalse(planner.plan(firstState, firstResolved, "RECONCILE").operations().isEmpty());
-    }
-
-    @Test
-    void conflictingApplicationYamlLeavesAreRejectedBeforeMaterialization() throws Exception {
-        Path root = temporary.resolve("yaml-conflict/code"); copyRuntime(codeRoot(), root);
-        Path authorization = root.resolve("backend/extensions/authorization/extension.yaml");
-        String manifest = read(authorization).replace("    bee:\n      persistence:",
-                "    bee:\n      auth:\n        client-id: conflicting-client\n      persistence:");
-        Files.write(authorization, manifest.getBytes(StandardCharsets.UTF_8));
-        CodeTemplateRelease release = new CodeTemplateReleaseLoader(root).load();
-        V3Exception exception = assertThrows(V3Exception.class,
-                () -> new ExtensionResolver(release).resolve(requested("authorization", Collections.<String, Object>emptyMap())));
-        assertEquals("APPLICATION_YAML_CONFLICT", exception.code());
+        assertEquals(7, planner.plan(firstState, firstResolved, "RECONCILE").operations().size());
     }
 
     private int count(List<Map<String, Object>> operations, String type) { int total = 0; for (Map<String, Object> operation : operations) if (type.equals(operation.get("type"))) total++; return total; }
@@ -148,12 +162,22 @@ class V3UpdatePlannerTest {
         Files.copy(source.resolve("template-revision.txt"), target.resolve("template-revision.txt"));
     }
     private void copyDirectory(Path source, Path target) throws Exception {
-        try (java.util.stream.Stream<Path> paths = Files.walk(source)) {
-            for (Path path : (Iterable<Path>) paths::iterator) {
+        Files.walkFileTree(source, new SimpleFileVisitor<Path>() {
+            @Override public FileVisitResult preVisitDirectory(Path path, BasicFileAttributes attributes) throws java.io.IOException {
+                if (!path.equals(source) && ignoredFixtureEntry(path, source)) return FileVisitResult.SKIP_SUBTREE;
                 Path destination = target.resolve(source.relativize(path));
-                if (Files.isDirectory(path)) Files.createDirectories(destination); else Files.copy(path, destination);
+                Files.createDirectories(destination);
+                return FileVisitResult.CONTINUE;
             }
-        }
+            @Override public FileVisitResult visitFile(Path path, BasicFileAttributes attributes) throws java.io.IOException {
+                if (!ignoredFixtureEntry(path, source)) Files.copy(path, target.resolve(source.relativize(path)));
+                return FileVisitResult.CONTINUE;
+            }
+        });
+    }
+    private boolean ignoredFixtureEntry(Path path, Path root) {
+        for (Path segment : root.relativize(path)) if ("node_modules".equals(segment.toString())) return true;
+        return ".DS_Store".equals(path.getFileName().toString());
     }
     private static Path repositoryRoot() { Path path = Paths.get(System.getProperty("user.dir")).toAbsolutePath(); while (path != null && !Files.isDirectory(path.resolve("template-source"))) path = path.getParent(); if (path == null) throw new AssertionError("repository root not found"); return path; }
 }

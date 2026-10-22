@@ -5,6 +5,7 @@ import { StyleProvider } from '@ant-design/cssinjs';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Routes } from '@/routes/index';
 import { AppProviders } from '@/providers/AppProviders';
+import { appConfig } from '@/config/appConfig';
 /**
  * 应用入口文件
  */
@@ -14,7 +15,15 @@ const App: React.FC = () => {
     <BrowserRouter>
       <ErrorBoundary>
         <StyleProvider layer>
-          <ConfigProvider theme={{ token: { colorPrimary: '#2c68ff' } }}>
+          <ConfigProvider
+            theme={{
+              token: {
+                colorPrimary: appConfig.theme.primaryColor,
+                // Ant Design keeps link color as a separate alias token.
+                colorLink: appConfig.theme.primaryColor,
+              },
+            }}
+          >
             <AppProviders>
               <Routes />
             </AppProviders>

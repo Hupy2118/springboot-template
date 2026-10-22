@@ -1,5 +1,3 @@
-/// <reference types="vite/client" />
-
 /**
  * svg 图片当做 component 引入
  */

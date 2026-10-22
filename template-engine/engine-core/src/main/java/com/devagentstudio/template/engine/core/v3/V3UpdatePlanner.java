@@ -1,9 +1,6 @@
 package com.devagentstudio.template.engine.core.v3;
 
-import com.devagentstudio.template.engine.core.common.StateDigest;
-
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -18,8 +15,67 @@ public final class V3UpdatePlanner {
 
     public V3UpdatePlanner(CodeTemplateRelease release) { this.release = release; }
 
+    /** V4 only installs capabilities absent from the caller's state. Parameters and release refreshes are excluded. */
+    @SuppressWarnings("unchecked")
+    public V3UpdateResult planCapabilities(Map<String, Object> current, ExtensionResolver.ResolvedExtensions resolved, String mode) {
+        RevisionVersion currentRevision = RevisionVersion.parse((String) current.get("templateRevision"));
+        if (currentRevision.compareTo(RevisionVersion.parse(release.revision())) > 0)
+            throw new V3Exception("TEMPLATE_RELEASE_DOWNGRADE_UNSUPPORTED", "current TemplateState is newer than this server Release", 409);
+        Map<String, Map<String, Object>> effective = (Map<String, Map<String, Object>>) current.get("effective");
+        Map<String, Map<String, Object>> artifacts = (Map<String, Map<String, Object>>) current.get("installedArtifacts");
+        Map<String, Map<String, Object>> contributions = (Map<String, Map<String, Object>>) current.get("managedContributions");
+        for (String id : effective.keySet()) {
+            if (!resolved.effective().containsKey(id))
+                throw new V3Exception("CAPABILITY_REMOVAL_UNSUPPORTED", "removing capability is unsupported: " + id, 409);
+            if (!effective.get(id).equals(resolved.effective().get(id)))
+                throw new V3Exception("CAPABILITY_UPGRADE_UNSUPPORTED", "changing an installed capability is unsupported: " + id, 409);
+        }
+        if ("RECONCILE".equals(mode)) {
+            if (!effective.keySet().equals(resolved.effective().keySet()) || !release.revision().equals(current.get("templateRevision")))
+                throw new V3Exception("RECONCILE_STATE_CHANGE_REQUIRED", "RECONCILE cannot change TemplateState", 409);
+            List<OperationDraft> repair = new ArrayList<OperationDraft>();
+            for (String target : REGISTRIES) repair.add(OperationDraft.replace(target, registryBytes(resolved, target)));
+            for (Map.Entry<String, Map<String, Object>> item : contributions.entrySet()) repair.add(ensure(item.getKey(), item.getValue()));
+            Map<String, Object> repaired = new LinkedHashMap<String, Object>(current);
+            repaired.remove("managedConfiguration");
+            repaired.put("stateSequence", current.getOrDefault("stateSequence", 0));
+            return compile(current, repaired, mode, repair);
+        }
+        if (effective.keySet().equals(resolved.effective().keySet())) return V3UpdateResult.noChange(current);
+        Map<String, Map<String, Object>> nextArtifacts = new TreeMap<String, Map<String, Object>>(artifacts);
+        List<OperationDraft> operations = new ArrayList<OperationDraft>();
+        for (Map.Entry<String, Map<String, Object>> item : artifactStates(resolved.order()).entrySet()) {
+            if (artifacts.containsKey(item.getKey())) continue;
+            String target = (String) item.getValue().get("target");
+            for (Map<String, Object> prior : artifacts.values()) if (target.equals(prior.get("target")))
+                throw new V3Exception("TEMPLATE_STATE_INVALID", "new Artifact target conflicts with installed Artifact", 409);
+            nextArtifacts.put(item.getKey(), item.getValue());
+            operations.add(OperationDraft.add(item.getKey(), target, artifactBytes(item.getKey())));
+        }
+        Map<String, Map<String, Object>> nextContributions = deepContributions(resolved.managedContributions());
+        for (Map.Entry<String, Map<String, Object>> item : contributions.entrySet()) {
+            Map<String, Object> next = nextContributions.get(item.getKey());
+            if (next == null || !sameSpec(item.getValue(), next))
+                throw new V3Exception("CAPABILITY_UPGRADE_UNSUPPORTED", "installed Contribution changed: " + item.getKey(), 409);
+            next.put("appliedRevision", item.getValue().get("appliedRevision"));
+        }
+        for (Map.Entry<String, Map<String, Object>> item : nextContributions.entrySet())
+            if (!contributions.containsKey(item.getKey())) operations.add(ensure(item.getKey(), item.getValue()));
+        for (String target : REGISTRIES) operations.add(OperationDraft.replace(target, registryBytes(resolved, target)));
+        Map<String, Object> next = state(resolved, nextArtifacts, nextContributions, null);
+        long sequence = ((Number) current.getOrDefault("stateSequence", 0)).longValue();
+        if (sequence == Long.MAX_VALUE) throw new V3Exception("TEMPLATE_STATE_INVALID", "stateSequence is exhausted", 409);
+        next.put("stateSequence", sequence + 1);
+        return compile(current, next, mode, operations);
+    }
+
     @SuppressWarnings("unchecked")
     public V3UpdateResult plan(Map<String, Object> current, ExtensionResolver.ResolvedExtensions resolved, String mode) {
+        return plan(current, resolved, mode, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    public V3UpdateResult plan(Map<String, Object> current, ExtensionResolver.ResolvedExtensions resolved, String mode, Map<String, Object> applicationConfig) {
         RevisionVersion currentRevision = RevisionVersion.parse((String) current.get("templateRevision"));
         RevisionVersion releaseRevision = RevisionVersion.parse(release.revision());
         if (currentRevision.compareTo(releaseRevision) > 0)
@@ -44,21 +100,23 @@ public final class V3UpdatePlanner {
         }
 
         Map<String, Map<String, Object>> targetContributions = deepContributions(resolved.managedContributions());
-        Map<String, Object> nextState = state(resolved, nextArtifacts, targetContributions);
+        Map<String, Object> currentApplication = (Map<String, Object>) current.get("managedConfiguration");
+        Map<String, Object> nextState = state(resolved, nextArtifacts, targetContributions, applicationConfig);
+        if (current.containsKey("stateSequence")) nextState.put("stateSequence", current.get("stateSequence"));
         boolean releaseChanged = !release.revision().equals(current.get("templateRevision"));
         boolean requestedChanged = !currentRequested.equals(resolved.requested());
         boolean effectiveChanged = !currentEffective.equals(resolved.effective());
         boolean artifactsChanged = !sameKeys(currentArtifacts, nextArtifacts);
         boolean contributionsChanged = !sameContributionState(currentContributions, targetContributions);
-        boolean stateChanged = releaseChanged || requestedChanged || effectiveChanged || artifactsChanged || contributionsChanged;
+        boolean configurationChanged = !sameNullable(currentApplication, applicationConfig);
+        boolean stateChanged = releaseChanged || requestedChanged || effectiveChanged || artifactsChanged || contributionsChanged || configurationChanged;
 
         if ("RECONCILE".equals(mode)) {
             if (stateChanged) throw new V3Exception("RECONCILE_STATE_CHANGE_REQUIRED", "RECONCILE cannot change TemplateState", 409);
             List<OperationDraft> repair = new ArrayList<OperationDraft>();
             for (String target : REGISTRIES) repair.add(OperationDraft.replace(target, registryBytes(resolved, target)));
-            if (hasYamlContributions(currentContributions)) repair.add(OperationDraft.replace("backend/src/main/resources/application.yml", applicationYamlBytes(resolved)));
-            for (Map.Entry<String, Map<String, Object>> item : currentContributions.entrySet())
-                if (!"APPLICATION_YAML".equals(item.getValue().get("type"))) repair.add(ensure(item.getKey(), item.getValue()));
+            for (Map.Entry<String, Map<String, Object>> item : currentContributions.entrySet()) repair.add(ensure(item.getKey(), item.getValue()));
+            repair.addAll(configOperations(currentApplication));
             return compile(current, current, mode, repair);
         }
 
@@ -66,10 +124,9 @@ public final class V3UpdatePlanner {
         List<OperationDraft> operations = new ArrayList<OperationDraft>();
         operations.addAll(diffContributions(currentContributions, targetContributions));
         operations.addAll(adds);
-        if (yamlContributionsChanged(currentContributions, targetContributions))
-            operations.add(OperationDraft.replace("backend/src/main/resources/application.yml", applicationYamlBytes(resolved)));
         boolean projectionChanged = releaseChanged || !currentEffective.keySet().equals(resolved.effective().keySet());
         if (projectionChanged) for (String target : REGISTRIES) operations.add(OperationDraft.replace(target, registryBytes(resolved, target)));
+        if (configurationChanged) operations.addAll(configOperations(applicationConfig));
         return compile(current, nextState, mode, operations);
     }
 
@@ -103,12 +160,10 @@ public final class V3UpdatePlanner {
                                                    Map<String, Map<String, Object>> target) {
         List<OperationDraft> result = new ArrayList<OperationDraft>();
         for (Map.Entry<String, Map<String, Object>> old : current.entrySet()) {
-            if ("APPLICATION_YAML".equals(old.getValue().get("type"))) continue;
             Map<String, Object> next = target.get(old.getKey());
             if (next == null || !sameSpec(old.getValue(), next)) result.add(remove(old.getKey(), old.getValue()));
         }
         for (Map.Entry<String, Map<String, Object>> next : target.entrySet()) {
-            if ("APPLICATION_YAML".equals(next.getValue().get("type"))) continue;
             Map<String, Object> old = current.get(next.getKey());
             if (old == null || !sameSpec(old, next.getValue())) result.add(ensure(next.getKey(), next.getValue()));
         }
@@ -140,23 +195,6 @@ public final class V3UpdatePlanner {
         for (String key : left.keySet()) if (!left.get(key).equals(right.get(key))) return false;
         return true;
     }
-    private boolean hasYamlContributions(Map<String, Map<String, Object>> values) {
-        for (Map<String, Object> value : values.values()) if ("APPLICATION_YAML".equals(value.get("type"))) return true;
-        return false;
-    }
-    private boolean yamlContributionsChanged(Map<String, Map<String, Object>> left, Map<String, Map<String, Object>> right) {
-        Map<String, Map<String, Object>> leftYaml = yamlContributions(left);
-        Map<String, Map<String, Object>> rightYaml = yamlContributions(right);
-        if (!leftYaml.keySet().equals(rightYaml.keySet())) return true;
-        for (String key : leftYaml.keySet()) if (!sameSpec(leftYaml.get(key), rightYaml.get(key))) return true;
-        return false;
-    }
-    private Map<String, Map<String, Object>> yamlContributions(Map<String, Map<String, Object>> values) {
-        Map<String, Map<String, Object>> result = new TreeMap<String, Map<String, Object>>();
-        for (Map.Entry<String, Map<String, Object>> item : values.entrySet())
-            if ("APPLICATION_YAML".equals(item.getValue().get("type"))) result.put(item.getKey(), item.getValue());
-        return result;
-    }
     private boolean sameKeys(Map<String, Map<String, Object>> left, Map<String, Map<String, Object>> right) { return left.keySet().equals(right.keySet()); }
 
     private Map<String, Map<String, Object>> deepContributions(Map<String, Map<String, Object>> values) {
@@ -176,11 +214,19 @@ public final class V3UpdatePlanner {
         return result;
     }
     private Map<String, Object> state(ExtensionResolver.ResolvedExtensions resolved, Map<String, Map<String, Object>> artifacts,
-                                      Map<String, Map<String, Object>> contributions) {
+                                      Map<String, Map<String, Object>> contributions, Map<String, Object> applicationConfig) {
         Map<String, Object> result = new LinkedHashMap<String, Object>();
         result.put("schemaVersion", 3); result.put("templateRevision", release.revision());
         result.put("requested", resolved.requested()); result.put("effective", resolved.effective());
         result.put("installedArtifacts", artifacts); result.put("managedContributions", contributions);
+        if (applicationConfig != null) result.put("managedConfiguration", deep(applicationConfig));
+        return result;
+    }
+    private boolean sameNullable(Object left, Object right) { return left == null ? right == null : left.equals(right); }
+    private List<OperationDraft> configOperations(Map<String, Object> applicationConfig) {
+        List<OperationDraft> result = new ArrayList<OperationDraft>();
+        for (Map.Entry<String, byte[]> item : ApplicationConfigProjector.project(Collections.<String, byte[]>emptyMap(), applicationConfig).entrySet())
+            result.add(OperationDraft.config(item.getKey(), item.getKey().equals(ApplicationConfigProjector.FRONTEND_TARGET) ? "app-frontend" : "login-auth", item.getValue()));
         return result;
     }
 
@@ -215,11 +261,6 @@ public final class V3UpdatePlanner {
         if (bytes == null) throw packageError("managed registry source missing: " + target);
         return bytes;
     }
-    private byte[] applicationYamlBytes(ExtensionResolver.ResolvedExtensions resolved) {
-        byte[] bytes = new V3ProjectMaterializer(release).materialize(resolved).get("backend/src/main/resources/application.yml");
-        if (bytes == null) throw packageError("managed application.yml source missing");
-        return bytes;
-    }
     private V3Exception packageError(String message) { return new V3Exception("PACKAGE_BUILD_FAILED", message, 500); }
 
     private static final class OperationDraft {
@@ -240,6 +281,10 @@ public final class V3UpdatePlanner {
         private static OperationDraft contribution(String type, String id, String target, Map<String, Object> parameters) {
             int phase = type.startsWith("REMOVE_") ? 0 : "ENSURE_MAVEN_DEPENDENCY".equals(type) ? 2 : 3;
             return new OperationDraft(type, id, target, phase, new LinkedHashMap<String, Object>(parameters), null);
+        }
+        private static OperationDraft config(String target, String blockId, byte[] payload) {
+            Map<String, Object> parameters = new LinkedHashMap<String, Object>(); parameters.put("blockId", blockId);
+            return new OperationDraft("UPSERT_MANAGED_CONFIG_BLOCK", "upsert-config:" + target, target, 4, parameters, payload);
         }
     }
 }

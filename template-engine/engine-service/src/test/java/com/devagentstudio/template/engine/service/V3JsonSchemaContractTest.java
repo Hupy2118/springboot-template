@@ -27,7 +27,7 @@ class V3JsonSchemaContractTest {
     }
 
     @Test
-    void stateUsesResourceOwnershipAndOperationSchemaFreezesSixTypes() throws Exception {
+    void stateUsesResourceOwnershipAndOperationSchemaFreezesSevenTypes() throws Exception {
         JsonNode state = read("template-state.schema.json");
         List<String> stateFields = Arrays.asList("schemaVersion", "templateRevision", "requested", "effective", "installedArtifacts", "managedContributions");
         for (String field : stateFields) assertTrue(contains(state.path("required"), field), field);
@@ -40,8 +40,8 @@ class V3JsonSchemaContractTest {
 
         JsonNode operation = read("operation.schema.json");
         JsonNode types = operation.at("/properties/type/enum");
-        assertEquals(6, types.size());
-        for (String expected : Arrays.asList("ADD_FILE", "REPLACE_MANAGED_FILE", "ENSURE_JAVA_ANNOTATION",
+        assertEquals(7, types.size());
+        for (String expected : Arrays.asList("ADD_FILE", "REPLACE_MANAGED_FILE", "UPSERT_MANAGED_CONFIG_BLOCK", "ENSURE_JAVA_ANNOTATION",
                 "REMOVE_JAVA_ANNOTATION", "ENSURE_MAVEN_DEPENDENCY", "REMOVE_MAVEN_DEPENDENCY")) {
             assertTrue(contains(types, expected), expected);
         }
@@ -61,6 +61,22 @@ class V3JsonSchemaContractTest {
         assertTrue(schema.at("/properties/packageId/pattern").asText().contains("pkg-"));
     }
 
+    @Test
+    void v4PackageExcludesDigestAndConfigurationOperations() throws Exception {
+        JsonNode schema = readV4("extension-update-package.schema.json");
+        assertEquals("4", schema.at("/properties/protocolVersion/const").asText());
+        assertTrue(contains(schema.path("required"), "expectedStateSequence"));
+        assertFalse(schema.path("properties").has("currentStateDigest"));
+        assertFalse(schema.path("properties").has("nextStateDigest"));
+        assertEquals(1, schema.at("/$defs/payloadMetadata/required").size());
+        assertFalse(schema.at("/$defs/payloadMetadata/properties").has("sha256"));
+        JsonNode operation = readV4("operation.schema.json");
+        assertFalse(contains(operation.at("/properties/type/enum"), "UPSERT_MANAGED_CONFIG_BLOCK"));
+        JsonNode nextState = readV4("template-state.schema.json");
+        assertTrue(contains(nextState.path("required"), "stateSequence"));
+        assertFalse(nextState.path("properties").has("managedConfiguration"));
+    }
+
     private static boolean contains(JsonNode array, String value) {
         for (JsonNode item : array) if (value.equals(item.asText())) return true;
         return false;
@@ -68,6 +84,12 @@ class V3JsonSchemaContractTest {
 
     private static JsonNode read(String name) throws Exception {
         try (InputStream input = V3JsonSchemaContractTest.class.getResourceAsStream("/contracts/v3/" + name)) {
+            assertNotNull(input, "JSON Schema resource " + name);
+            return JSON.readTree(input);
+        }
+    }
+    private static JsonNode readV4(String name) throws Exception {
+        try (InputStream input = V3JsonSchemaContractTest.class.getResourceAsStream("/contracts/v4/" + name)) {
             assertNotNull(input, "JSON Schema resource " + name);
             return JSON.readTree(input);
         }

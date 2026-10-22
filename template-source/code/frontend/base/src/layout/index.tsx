@@ -10,6 +10,7 @@ import AppIcon from './components/AppIcon';
 import { AccessStateView } from '@/platform/access/AccessStateView';
 import { useIdentity } from '@/platform/identity/useIdentity';
 import { usePageMenus } from '@/hooks/usePageMenus';
+import { appConfig } from '@/config/appConfig';
 
 const HEADER_FOOTER_SETTING: Partial<ProSettings> = {
   headerRender: undefined, // 启用Header时渲染默认的Header，可以手动复写为自定义Header
@@ -66,13 +67,11 @@ export default () => {
     <ProConfigProvider>
       <ProLayout
         siderWidth={216}
-        title='测试应用4'
+        title={appConfig.app.name}
         logo={
           <AppIcon
-            icon={
-              'https://s3gw.cmbchina.com/lt5230-images-prd/TFQ1NC4wMQ==/059a63b2804b41e987952290540b6f77'
-            }
-            appName={'测试应用4'}
+            icon={appConfig.app.icon}
+            appName={appConfig.app.name}
           />
         }
         route={{ path: '/', routes: [routes] }}

@@ -28,7 +28,7 @@ final class EngineMapper {
     @SuppressWarnings("unchecked")
     static Map<String, Object> requestedConfig(Object raw) {
         Map<String, Object> config = requireMap(raw, "BAD_REQUEST", "requestedConfig must be an object", 400);
-        exact(config, Collections.singleton("capabilities"), "BAD_REQUEST", "requestedConfig fields are invalid", 400);
+        if (!config.containsKey("capabilities") || config.size() > 2 || (config.size() == 2 && !config.containsKey("applicationConfig"))) throw bad("requestedConfig fields are invalid");
         Map<String, Object> capabilities = requireMap(config.get("capabilities"), "BAD_REQUEST", "requestedConfig.capabilities must be an object", 400);
         Map<String, Object> result = new TreeMap<String, Object>();
         for (Map.Entry<String, Object> entry : capabilities.entrySet()) {
@@ -43,6 +43,7 @@ final class EngineMapper {
             normalized.put("enabled", enabled); normalized.put("config", deep(capabilityConfig));
             result.put(id, normalized);
         }
+        if (config.containsKey("applicationConfig")) result.put("applicationConfig", requireMap(config.get("applicationConfig"), "BAD_REQUEST", "requestedConfig.applicationConfig must be an object", 400));
         return result;
     }
 
@@ -52,7 +53,12 @@ final class EngineMapper {
         if (!integer(schemaVersion)) throw bad("currentTemplateState.schemaVersion must be an integer");
         if (new java.math.BigDecimal(schemaVersion.toString()).compareTo(java.math.BigDecimal.valueOf(3L)) != 0)
             throw new V3Exception("TEMPLATE_STATE_SCHEMA_UNSUPPORTED", "currentTemplateState.schemaVersion must be 3", 400);
-        exact(state, STATE_FIELDS, "TEMPLATE_STATE_INVALID", "TemplateState fields are invalid", 400);
+        Set<String> supplied = new TreeSet<String>(state.keySet()); supplied.remove("managedConfiguration"); supplied.remove("stateSequence");
+        if (!supplied.equals(STATE_FIELDS)) invalidState("TemplateState fields are invalid");
+        Object sequence = state.containsKey("stateSequence") ? state.get("stateSequence") : 0;
+        if (!integer(sequence) || new java.math.BigDecimal(sequence.toString()).compareTo(java.math.BigDecimal.ZERO) < 0
+                || new java.math.BigDecimal(sequence.toString()).compareTo(java.math.BigDecimal.valueOf(Long.MAX_VALUE)) > 0)
+            invalidState("stateSequence must be a nonnegative integer");
         String revision = state.get("templateRevision") instanceof String ? (String) state.get("templateRevision") : null;
         if (revision == null) invalidState("templateRevision must be a string");
         try { RevisionVersion.parse(revision); } catch (IllegalArgumentException e) { invalidState("templateRevision is invalid"); }
@@ -65,8 +71,10 @@ final class EngineMapper {
 
         Map<String, Object> normalized = new LinkedHashMap<String, Object>();
         normalized.put("schemaVersion", 3); normalized.put("templateRevision", revision);
+        if (state.containsKey("stateSequence")) normalized.put("stateSequence", Long.valueOf(sequence.toString()));
         normalized.put("requested", requested); normalized.put("effective", effective);
         normalized.put("installedArtifacts", artifacts); normalized.put("managedContributions", contributions);
+        if (state.containsKey("managedConfiguration")) normalized.put("managedConfiguration", requireMap(state.get("managedConfiguration"), "TEMPLATE_STATE_INVALID", "managedConfiguration must be an object", 400));
         return normalized;
     }
 
@@ -146,12 +154,6 @@ final class EngineMapper {
                 if (version != null && !(version instanceof String)) invalidState("Maven version must be string or null");
                 if (scope != null && (!(scope instanceof String) || !Arrays.asList("compile", "provided", "runtime", "test", "system").contains(scope))) invalidState("Maven scope is invalid");
                 normalizedSpec.put("groupId", groupId); normalizedSpec.put("artifactId", artifactId); normalizedSpec.put("version", version); normalizedSpec.put("scope", scope);
-            } else if ("APPLICATION_YAML".equals(type)) {
-                if (!"backend/src/main/resources/application.yml".equals(target)) invalidState("Application YAML target is invalid");
-                exact(spec, new TreeSet<String>(Arrays.asList("path", "value")), "TEMPLATE_STATE_INVALID", "Application YAML spec fields are invalid", 400);
-                String path = string(spec.get("path"), "Application YAML path");
-                if (!path.matches("[A-Za-z0-9_.-]+") || !entry.getKey().equals("yaml:" + path)) invalidState("Application YAML resource key is invalid");
-                normalizedSpec.put("path", path); normalizedSpec.put("value", spec.get("value"));
             } else invalidState("managed Contribution type is unsupported");
             Map<String, Object> normalized = new LinkedHashMap<String, Object>(); normalized.put("type", type); normalized.put("target", target);
             normalized.put("owners", owners); normalized.put("spec", normalizedSpec); normalized.put("appliedRevision", appliedRevision);

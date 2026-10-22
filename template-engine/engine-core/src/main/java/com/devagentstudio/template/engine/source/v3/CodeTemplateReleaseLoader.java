@@ -9,8 +9,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -80,7 +80,7 @@ public final class CodeTemplateReleaseLoader {
         try (java.util.stream.Stream<Path> stream = Files.list(parent)) { stream.forEach(children::add); }
         Collections.sort(children, Comparator.comparing(path -> path.getFileName().toString()));
         for (Path directory : children) {
-            if (isIgnoredRuntimeEntry(directory)) continue;
+            if (ignored(directory, parent)) continue;
             if (Files.isSymbolicLink(directory)) sourceError("symlink is not allowed: " + relative(directory));
             if (!Files.isDirectory(directory)) {
                 if (!".gitkeep".equals(directory.getFileName().toString())) sourceError("unexpected extensions entry: " + relative(directory));
@@ -197,18 +197,14 @@ public final class CodeTemplateReleaseLoader {
             item.put("scope", scope);
             partial.dependencies.add(item);
         }
-        JsonNode applicationYaml = contributes.path("applicationYaml");
-        if (applicationYaml.isMissingNode()) applicationYaml = yaml.createObjectNode();
-        if (!applicationYaml.isObject()) sourceError(partial.id + ".contributes.applicationYaml must be an object");
-        partial.applicationYaml = objectMap(applicationYaml);
     }
 
     private void validateExtensionRoot(Path directory, boolean frontend) throws IOException {
         try (java.util.stream.Stream<Path> stream = Files.list(directory)) {
             for (Path child : (Iterable<Path>) stream::iterator) {
                 String name = child.getFileName().toString();
-                if (isIgnoredRuntimeEntry(child)) continue;
                 if (Files.isSymbolicLink(child)) sourceError("symlink is not allowed: " + relative(child));
+                if (ignored(child, directory)) continue;
                 if ("extension.yaml".equals(name)) continue;
                 if (frontend && "src".equals(name) || !frontend && Arrays.asList("src", "docs", "migrations").contains(name)) {
                     if (!Files.isDirectory(child)) sourceError("expected extension source directory: " + relative(child));
@@ -276,36 +272,30 @@ public final class CodeTemplateReleaseLoader {
     private Map<String, byte[]> readTree(Path directory, String label) throws IOException {
         requireDirectory(directory, label);
         Map<String, byte[]> files = new TreeMap<String, byte[]>();
-        List<Path> paths = new ArrayList<Path>();
         Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
             @Override public FileVisitResult preVisitDirectory(Path path, BasicFileAttributes attributes) {
-                return path.equals(directory) || !isIgnoredRuntimeDirectory(path)
-                        ? FileVisitResult.CONTINUE : FileVisitResult.SKIP_SUBTREE;
+                return path.equals(directory) || !ignored(path, directory) ? FileVisitResult.CONTINUE : FileVisitResult.SKIP_SUBTREE;
             }
-
-            @Override public FileVisitResult visitFile(Path path, BasicFileAttributes attributes) {
-                if (!isIgnoredRuntimeFile(path)) paths.add(path);
+            @Override public FileVisitResult visitFile(Path path, BasicFileAttributes attributes) throws IOException {
+                if (ignored(path, directory)) return FileVisitResult.CONTINUE;
+                if (Files.isSymbolicLink(path)) sourceError("symlink is not allowed: " + relative(path));
+                if (!Files.isRegularFile(path)) sourceError("unsupported Runtime Source entry: " + relative(path));
+                byte[] bytes = Files.readAllBytes(path);
+                if (containsNul(bytes)) sourceError("binary Runtime Source is not allowed: " + relative(path));
+                decode(bytes, relative(path));
+                files.put(directory.relativize(path).toString().replace('\\', '/'), bytes);
                 return FileVisitResult.CONTINUE;
             }
         });
-        Collections.sort(paths, Comparator.comparing(path -> directory.relativize(path).toString()));
-        for (Path path : paths) {
-            if (Files.isSymbolicLink(path)) sourceError("symlink is not allowed: " + relative(path));
-            if (!Files.isRegularFile(path)) sourceError("unsupported Runtime Source entry: " + relative(path));
-            byte[] bytes = Files.readAllBytes(path);
-            if (containsNul(bytes)) sourceError("binary Runtime Source is not allowed: " + relative(path));
-            decode(bytes, relative(path));
-            files.put(directory.relativize(path).toString().replace('\\', '/'), bytes);
-        }
         return files;
     }
 
-    /** Machine-local metadata and installed dependencies are never Runtime Source inputs. */
-    private boolean isIgnoredRuntimeEntry(Path path) {
-        return isIgnoredRuntimeDirectory(path) || isIgnoredRuntimeFile(path);
+    /** Development dependency trees and macOS metadata are never Runtime Source or release inputs. */
+    private boolean ignored(Path path, Path root) {
+        Path relative = root.relativize(path);
+        for (Path segment : relative) if ("node_modules".equals(segment.toString()) || "build".equals(segment.toString())) return true;
+        return ".DS_Store".equals(path.getFileName().toString());
     }
-    private boolean isIgnoredRuntimeDirectory(Path path) { return "node_modules".equals(path.getFileName().toString()); }
-    private boolean isIgnoredRuntimeFile(Path path) { return ".DS_Store".equals(path.getFileName().toString()); }
 
     private JsonNode readDocument(Path path) throws IOException {
         if (Files.isSymbolicLink(path) || !Files.isRegularFile(path)) sourceError("missing or unsafe extension manifest: " + relative(path));
@@ -390,7 +380,6 @@ public final class CodeTemplateReleaseLoader {
         private final Map<String, List<Map<String, Object>>> frontendContributions = new HashMap<String, List<Map<String, Object>>>();
         private final List<String> annotations = new ArrayList<String>();
         private final List<Map<String, Object>> dependencies = new ArrayList<Map<String, Object>>();
-        private Map<String, Object> applicationYaml = Collections.emptyMap();
         private PartialExtension(String id) { this.id = id; }
         private ExtensionRelease finish() {
             List<String> deps = requires == null ? Collections.<String>emptyList() : requires;
@@ -400,7 +389,7 @@ public final class CodeTemplateReleaseLoader {
                     frontendContributions.containsKey("pageRoutes") ? frontendContributions.get("pageRoutes") : Collections.<Map<String, Object>>emptyList(),
                     frontendContributions.containsKey("initializers") ? frontendContributions.get("initializers") : Collections.<Map<String, Object>>emptyList(),
                     frontendContributions.containsKey("errorReporters") ? frontendContributions.get("errorReporters") : Collections.<Map<String, Object>>emptyList(),
-                    annotations, dependencies, applicationYaml);
+                    annotations, dependencies);
         }
     }
 }

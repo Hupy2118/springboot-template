@@ -20,11 +20,12 @@
       "type": "object",
       "patternProperties": {
         "^annotation:[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)+$": { "$ref": "#/$defs/javaAnnotationContribution" },
-        "^maven:[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+$": { "$ref": "#/$defs/mavenContribution" },
-        "^yaml:[A-Za-z0-9_.-]+$": { "$ref": "#/$defs/applicationYamlContribution" }
+        "^maven:[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+$": { "$ref": "#/$defs/mavenContribution" }
       },
       "additionalProperties": false
-    }
+    },
+    "managedConfiguration": { "type": "object" },
+    "stateSequence": { "type": "integer", "minimum": 0 }
   },
   "additionalProperties": false,
   "$defs": {
@@ -92,26 +93,6 @@
             "artifactId": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
             "version": { "type": ["string", "null"] },
             "scope": { "enum": ["compile", "provided", "runtime", "test", "system", null] }
-          },
-          "additionalProperties": false
-        },
-        "appliedRevision": { "$ref": "#/$defs/revision" }
-      },
-      "additionalProperties": false
-    },
-    "applicationYamlContribution": {
-      "type": "object",
-      "required": ["type", "target", "owners", "spec", "appliedRevision"],
-      "properties": {
-        "type": { "const": "APPLICATION_YAML" },
-        "target": { "const": "backend/src/main/resources/application.yml" },
-        "owners": { "$ref": "#/$defs/owners" },
-        "spec": {
-          "type": "object",
-          "required": ["path", "value"],
-          "properties": {
-            "path": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
-            "value": {}
           },
           "additionalProperties": false
         },

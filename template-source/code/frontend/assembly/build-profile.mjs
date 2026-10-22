@@ -47,7 +47,7 @@ try {
   const dependencies = await ensureDependencies(workspace);
   process.stdout.write(dependencies.reused ? 'Reusing verified workspace dependencies.\n' : 'Installed workspace dependencies.\n');
   await execute('pnpm', ['exec', 'tsc', '-b'], { cwd: workspace });
-  await execute('pnpm', ['exec', 'vite', 'build'], { cwd: workspace });
+  await execute('pnpm', ['exec', 'rsbuild', 'build'], { cwd: workspace });
 } finally {
   await preserveNodeModules();
   await rm(workspace, { recursive: true, force: true });

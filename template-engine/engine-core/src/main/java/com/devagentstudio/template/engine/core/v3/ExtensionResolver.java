@@ -89,7 +89,6 @@ public final class ExtensionResolver {
                 String key = "maven:" + groupId + ":" + artifactId;
                 addOwner(result, key, id, "MAVEN_DEPENDENCY", "backend/pom.xml", dependency);
             }
-            addYamlOwners(result, id, extension.applicationYaml(), "");
         }
         for (Map<String, Object> contribution : result.values()) {
             @SuppressWarnings("unchecked") List<String> owners = (List<String>) contribution.get("owners");
@@ -109,8 +108,7 @@ public final class ExtensionResolver {
             contribution.put("owners", new ArrayList<String>()); contribution.put("spec", new LinkedHashMap<String, Object>(spec));
             result.put(key, contribution);
         } else if (!contribution.get("spec").equals(spec)) {
-            String code = "MAVEN_DEPENDENCY".equals(type) ? "MAVEN_DEPENDENCY_CONFLICT"
-                    : "APPLICATION_YAML".equals(type) ? "APPLICATION_YAML_CONFLICT" : "TEMPLATE_SOURCE_INVALID";
+            String code = "MAVEN_DEPENDENCY".equals(type) ? "MAVEN_DEPENDENCY_CONFLICT" : "TEMPLATE_SOURCE_INVALID";
             throw new V3Exception(code, "conflicting managed contribution spec for " + key, 500);
         }
         ((List<String>) contribution.get("owners")).add(owner);
@@ -118,20 +116,6 @@ public final class ExtensionResolver {
 
     private Map<String, Object> singleton(String key, Object value) {
         Map<String, Object> result = new LinkedHashMap<String, Object>(); result.put(key, value); return result;
-    }
-
-    @SuppressWarnings("unchecked")
-    private void addYamlOwners(Map<String, Map<String, Object>> result, String owner, Map<String, Object> source, String prefix) {
-        for (Map.Entry<String, Object> entry : source.entrySet()) {
-            String path = prefix.isEmpty() ? entry.getKey() : prefix + "." + entry.getKey();
-            Object value = entry.getValue();
-            if (value instanceof Map) addYamlOwners(result, owner, (Map<String, Object>) value, path);
-            else {
-                Map<String, Object> spec = new LinkedHashMap<String, Object>();
-                spec.put("path", path); spec.put("value", value);
-                addOwner(result, "yaml:" + path, owner, "APPLICATION_YAML", "backend/src/main/resources/application.yml", spec);
-            }
-        }
     }
 
     @SuppressWarnings("unchecked")

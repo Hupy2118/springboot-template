@@ -8,7 +8,7 @@
     "schemaVersion": { "const": 1 },
     "operationId": { "type": "string", "minLength": 1 },
     "index": { "type": "integer", "minimum": 0 },
-    "type": { "enum": ["ADD_FILE", "REPLACE_MANAGED_FILE", "ENSURE_JAVA_ANNOTATION", "REMOVE_JAVA_ANNOTATION", "ENSURE_MAVEN_DEPENDENCY", "REMOVE_MAVEN_DEPENDENCY"] },
+    "type": { "enum": ["ADD_FILE", "REPLACE_MANAGED_FILE", "UPSERT_MANAGED_CONFIG_BLOCK", "ENSURE_JAVA_ANNOTATION", "REMOVE_JAVA_ANNOTATION", "ENSURE_MAVEN_DEPENDENCY", "REMOVE_MAVEN_DEPENDENCY"] },
     "target": { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(/|$))(?!.*\\\\).+$" },
     "parameters": { "type": "object" },
     "payloadRef": { "type": ["string", "null"] }
@@ -21,7 +21,11 @@
     },
     {
       "if": { "properties": { "type": { "const": "REPLACE_MANAGED_FILE" } }, "required": ["type"] },
-      "then": { "properties": { "parameters": { "const": {} }, "payloadRef": { "type": "string", "pattern": "^payload/.+$" }, "target": { "enum": ["frontend/src/extensions/providers.ts", "frontend/src/extensions/rootRoutes.tsx", "frontend/src/extensions/systemPageRoutes.ts", "frontend/src/extensions/initializers.ts", "frontend/src/extensions/errorReporters.ts", "backend/src/main/resources/application.yml"] } } }
+      "then": { "properties": { "parameters": { "const": {} }, "payloadRef": { "type": "string", "pattern": "^payload/.+$" }, "target": { "enum": ["frontend/src/extensions/providers.ts", "frontend/src/extensions/rootRoutes.tsx", "frontend/src/extensions/systemPageRoutes.ts", "frontend/src/extensions/initializers.ts", "frontend/src/extensions/errorReporters.ts"] } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "UPSERT_MANAGED_CONFIG_BLOCK" } }, "required": ["type"] },
+      "then": { "properties": { "parameters": { "type": "object", "required": ["blockId"], "properties": { "blockId": { "enum": ["app-frontend", "login-auth"] } }, "additionalProperties": false }, "payloadRef": { "type": "string", "pattern": "^payload/.+$" }, "target": { "enum": ["frontend/.env", "backend/src/main/resources/application.yml"] } } }
     },
     {
       "if": { "properties": { "type": { "enum": ["ENSURE_JAVA_ANNOTATION", "REMOVE_JAVA_ANNOTATION"] } }, "required": ["type"] },

@@ -20,14 +20,13 @@ public final class ExtensionRelease {
     private final List<Map<String, Object>> errorReporters;
     private final List<String> applicationAnnotations;
     private final List<Map<String, Object>> mavenDependencies;
-    private final Map<String, Object> applicationYaml;
 
     public ExtensionRelease(String id, List<String> requires, Map<String, byte[]> frontendFiles,
                             Map<String, byte[]> backendFiles, Map<String, Object> defaultConfig,
                             List<Map<String, Object>> providers, List<Map<String, Object>> rootRoutes,
                             List<Map<String, Object>> pageRoutes, List<Map<String, Object>> initializers,
                             List<Map<String, Object>> errorReporters, List<String> applicationAnnotations,
-                            List<Map<String, Object>> mavenDependencies, Map<String, Object> applicationYaml) {
+                            List<Map<String, Object>> mavenDependencies) {
         this.id = id;
         this.requires = immutableList(requires);
         this.frontendFiles = immutableBytesMap(frontendFiles);
@@ -40,7 +39,6 @@ public final class ExtensionRelease {
         this.errorReporters = immutableMapList(errorReporters);
         this.applicationAnnotations = immutableList(applicationAnnotations);
         this.mavenDependencies = immutableMapList(mavenDependencies);
-        this.applicationYaml = immutableMap(applicationYaml);
     }
 
     private static List<String> immutableList(List<String> source) { return Collections.unmodifiableList(new ArrayList<String>(source)); }
@@ -52,17 +50,6 @@ public final class ExtensionRelease {
     private static Map<String, byte[]> immutableBytesMap(Map<String, byte[]> source) {
         Map<String, byte[]> result = new LinkedHashMap<String, byte[]>();
         for (Map.Entry<String, byte[]> entry : source.entrySet()) result.put(entry.getKey(), entry.getValue().clone());
-        return Collections.unmodifiableMap(result);
-    }
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> immutableMap(Map<String, Object> source) {
-        Map<String, Object> result = new LinkedHashMap<String, Object>();
-        for (Map.Entry<String, Object> entry : source.entrySet()) {
-            Object value = entry.getValue();
-            if (value instanceof Map) value = immutableMap((Map<String, Object>) value);
-            else if (value instanceof List) value = Collections.unmodifiableList(new ArrayList<Object>((List<Object>) value));
-            result.put(entry.getKey(), value);
-        }
         return Collections.unmodifiableMap(result);
     }
 
@@ -83,5 +70,4 @@ public final class ExtensionRelease {
     public List<Map<String, Object>> errorReporters() { return errorReporters; }
     public List<String> applicationAnnotations() { return applicationAnnotations; }
     public List<Map<String, Object>> mavenDependencies() { return mavenDependencies; }
-    public Map<String, Object> applicationYaml() { return applicationYaml; }
 }

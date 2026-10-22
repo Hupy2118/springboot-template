@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -50,6 +51,32 @@ final class PackageBuilder {
             manifest.put(payload.getKey(), value);
         }
         metadata.put("payloadManifest", manifest); metadata.put("nextTemplateState", result.nextState()); metadata.put("diagnostics", Collections.emptyList());
+        entries.put("extension-update-package.json", jsonBytes(metadata));
+        return zip(entries);
+    }
+
+    byte[] updatePackageV4(V3UpdateResult result) {
+        if (result.kind() != V3UpdateResult.Kind.CHANGE) throw packageError("update package requires changes");
+        Map<String, Object> metadata = new LinkedHashMap<String, Object>();
+        metadata.put("protocolVersion", "4");
+        metadata.put("packageId", "pkg-" + UUID.randomUUID().toString());
+        metadata.put("mode", result.mode());
+        metadata.put("sourceRevision", result.currentState().get("templateRevision"));
+        metadata.put("expectedStateSequence", result.currentState().getOrDefault("stateSequence", 0));
+        metadata.put("operations", result.operations());
+        metadata.put("validationPlan", Collections.emptyList());
+        Map<String, Object> manifest = new TreeMap<String, Object>();
+        Map<String, byte[]> entries = new TreeMap<String, byte[]>();
+        for (Map.Entry<String, byte[]> payload : result.payloads().entrySet()) {
+            if (!payload.getKey().startsWith("payload/") || !safe(payload.getKey())) throw packageError("unsafe payload path");
+            entries.put(payload.getKey(), payload.getValue());
+            Map<String, Object> value = new LinkedHashMap<String, Object>();
+            value.put("size", payload.getValue().length);
+            manifest.put(payload.getKey(), value);
+        }
+        metadata.put("payloadManifest", manifest);
+        metadata.put("nextTemplateState", result.nextState());
+        metadata.put("diagnostics", Collections.emptyList());
         entries.put("extension-update-package.json", jsonBytes(metadata));
         return zip(entries);
     }

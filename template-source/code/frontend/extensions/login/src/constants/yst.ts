@@ -13,30 +13,8 @@ export const YST: YstConfigType =
         LOGOUT_SHARE_JS: '',
         ENV: 'local'
       }
-    : process.env.WORKS_ENV === 'prd'
-      ? {
-          CLIENT_ID: '143fe77002c1444485dcd95808fdc5a7',
-          REDIRECT_URI: `${window.location.origin}/login`,
-          LOGOUT_URI: `${window.location.origin}/logout`,
-          HREF: 'https://oa-auth.paas.cmbchina.com/auth-server/auth',
-          END_URL: `https://oa-auth.paas.cmbchina.com/auth-server/endsession`,
-          RESPONSE_TYPE: 'code',
-          LOGOUT_SHARE_JS: 'https://oa-auth.paas.cmbchina.com/logout-share/js/logoutShare.js',
-          ENV: 'prod'
-        }
-      : process.env.WORKS_ENV === 'biz'
-        ? {
-            CLIENT_ID: '143fe77002c1444485dcd95808fdc5a7',
-            REDIRECT_URI: `${window.location.origin}/login`,
-            LOGOUT_URI: `${window.location.origin}/logout`,
-            HREF: 'https://oa-auth.paas.cmbchina.cn/auth-server/auth',
-            END_URL: `https://oa-auth.paas.cmbchina.cn/auth-server/endsession`,
-            RESPONSE_TYPE: 'code',
-            LOGOUT_SHARE_JS: 'https://oa-auth.paas.cmbchina.cn/logout-share/js/logoutShare.js',
-            ENV: 'biz'
-          }
-        : {
-            CLIENT_ID: '143fe77002c1444485dcd95808fdc5a7',
+    : {
+            CLIENT_ID: import.meta.env.PUBLIC_YHT_CLIENT_ID || '',
             REDIRECT_URI: `${window.location.origin}/login`,
             LOGOUT_URI: `${window.location.origin}/logout`,
             HREF: 'https://one-account-gateway.paasuat.cmbchina.cn/auth-server/auth',

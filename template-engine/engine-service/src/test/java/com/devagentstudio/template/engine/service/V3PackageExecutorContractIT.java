@@ -57,7 +57,7 @@ class V3PackageExecutorContractIT {
     private static final Set<String> MANAGED_REGISTRIES = new HashSet<String>(Arrays.asList(
             "frontend/src/extensions/providers.ts", "frontend/src/extensions/rootRoutes.tsx",
             "frontend/src/extensions/systemPageRoutes.ts", "frontend/src/extensions/initializers.ts",
-            "frontend/src/extensions/errorReporters.ts", "backend/src/main/resources/application.yml"));
+            "frontend/src/extensions/errorReporters.ts"));
     @Autowired private WebApplicationContext context;
 
     @DynamicPropertySource

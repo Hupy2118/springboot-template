@@ -30,10 +30,6 @@ function outputDirectory() {
   return candidate;
 }
 
-function isIgnoredSourceEntry(name) {
-  return name === '.DS_Store' || name === 'node_modules';
-}
-
 async function readManifest(directory) {
   const manifestPath = path.join(directory, 'extension.yaml');
   let manifest;
@@ -78,7 +74,7 @@ function validateManifest(manifest, manifestPath) {
 
 async function manifests() {
   const directories = (await readdir(extensionRoot, { withFileTypes: true }))
-    .filter((entry) => entry.isDirectory() && !isIgnoredSourceEntry(entry.name)).map((entry) => path.join(extensionRoot, entry.name));
+    .filter((entry) => entry.isDirectory()).map((entry) => path.join(extensionRoot, entry.name));
   const all = await Promise.all(directories.map(readManifest));
   const ids = new Set();
   for (const manifest of all) {
@@ -119,7 +115,7 @@ function selectExtensions(all, requested, disabled) {
 
 async function filesRecursively(directory, prefix = '') {
   const entries = await readdir(directory, { withFileTypes: true });
-  const nested = await Promise.all(entries.filter((entry) => !isIgnoredSourceEntry(entry.name)).sort((a, b) => a.name.localeCompare(b.name)).map(async (entry) => {
+  const nested = await Promise.all(entries.filter((entry) => !['node_modules', 'build'].includes(entry.name)).sort((a, b) => a.name.localeCompare(b.name)).map(async (entry) => {
     const relative = path.join(prefix, entry.name);
     return entry.isDirectory() ? filesRecursively(path.join(directory, entry.name), relative) : [relative];
   }));
@@ -236,7 +232,7 @@ async function assemble() {
   }
   await rm(destination, { recursive: true, force: true });
   await mkdir(destination, { recursive: true });
-  await cp(sourceRoot, destination, { recursive: true, filter: (source) => !isIgnoredSourceEntry(path.basename(source)) });
+  await cp(sourceRoot, destination, { recursive: true, filter: (candidate) => !['node_modules', 'build'].includes(path.basename(candidate)) });
   const owners = new Map((await filesRecursively(sourceRoot)).map((file) => [file, 'base']));
   for (const extension of selected) {
     const extensionSource = path.join(extension.directory, 'src');
@@ -245,7 +241,7 @@ async function assemble() {
       if (ASSEMBLY_MANAGED_FILES.has(target) || owners.has(target)) throw new AssemblyError('FILE_COLLISION', `${owners.get(target) || 'assembly'} and ${extension.id}: src/${file}`);
       owners.set(target, extension.id);
     }
-    await cp(extensionSource, path.join(destination, 'src'), { recursive: true, filter: (source) => !isIgnoredSourceEntry(path.basename(source)) });
+    await cp(extensionSource, path.join(destination, 'src'), { recursive: true, filter: (candidate) => !['node_modules', 'build'].includes(path.basename(candidate)) });
   }
   const providers = contributionList(selected, 'providers');
   const rootRouteContributions = contributionList(selected, 'rootRoutes');

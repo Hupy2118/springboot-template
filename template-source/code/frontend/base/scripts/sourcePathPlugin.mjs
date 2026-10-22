@@ -77,7 +77,7 @@ export async function transformSourcePath(code, fileName, rootDir) {
   return { code: result.code, map: result.map || null };
 }
 
-/** 创建开发服务器专用的 Vite 前置转换插件，并保持原 react() 插件配置不变。 */
+/** 兼容旧维护调用的开发服务器前置转换插件；Rsbuild 通过 sourcePathLoader.cjs 复用 transformSourcePath。 */
 export function sourcePathPlugin(options = {}) {
   const rootDir = options.rootDir || process.cwd();
   return {

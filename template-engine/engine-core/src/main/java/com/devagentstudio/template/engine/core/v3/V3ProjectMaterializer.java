@@ -1,7 +1,6 @@
 package com.devagentstudio.template.engine.core.v3;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -27,20 +26,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-    /** Deterministically materializes frontend and backend Base + Extension Runtime Source. */
+/** Deterministically materializes frontend and backend Base + Extension Runtime Source. */
 public final class V3ProjectMaterializer {
     public static final List<String> REGISTRY_TARGETS = Collections.unmodifiableList(Arrays.asList(
             "frontend/src/extensions/providers.ts", "frontend/src/extensions/rootRoutes.tsx",
             "frontend/src/extensions/systemPageRoutes.ts", "frontend/src/extensions/initializers.ts",
             "frontend/src/extensions/errorReporters.ts"));
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
     private final CodeTemplateRelease release;
 
     public V3ProjectMaterializer(CodeTemplateRelease release) { this.release = release; }
 
     /** 按固定路径组装当前双端源码、扩展注册表和路由契约。 */
-    public Map<String, byte[]> materialize(ExtensionResolver.ResolvedExtensions resolved) {
+    public Map<String, byte[]> materialize(ExtensionResolver.ResolvedExtensions resolved) { return materialize(resolved, null); }
+    public Map<String, byte[]> materialize(ExtensionResolver.ResolvedExtensions resolved, Map<String, Object> applicationConfig) {
         Map<String, byte[]> files = new LinkedHashMap<String, byte[]>();
         // 契约沿用既有工作区路径，供调用方在 Build 收尾读取。
         add(files, ".devagentstudio/template-contracts/", release.contracts());
@@ -54,11 +53,12 @@ public final class V3ProjectMaterializer {
         for (Map.Entry<String, byte[]> registry : registries(resolved).entrySet()) files.put(registry.getKey(), registry.getValue());
         projectAnnotations(files, resolved.order());
         projectMavenDependencies(files, resolved.order());
-        projectApplicationYaml(files, resolved.order());
+        ApplicationConfigProjector.applyToProject(files, applicationConfig);
         return files;
     }
 
-    public Map<String, Object> templateState(ExtensionResolver.ResolvedExtensions resolved) {
+    public Map<String, Object> templateState(ExtensionResolver.ResolvedExtensions resolved) { return templateState(resolved, null); }
+    public Map<String, Object> templateState(ExtensionResolver.ResolvedExtensions resolved, Map<String, Object> applicationConfig) {
         Map<String, Map<String, Object>> artifacts = new java.util.TreeMap<String, Map<String, Object>>();
         for (String id : resolved.order()) {
             ExtensionRelease extension = release.extensions().get(id);
@@ -69,6 +69,7 @@ public final class V3ProjectMaterializer {
         state.put("schemaVersion", 3); state.put("templateRevision", release.revision());
         state.put("requested", resolved.requested()); state.put("effective", resolved.effective());
         state.put("installedArtifacts", artifacts); state.put("managedContributions", resolved.managedContributions());
+        state.put("stateSequence", 0);
         return state;
     }
 
@@ -216,82 +217,6 @@ public final class V3ProjectMaterializer {
         if (original == null) throw sourceError("backend pom.xml is required for Maven contributions");
         try { files.put(path, utf8(transformPom(new String(original, StandardCharsets.UTF_8), dependencies))); }
         catch (Exception e) { throw new V3Exception("TEMPLATE_SOURCE_INVALID", "cannot project Maven dependencies: " + e.getMessage(), 500); }
-    }
-
-    @SuppressWarnings("unchecked")
-    private void projectApplicationYaml(Map<String, byte[]> files, List<String> order) {
-        String path = "backend/src/main/resources/application.yml";
-        boolean hasContribution = false;
-        for (String id : order) hasContribution |= !release.extensions().get(id).applicationYaml().isEmpty();
-        if (!hasContribution) return;
-        byte[] original = files.get(path);
-        if (original == null) throw sourceError("backend application.yml is required for YAML contributions");
-        try {
-            Object loaded = YAML.readValue(new String(original, StandardCharsets.UTF_8), Object.class);
-            if (!(loaded instanceof Map)) throw sourceError("backend application.yml root must be an object");
-            Map<String, Object> merged = copyObject((Map<String, Object>) loaded);
-            Map<String, Object> contributed = new LinkedHashMap<String, Object>();
-            for (String id : order) mergeYaml(merged, release.extensions().get(id).applicationYaml(), "", id, contributed);
-            files.put(path, utf8(YAML.writeValueAsString(merged)));
-        } catch (V3Exception e) {
-            throw e;
-        } catch (Exception e) {
-            throw sourceError("cannot project backend application.yml: " + e.getMessage());
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private void mergeYaml(Map<String, Object> target, Map<String, Object> source, String prefix, String owner,
-                           Map<String, Object> contributed) {
-        for (Map.Entry<String, Object> entry : source.entrySet()) {
-            String key = entry.getKey();
-            String path = prefix.isEmpty() ? key : prefix + "." + key;
-            Object incoming = entry.getValue();
-            Object existing = target.get(key);
-            if (incoming instanceof Map) {
-                if (existing == null) {
-                    Map<String, Object> nested = copyObject((Map<String, Object>) incoming);
-                    target.put(key, nested);
-                    markYamlLeaves(nested, path, owner, contributed);
-                } else if (existing instanceof Map) {
-                    mergeYaml((Map<String, Object>) existing, (Map<String, Object>) incoming, path, owner, contributed);
-                } else {
-                    throw yamlConflict(path, owner);
-                }
-            } else if (existing == null) {
-                target.put(key, incoming);
-                contributed.put(path, incoming);
-            } else if (!existing.equals(incoming)) {
-                throw yamlConflict(path, owner);
-            } else if (contributed.containsKey(path) && !contributed.get(path).equals(incoming)) {
-                throw yamlConflict(path, owner);
-            } else {
-                contributed.put(path, incoming);
-            }
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private void markYamlLeaves(Map<String, Object> value, String prefix, String owner, Map<String, Object> contributed) {
-        for (Map.Entry<String, Object> entry : value.entrySet()) {
-            String path = prefix + "." + entry.getKey();
-            if (entry.getValue() instanceof Map) markYamlLeaves((Map<String, Object>) entry.getValue(), path, owner, contributed);
-            else contributed.put(path, entry.getValue());
-        }
-    }
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> copyObject(Map<String, Object> source) {
-        Map<String, Object> result = new LinkedHashMap<String, Object>();
-        for (Map.Entry<String, Object> entry : source.entrySet()) {
-            Object value = entry.getValue();
-            if (value instanceof Map) value = copyObject((Map<String, Object>) value);
-            else if (value instanceof List) value = new ArrayList<Object>((List<Object>) value);
-            result.put(entry.getKey(), value);
-        }
-        return result;
-    }
-    private V3Exception yamlConflict(String path, String owner) {
-        return new V3Exception("APPLICATION_YAML_CONFLICT", "conflicting application.yml contribution at " + path + " from " + owner, 500);
     }
 
     private String transformPom(String content, Collection<Map<String, Object>> dependencies) throws Exception {
