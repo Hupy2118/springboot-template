@@ -56,12 +56,12 @@ Web Adapter / Bootstrap
 
 ## 受管扩展与配置
 
-- `common/config/CapabilityWebMvcConfiguration.java` 是平台受管的 Capability 拦截器入口。只允许模板引擎写入受管块，不要手工调整其锚点或注册顺序。
+- Authorization 使用 Extension 自有 `common/config/WebMvcConfiguration.java`；Login 认证由 Bee EnableAuthClient 接入，不恢复旧 Capability Anchor。
 - 跨域配置、MyBatis 分页和统一异常处理属于 Base 共享能力。业务 Capability 不应覆盖这些文件。
-- 本地数据库连接使用 `DB_URL`、`DB_USERNAME`、`DB_PASSWORD` 环境变量覆盖 `application.yml` 的默认值；不得在代码、测试或文档中存放真实凭据。
+- 数据库连接使用 Bee/TDSQL 的 `bee.persistence.ds1.datasource` 及 Profile 中的 `datasource.ds1.*`；不得在代码、测试或文档中存放真实凭据。
 
 ## 动态 Capability 文档
 
-每个启用的 Capability 会与其代码一同生成 `docs/capabilities/<capability>.md`。该文档说明该能力实际加入的接口、配置、拦截器、数据资产和维护边界。Capability 被禁用时，对应文档不会存在；不要将它当作 Base 的固定目录或手工维护的功能索引。
+每个启用的 Capability 会与其代码一同生成 `docs/<capability>.md`。该文档说明该能力实际加入的接口、配置、拦截器、数据资产和维护边界。Capability 被禁用时，对应文档不会存在；不要将它当作 Base 的固定目录或手工维护的功能索引。
 
 当上述目录职责、依赖方向、统一响应/异常处理方式或受管扩展面发生变化时，必须同步更新本文档。

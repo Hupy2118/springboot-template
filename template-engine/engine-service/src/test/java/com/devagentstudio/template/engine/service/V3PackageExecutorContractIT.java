@@ -154,9 +154,9 @@ class V3PackageExecutorContractIT {
                 if (operation.path("index").asInt(-1) != index || !ids.add(operation.path("operationId").asText()) || !safe(operation.path("target").asText()))
                     throw new Failure("PACKAGE_SCHEMA_INVALID");
                 String type = operation.path("type").asText();
-                if (!Arrays.asList("ADD_FILE", "REPLACE_MANAGED_FILE", "ENSURE_JAVA_ANNOTATION", "REMOVE_JAVA_ANNOTATION", "ENSURE_MAVEN_DEPENDENCY", "REMOVE_MAVEN_DEPENDENCY").contains(type)) throw new Failure("OPERATION_UNSUPPORTED");
+                if (!Arrays.asList("ADD_FILE", "REPLACE_MANAGED_FILE", "REPLACE_MANAGED_YAML", "ENSURE_JAVA_ANNOTATION", "REMOVE_JAVA_ANNOTATION", "ENSURE_MAVEN_DEPENDENCY", "REMOVE_MAVEN_DEPENDENCY").contains(type)) throw new Failure("OPERATION_UNSUPPORTED");
                 String payloadRef = operation.path("payloadRef").isNull() ? null : operation.path("payloadRef").asText();
-                if ("ADD_FILE".equals(type) || "REPLACE_MANAGED_FILE".equals(type)) {
+                if ("ADD_FILE".equals(type) || "REPLACE_MANAGED_FILE".equals(type) || "REPLACE_MANAGED_YAML".equals(type)) {
                     if (payloadRef == null || !payloads.containsKey(payloadRef) || !payloadRef.equals("payload/" + operation.path("target").asText())) throw new Failure("PACKAGE_SCHEMA_INVALID");
                 } else if (payloadRef != null) throw new Failure("PACKAGE_SCHEMA_INVALID");
             }
@@ -178,6 +178,9 @@ class V3PackageExecutorContractIT {
                 staged.put(target, payloads.get(operation.path("payloadRef").asText()).clone());
             } else if ("REPLACE_MANAGED_FILE".equals(type)) {
                 if (!MANAGED_REGISTRIES.contains(target)) throw new Failure("UNSAFE_TARGET_PATH");
+                staged.put(target, payloads.get(operation.path("payloadRef").asText()).clone());
+            } else if ("REPLACE_MANAGED_YAML".equals(type)) {
+                if (!Arrays.asList("backend/src/main/resources/application.yml", "backend/src/main/resources/application-dev.yml").contains(target)) throw new Failure("UNSAFE_TARGET_PATH");
                 staged.put(target, payloads.get(operation.path("payloadRef").asText()).clone());
             } else if (type.endsWith("JAVA_ANNOTATION")) {
                 applyAnnotation(staged, target, operation.path("parameters").path("annotationClass").asText(), type.startsWith("ENSURE_"));

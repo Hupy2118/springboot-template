@@ -26,4 +26,7 @@ interface ImportMetaEnv {
   readonly PUBLIC_APP_ICON: string;
   readonly PUBLIC_THEME_PRIMARY_COLOR: string;
   readonly PUBLIC_YHT_CLIENT_ID: string;
+  readonly PUBLIC_YHT_AUTHORIZE_URI: string;
+  readonly PUBLIC_YHT_END_URL: string;
+  readonly PUBLIC_YHT_LOGOUT_SHARE_JS: string;
 }

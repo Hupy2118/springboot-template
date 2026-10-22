@@ -44,7 +44,7 @@ public class EngineController {
         Map<String, Object> requested = EngineMapper.requestedConfig(request.get("requestedConfig"));
         @SuppressWarnings("unchecked") Map<String, Object> suppliedApplication = (Map<String, Object>) requested.remove("applicationConfig");
         ExtensionResolver.ResolvedExtensions resolved = resolver.resolve(requested);
-        Map<String, Object> application = ApplicationConfigProjector.resolve(suppliedApplication, resolved.requested());
+        Map<String, Object> application = ApplicationConfigProjector.resolve(suppliedApplication, resolved.effective());
         Map<String, byte[]> project = materializer.materialize(resolved, application);
         Map<String, Object> state = materializer.templateState(resolved, application);
         return zip(packages.generatedProject(project, state));
@@ -66,7 +66,7 @@ public class EngineController {
         @SuppressWarnings("unchecked") Map<String, Object> suppliedApplication = (Map<String, Object>) requested.remove("applicationConfig");
         ExtensionResolver.ResolvedExtensions resolved = resolver.resolve(requested);
         @SuppressWarnings("unchecked") Map<String, Object> previousApplication = (Map<String, Object>) current.get("managedConfiguration");
-        Map<String, Object> application = suppliedApplication == null ? previousApplication : ApplicationConfigProjector.resolve(suppliedApplication, resolved.requested());
+        Map<String, Object> application = suppliedApplication == null ? previousApplication : ApplicationConfigProjector.resolve(suppliedApplication, resolved.effective());
         V3UpdateResult result = v4 ? planner.planCapabilities(current, resolved, (String) rawMode)
                 : planner.plan(current, resolved, (String) rawMode, application);
         if (result.kind() == V3UpdateResult.Kind.NO_CHANGE) return ResponseEntity.noContent().build();

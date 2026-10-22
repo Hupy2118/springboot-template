@@ -160,7 +160,7 @@ public final class CodeTemplateReleaseLoader {
         JsonNode contributes = manifest.path("contributes");
         if (!contributes.isObject()) sourceError(partial.id + " backend contributes must be an object");
         Map<String, byte[]> files = new LinkedHashMap<String, byte[]>();
-        for (String child : Arrays.asList("src", "docs", "migrations")) {
+        for (String child : Arrays.asList("src", "docs", "migrations", "scripts", "sql")) {
             Path path = directory.resolve(child);
             if (Files.exists(path) || Files.isSymbolicLink(path)) {
                 if (Files.isSymbolicLink(path)) sourceError("symlink is not allowed: " + relative(path));
@@ -197,6 +197,15 @@ public final class CodeTemplateReleaseLoader {
             item.put("scope", scope);
             partial.dependencies.add(item);
         }
+        JsonNode applicationYaml = contributes.path("applicationYaml");
+        if (!applicationYaml.isMissingNode() && !applicationYaml.isObject()) sourceError(partial.id + ".contributes.applicationYaml must be an object");
+        if (applicationYaml.isObject()) partial.applicationYaml = objectMap(applicationYaml);
+        JsonNode profiles = contributes.path("applicationProfileYaml");
+        if (!profiles.isMissingNode() && !profiles.isObject()) sourceError(partial.id + ".contributes.applicationProfileYaml must be an object");
+        if (profiles.isObject()) {
+            java.util.Iterator<Map.Entry<String, JsonNode>> fields=profiles.fields();
+            while(fields.hasNext()) { Map.Entry<String,JsonNode> item=fields.next(); if(!item.getKey().matches("[A-Za-z0-9][A-Za-z0-9_-]*") || !item.getValue().isObject()) sourceError(partial.id + " has invalid application profile YAML"); partial.applicationProfileYaml.put(item.getKey(), objectMap(item.getValue())); }
+        }
     }
 
     private void validateExtensionRoot(Path directory, boolean frontend) throws IOException {
@@ -206,11 +215,10 @@ public final class CodeTemplateReleaseLoader {
                 if (Files.isSymbolicLink(child)) sourceError("symlink is not allowed: " + relative(child));
                 if (ignored(child, directory)) continue;
                 if ("extension.yaml".equals(name)) continue;
-                if (frontend && "src".equals(name) || !frontend && Arrays.asList("src", "docs", "migrations").contains(name)) {
+                if (frontend && "src".equals(name) || !frontend && Arrays.asList("src", "docs", "migrations", "scripts", "sql").contains(name)) {
                     if (!Files.isDirectory(child)) sourceError("expected extension source directory: " + relative(child));
                     continue;
                 }
-                if (!frontend && "scripts".equals(name) && Files.isDirectory(child)) continue;
                 sourceError("unexpected extension entry: " + relative(child));
             }
         }
@@ -380,6 +388,8 @@ public final class CodeTemplateReleaseLoader {
         private final Map<String, List<Map<String, Object>>> frontendContributions = new HashMap<String, List<Map<String, Object>>>();
         private final List<String> annotations = new ArrayList<String>();
         private final List<Map<String, Object>> dependencies = new ArrayList<Map<String, Object>>();
+        private Map<String,Object> applicationYaml = Collections.emptyMap();
+        private final Map<String,Map<String,Object>> applicationProfileYaml = new TreeMap<String,Map<String,Object>>();
         private PartialExtension(String id) { this.id = id; }
         private ExtensionRelease finish() {
             List<String> deps = requires == null ? Collections.<String>emptyList() : requires;
@@ -389,7 +399,7 @@ public final class CodeTemplateReleaseLoader {
                     frontendContributions.containsKey("pageRoutes") ? frontendContributions.get("pageRoutes") : Collections.<Map<String, Object>>emptyList(),
                     frontendContributions.containsKey("initializers") ? frontendContributions.get("initializers") : Collections.<Map<String, Object>>emptyList(),
                     frontendContributions.containsKey("errorReporters") ? frontendContributions.get("errorReporters") : Collections.<Map<String, Object>>emptyList(),
-                    annotations, dependencies);
+                    annotations, dependencies, applicationYaml, applicationProfileYaml);
         }
     }
 }

@@ -20,13 +20,16 @@ public final class ExtensionRelease {
     private final List<Map<String, Object>> errorReporters;
     private final List<String> applicationAnnotations;
     private final List<Map<String, Object>> mavenDependencies;
+    private final Map<String, Object> applicationYaml;
+    private final Map<String, Map<String, Object>> applicationProfileYaml;
 
     public ExtensionRelease(String id, List<String> requires, Map<String, byte[]> frontendFiles,
                             Map<String, byte[]> backendFiles, Map<String, Object> defaultConfig,
                             List<Map<String, Object>> providers, List<Map<String, Object>> rootRoutes,
                             List<Map<String, Object>> pageRoutes, List<Map<String, Object>> initializers,
                             List<Map<String, Object>> errorReporters, List<String> applicationAnnotations,
-                            List<Map<String, Object>> mavenDependencies) {
+                            List<Map<String, Object>> mavenDependencies, Map<String, Object> applicationYaml,
+                            Map<String, Map<String, Object>> applicationProfileYaml) {
         this.id = id;
         this.requires = immutableList(requires);
         this.frontendFiles = immutableBytesMap(frontendFiles);
@@ -39,6 +42,8 @@ public final class ExtensionRelease {
         this.errorReporters = immutableMapList(errorReporters);
         this.applicationAnnotations = immutableList(applicationAnnotations);
         this.mavenDependencies = immutableMapList(mavenDependencies);
+        this.applicationYaml = immutableObject(applicationYaml);
+        this.applicationProfileYaml = immutableObjectMap(applicationProfileYaml);
     }
 
     private static List<String> immutableList(List<String> source) { return Collections.unmodifiableList(new ArrayList<String>(source)); }
@@ -70,4 +75,8 @@ public final class ExtensionRelease {
     public List<Map<String, Object>> errorReporters() { return errorReporters; }
     public List<String> applicationAnnotations() { return applicationAnnotations; }
     public List<Map<String, Object>> mavenDependencies() { return mavenDependencies; }
+    public Map<String, Object> applicationYaml() { return applicationYaml; }
+    public Map<String, Map<String, Object>> applicationProfileYaml() { return applicationProfileYaml; }
+    @SuppressWarnings("unchecked") private static Map<String,Object> immutableObject(Map<String,Object> source) { Map<String,Object> output=new LinkedHashMap<String,Object>(); for(Map.Entry<String,Object> entry:source.entrySet()) { Object value=entry.getValue(); if(value instanceof Map) value=immutableObject((Map<String,Object>)value); else if(value instanceof List) value=Collections.unmodifiableList(new ArrayList<Object>((List<Object>)value)); output.put(entry.getKey(), value); } return Collections.unmodifiableMap(output); }
+    private static Map<String,Map<String,Object>> immutableObjectMap(Map<String,Map<String,Object>> source) { Map<String,Map<String,Object>> output=new LinkedHashMap<String,Map<String,Object>>(); for(Map.Entry<String,Map<String,Object>> entry:source.entrySet()) output.put(entry.getKey(), immutableObject(entry.getValue())); return Collections.unmodifiableMap(output); }
 }

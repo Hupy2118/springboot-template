@@ -40,8 +40,8 @@ class V3JsonSchemaContractTest {
 
         JsonNode operation = read("operation.schema.json");
         JsonNode types = operation.at("/properties/type/enum");
-        assertEquals(7, types.size());
-        for (String expected : Arrays.asList("ADD_FILE", "REPLACE_MANAGED_FILE", "UPSERT_MANAGED_CONFIG_BLOCK", "ENSURE_JAVA_ANNOTATION",
+        assertEquals(8, types.size());
+        for (String expected : Arrays.asList("ADD_FILE", "REPLACE_MANAGED_FILE", "REPLACE_MANAGED_YAML", "UPSERT_MANAGED_CONFIG_BLOCK", "ENSURE_JAVA_ANNOTATION",
                 "REMOVE_JAVA_ANNOTATION", "ENSURE_MAVEN_DEPENDENCY", "REMOVE_MAVEN_DEPENDENCY")) {
             assertTrue(contains(types, expected), expected);
         }
@@ -72,6 +72,8 @@ class V3JsonSchemaContractTest {
         assertFalse(schema.at("/$defs/payloadMetadata/properties").has("sha256"));
         JsonNode operation = readV4("operation.schema.json");
         assertFalse(contains(operation.at("/properties/type/enum"), "UPSERT_MANAGED_CONFIG_BLOCK"));
+        assertTrue(contains(operation.at("/properties/type/enum"), "ENSURE_CAPABILITY_CONFIG"));
+        assertTrue(operation.toString().contains("capabilityConfigParameters"));
         JsonNode nextState = readV4("template-state.schema.json");
         assertTrue(contains(nextState.path("required"), "stateSequence"));
         assertFalse(nextState.path("properties").has("managedConfiguration"));

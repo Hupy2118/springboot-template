@@ -44,6 +44,8 @@ public final class V3UpdatePlanner {
         if (effective.keySet().equals(resolved.effective().keySet())) return V3UpdateResult.noChange(current);
         Map<String, Map<String, Object>> nextArtifacts = new TreeMap<String, Map<String, Object>>(artifacts);
         List<OperationDraft> operations = new ArrayList<OperationDraft>();
+        List<String> newCapabilityIds = new ArrayList<String>();
+        for (String id : resolved.order()) if (!effective.containsKey(id)) newCapabilityIds.add(id);
         for (Map.Entry<String, Map<String, Object>> item : artifactStates(resolved.order()).entrySet()) {
             if (artifacts.containsKey(item.getKey())) continue;
             String target = (String) item.getValue().get("target");
@@ -52,6 +54,7 @@ public final class V3UpdatePlanner {
             nextArtifacts.put(item.getKey(), item.getValue());
             operations.add(OperationDraft.add(item.getKey(), target, artifactBytes(item.getKey())));
         }
+        operations.addAll(capabilityConfigOperations(newCapabilityIds));
         Map<String, Map<String, Object>> nextContributions = deepContributions(resolved.managedContributions());
         for (Map.Entry<String, Map<String, Object>> item : contributions.entrySet()) {
             Map<String, Object> next = nextContributions.get(item.getKey());
@@ -67,6 +70,39 @@ public final class V3UpdatePlanner {
         if (sequence == Long.MAX_VALUE) throw new V3Exception("TEMPLATE_STATE_INVALID", "stateSequence is exhausted", 409);
         next.put("stateSequence", sequence + 1);
         return compile(current, next, mode, operations);
+    }
+
+    /** V4 config payloads are extension fragments, never reconstructed project files or user values. */
+    private List<OperationDraft> capabilityConfigOperations(List<String> ids) {
+        Map<String, Object> application = new LinkedHashMap<String, Object>();
+        Map<String, Object> dev = new LinkedHashMap<String, Object>();
+        List<String> applicationOwners = new ArrayList<String>();
+        List<String> devOwners = new ArrayList<String>();
+        boolean login = false;
+        for (String id : ids) {
+            ExtensionRelease extension = release.extensions().get(id);
+            if (!extension.applicationYaml().isEmpty()) { mergeConfig(application, extension.applicationYaml(), ""); applicationOwners.add(id); }
+            Map<String, Object> profile = extension.applicationProfileYaml().get("dev");
+            if (profile != null && !profile.isEmpty()) { mergeConfig(dev, profile, ""); devOwners.add(id); }
+            if ("login".equals(id)) login = true;
+        }
+        List<OperationDraft> result = new ArrayList<OperationDraft>();
+        if (!application.isEmpty()) result.add(OperationDraft.capabilityConfig("backend/src/main/resources/application.yml", "yaml", applicationOwners, ApplicationConfigProjector.dump(application)));
+        if (!dev.isEmpty()) result.add(OperationDraft.capabilityConfig("backend/src/main/resources/application-dev.yml", "yaml", devOwners, ApplicationConfigProjector.dump(dev)));
+        if (login) result.add(OperationDraft.capabilityConfig(ApplicationConfigProjector.FRONTEND_TARGET, "dotenv", Collections.singletonList("login"), ApplicationConfigProjector.loginEnvDefaults(dev)));
+        return result;
+    }
+    @SuppressWarnings("unchecked") private void mergeConfig(Map<String, Object> target, Map<String, Object> source, String prefix) {
+        for (Map.Entry<String, Object> entry : source.entrySet()) {
+            String path = prefix.isEmpty() ? entry.getKey() : prefix + "." + entry.getKey();
+            Object incoming = entry.getValue(); Object existing = target.get(entry.getKey());
+            if (incoming instanceof Map) {
+                if (existing == null) { Map<String, Object> copy = new LinkedHashMap<String, Object>(); mergeConfig(copy, (Map<String, Object>) incoming, path); target.put(entry.getKey(), copy); }
+                else if (existing instanceof Map) mergeConfig((Map<String, Object>) existing, (Map<String, Object>) incoming, path);
+                else throw packageError("capability configuration conflict: " + path);
+            } else if (existing == null) target.put(entry.getKey(), incoming);
+            else if (!existing.equals(incoming)) throw packageError("capability configuration conflict: " + path);
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -115,6 +151,7 @@ public final class V3UpdatePlanner {
             if (stateChanged) throw new V3Exception("RECONCILE_STATE_CHANGE_REQUIRED", "RECONCILE cannot change TemplateState", 409);
             List<OperationDraft> repair = new ArrayList<OperationDraft>();
             for (String target : REGISTRIES) repair.add(OperationDraft.replace(target, registryBytes(resolved, target)));
+            for (String target : yamlTargets(resolved)) repair.add(OperationDraft.replaceYaml(target, projectBytes(resolved, target)));
             for (Map.Entry<String, Map<String, Object>> item : currentContributions.entrySet()) repair.add(ensure(item.getKey(), item.getValue()));
             repair.addAll(configOperations(currentApplication));
             return compile(current, current, mode, repair);
@@ -125,7 +162,10 @@ public final class V3UpdatePlanner {
         operations.addAll(diffContributions(currentContributions, targetContributions));
         operations.addAll(adds);
         boolean projectionChanged = releaseChanged || !currentEffective.keySet().equals(resolved.effective().keySet());
-        if (projectionChanged) for (String target : REGISTRIES) operations.add(OperationDraft.replace(target, registryBytes(resolved, target)));
+        if (projectionChanged) {
+            for (String target : REGISTRIES) operations.add(OperationDraft.replace(target, registryBytes(resolved, target)));
+            for (String target : yamlTargets(resolved)) operations.add(OperationDraft.replaceYaml(target, projectBytes(resolved, target)));
+        }
         if (configurationChanged) operations.addAll(configOperations(applicationConfig));
         return compile(current, nextState, mode, operations);
     }
@@ -154,6 +194,14 @@ public final class V3UpdatePlanner {
         byte[] value = "frontend".equals(parts[0]) ? extension.frontendFiles().get(parts[2]) : extension.backendFiles().get(parts[2]);
         if (value == null) throw packageError("Artifact source disappeared: " + artifactId);
         return value;
+    }
+    private List<String> yamlTargets(ExtensionResolver.ResolvedExtensions resolved) {
+        java.util.Set<String> targets=new java.util.TreeSet<String>();
+        for(String id:resolved.order()) { ExtensionRelease extension=release.extensions().get(id); if(!extension.applicationYaml().isEmpty()) targets.add("backend/src/main/resources/application.yml"); for(String profile:extension.applicationProfileYaml().keySet()) targets.add("backend/src/main/resources/application-" + profile + ".yml"); }
+        return new ArrayList<String>(targets);
+    }
+    private byte[] projectBytes(ExtensionResolver.ResolvedExtensions resolved, String target) {
+        byte[] value=new V3ProjectMaterializer(release).materialize(resolved).get(target); if(value==null) throw packageError("YAML projection source disappeared: " + target); return value;
     }
 
     private List<OperationDraft> diffContributions(Map<String, Map<String, Object>> current,
@@ -224,10 +272,8 @@ public final class V3UpdatePlanner {
     }
     private boolean sameNullable(Object left, Object right) { return left == null ? right == null : left.equals(right); }
     private List<OperationDraft> configOperations(Map<String, Object> applicationConfig) {
-        List<OperationDraft> result = new ArrayList<OperationDraft>();
-        for (Map.Entry<String, byte[]> item : ApplicationConfigProjector.project(Collections.<String, byte[]>emptyMap(), applicationConfig).entrySet())
-            result.add(OperationDraft.config(item.getKey(), item.getKey().equals(ApplicationConfigProjector.FRONTEND_TARGET) ? "app-frontend" : "login-auth", item.getValue()));
-        return result;
+        if (applicationConfig == null) return Collections.emptyList();
+        throw new V3Exception("CONFIG_TARGET_CONFLICT", "V3 application configuration refresh is unsupported; use local parameter updates", 409);
     }
 
     private V3UpdateResult compile(Map<String, Object> current, Map<String, Object> next, String mode, List<OperationDraft> drafts) {
@@ -278,6 +324,9 @@ public final class V3UpdatePlanner {
         private static OperationDraft replace(String target, byte[] payload) {
             return new OperationDraft("REPLACE_MANAGED_FILE", "replace-managed:" + target, target, 4, Collections.<String, Object>emptyMap(), payload);
         }
+        private static OperationDraft replaceYaml(String target, byte[] payload) {
+            return new OperationDraft("REPLACE_MANAGED_YAML", "replace-managed-yaml:" + target, target, 4, Collections.<String, Object>emptyMap(), payload);
+        }
         private static OperationDraft contribution(String type, String id, String target, Map<String, Object> parameters) {
             int phase = type.startsWith("REMOVE_") ? 0 : "ENSURE_MAVEN_DEPENDENCY".equals(type) ? 2 : 3;
             return new OperationDraft(type, id, target, phase, new LinkedHashMap<String, Object>(parameters), null);
@@ -285,6 +334,11 @@ public final class V3UpdatePlanner {
         private static OperationDraft config(String target, String blockId, byte[] payload) {
             Map<String, Object> parameters = new LinkedHashMap<String, Object>(); parameters.put("blockId", blockId);
             return new OperationDraft("UPSERT_MANAGED_CONFIG_BLOCK", "upsert-config:" + target, target, 4, parameters, payload);
+        }
+        private static OperationDraft capabilityConfig(String target, String format, List<String> capabilityIds, byte[] payload) {
+            Map<String, Object> parameters = new LinkedHashMap<String, Object>();
+            parameters.put("format", format); parameters.put("capabilityIds", new ArrayList<String>(capabilityIds));
+            return new OperationDraft("ENSURE_CAPABILITY_CONFIG", "ensure-config:" + target, target, 4, parameters, payload);
         }
     }
 }

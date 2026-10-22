@@ -2,10 +2,8 @@ package com.cmbchina.backend.auth.bootstrap;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -48,8 +46,14 @@ public final class AuthorizationBootstrapCommand {
      */
     public static void main(String[] args) {
         try {
-            Arguments arguments = Arguments.parse(args);
+            Arguments arguments = Arguments.parse(scriptArguments(args));
             BootstrapInput input = loadBootstrapInput(arguments.technicalPlan, arguments.application);
+            BootstrapDataSource.Settings yamlSettings = BootstrapDataSource.load(arguments.applicationYml, arguments.profile);
+            splitDdl(arguments.ddl);
+            String dbUrl = firstNonBlank(arguments.dbUrl, yamlSettings.url);
+            String dbUser = firstNonBlank(arguments.dbUser, yamlSettings.username);
+            if (!dbUrl.startsWith("jdbc:tdsql-mysql://") || dbUser.trim().isEmpty())
+                throw new BootstrapException("Bootstrap 必须使用有效的 Bee/TDSQL 数据源");
             if (arguments.dryRun) {
                 System.out.printf(
                         "Dry-run 成功：fingerprint=%s，resources=%d，initialAdministrators=%d，业务 role_resource 将不会初始化%n",
@@ -57,10 +61,7 @@ public final class AuthorizationBootstrapCommand {
                 return;
             }
 
-            DataSourceSettings yamlSettings = loadDataSourceSettings(arguments.applicationYml);
-            Class.forName("com.mysql.cj.jdbc.Driver");
-            String dbUrl = firstNonBlank(arguments.dbUrl, yamlSettings.url);
-            String dbUser = firstNonBlank(arguments.dbUser, yamlSettings.username);
+            Class.forName(yamlSettings.driver);
             String dbPassword = yamlSettings.password == null ? "" : yamlSettings.password;
 
             try (Connection connection = DriverManager.getConnection(dbUrl, dbUser, dbPassword)) {
@@ -70,7 +71,7 @@ public final class AuthorizationBootstrapCommand {
             System.err.println("Bootstrap 失败：" + exception.getMessage());
             System.exit(2);
         } catch (Exception exception) {
-            System.err.println("Bootstrap 失败：" + exception.getClass().getSimpleName() + ": " + exception.getMessage());
+            System.err.println("Bootstrap 失败：" + exception.getClass().getSimpleName());
             System.exit(3);
         }
     }
@@ -83,21 +84,24 @@ public final class AuthorizationBootstrapCommand {
             technicalPlan = mapper.readTree(technicalPlanPath.toFile());
             application = mapper.readTree(applicationPath.toFile());
         } catch (IOException exception) {
-            throw new BootstrapException("无法读取初始化输入 JSON：" + exception.getMessage(), exception);
+            throw new BootstrapException("无法读取初始化输入 JSON", exception);
         }
 
-        if (!"confirmed".equals(textValue(technicalPlan.get("confirmation_status")))) {
+        if (!"technical-plan".equals(textValue(technicalPlan.get("artifact_type")))
+                || !"confirmed".equals(textValue(technicalPlan.get("confirmation_status")))) {
             throw new BootstrapException("TechnicalPlan 尚未确认，拒绝初始化权限数据");
         }
         JsonNode manifest = technicalPlan.get("authorization_manifest");
         if (manifest == null || !manifest.isObject()) {
             throw new BootstrapException("TechnicalPlan.authorization_manifest 缺失");
         }
-        if (!"authorization-manifest.v2".equals(textValue(manifest.get("schema_version")))) {
-            throw new BootstrapException("仅支持 authorization-manifest.v2");
+        if (!"authorization-manifest.v3".equals(textValue(manifest.get("schema_version")))) {
+            throw new BootstrapException("仅支持 authorization-manifest.v3");
         }
-        if (!manifest.path("enabled").asBoolean(false)) {
-            throw new BootstrapException("authorization_manifest.enabled 不是 true");
+        JsonNode system = manifest.path("systemAuthorization");
+        if (!"system_admin".equals(textValue(system.get("adminRoleSeedKey")))
+                || !SYSTEM_MANAGEMENT_RESOURCE.equals(textValue(system.get("managementResourceKey")))) {
+            throw new BootstrapException("systemAuthorization 必须指定 system_admin 与 system_authorization_management");
         }
 
         JsonNode resourceNodes = manifest.get("resources");
@@ -119,7 +123,16 @@ public final class AuthorizationBootstrapCommand {
                     optionalText(item.get("description"), prefix + ".description", 128),
                     requiredText(item.get("origin"), prefix + ".origin", 32),
                     optionalText(item.get("type"), prefix + ".type", 32),
-                    optionalText(item.get("targetResourceRef"), prefix + ".targetResourceRef", 255));
+                    requiredText(item.get("targetResourceRef"), prefix + ".targetResourceRef", 255));
+            if (!resource.key.matches("[a-z][a-z0-9]*(?:_[a-z0-9]+)*")
+                    || !("system".equals(resource.origin) || "business".equals(resource.origin))) {
+                throw new BootstrapException("资源键或 origin 非法");
+            }
+            if (!SYSTEM_MANAGEMENT_RESOURCE.equals(resource.key)
+                    && (!"business".equals(resource.origin)
+                    || !("page".equals(resource.type) || "operation".equals(resource.type)))) {
+                throw new BootstrapException("业务资源必须为 business/page 或 business/operation");
+            }
             if (!resourceKeys.add(resource.key)) {
                 throw new BootstrapException("manifest 存在重复 resourceKey：" + resource.key);
             }
@@ -129,14 +142,21 @@ public final class AuthorizationBootstrapCommand {
                     throw new BootstrapException("system_authorization_management 必须为 origin=system,type=system");
                 }
             }
+            if (("system".equals(resource.type) && !"system:authorization_management".equals(resource.targetResourceRef))
+                    || ("page".equals(resource.type) && !("page:" + resource.key).equals(resource.targetResourceRef))
+                    || ("operation".equals(resource.type) && !resource.targetResourceRef.matches("action:[a-z][a-z0-9_]*:[a-z][a-z0-9_]*"))) {
+                throw new BootstrapException("资源 targetResourceRef 与 type 不匹配");
+            }
             resources.add(resource);
         }
         if (systemResourceCount != 1) {
             throw new BootstrapException("manifest 必须恰好包含一个 system_authorization_management");
         }
 
+        validateDefaultRoles(manifest.path("defaultRoleAuthorization"), resourceKeys);
+
         JsonNode authorization = application.get("authorization");
-        if (authorization == null || !authorization.isObject() || !authorization.path("enabled").asBoolean(false)) {
+        if (authorization == null || !authorization.isObject() || !authorization.path("enabled").isBoolean() || !authorization.path("enabled").asBoolean(false)) {
             throw new BootstrapException("application.authorization.enabled 不是 true");
         }
         JsonNode subjectNodes = authorization.get("initialAdministratorSubjects");
@@ -155,7 +175,35 @@ public final class AuthorizationBootstrapCommand {
         }
 
         String fingerprint = requiredText(manifest.get("fingerprint"), "manifest.fingerprint", 128);
+        if (!fingerprint.matches("sha256:[0-9a-f]{64}")) throw new BootstrapException("manifest.fingerprint 格式非法");
         return new BootstrapInput(resources, subjects, fingerprint);
+    }
+
+    /** Validate business grants, but leave their persistence to a separately modelled workflow. */
+    private static void validateDefaultRoles(JsonNode defaults, Set<String> resources) {
+        if (!defaults.isObject() || !defaults.path("roles").isArray() || !defaults.path("roleResourceGrants").isArray())
+            throw new BootstrapException("defaultRoleAuthorization 必须包含 roles 与 roleResourceGrants 数组");
+        Set<String> roles = new HashSet<String>();
+        for (JsonNode role : defaults.path("roles")) {
+            String key = requiredText(role.get("roleSeedKey"), "roleSeedKey", 64);
+            requiredText(role.get("name"), "role.name", 32);
+            optionalText(role.get("description"), "role.description", 128);
+            if ("system_admin".equals(key) || "SYSTEM_ADMIN".equals(key) || !roles.add(key))
+                throw new BootstrapException("业务角色 seed key 重复或占用系统角色");
+        }
+        Set<String> granted = new HashSet<String>();
+        for (JsonNode grant : defaults.path("roleResourceGrants")) {
+            String key = requiredText(grant.get("roleSeedKey"), "grant.roleSeedKey", 64);
+            if (!roles.contains(key) || !granted.add(key) || !grant.path("resourceKeys").isArray())
+                throw new BootstrapException("业务角色授权引用非法");
+            Set<String> unique = new HashSet<String>();
+            for (JsonNode resource : grant.path("resourceKeys")) {
+                String resourceKey = requiredText(resource, "grant.resourceKey", 64);
+                if (!resources.contains(resourceKey) || SYSTEM_MANAGEMENT_RESOURCE.equals(resourceKey) || !unique.add(resourceKey))
+                    throw new BootstrapException("业务角色授权资源非法");
+            }
+        }
+        if (!roles.isEmpty()) System.out.println("业务默认角色与授权已校验，本命令不会写入这些数据");
     }
 
     private static String textValue(JsonNode value) {
@@ -198,66 +246,18 @@ public final class AuthorizationBootstrapCommand {
         return "";
     }
 
-    private static DataSourceSettings loadDataSourceSettings(Path applicationYml) {
-        if (!Files.isRegularFile(applicationYml)) {
-            throw new BootstrapException("后端数据库配置文件不存在：" + applicationYml);
+    // Numbered environment variables preserve spaces/quotes across Maven and both shells.
+    private static String[] scriptArguments(String[] args) {
+        String count = System.getenv("AUTHORIZATION_BOOTSTRAP_ARGUMENT_COUNT");
+        if (count == null) return args;
+        int size = Integer.parseInt(count);
+        if (size < 0 || size > 100) throw new BootstrapException("脚本参数数量非法");
+        String[] result = new String[size];
+        for (int i = 0; i < size; i++) {
+            result[i] = System.getenv("AUTHORIZATION_BOOTSTRAP_ARGUMENT_" + i);
+            if (result[i] == null) throw new BootstrapException("脚本参数缺失");
         }
-        Map<?, ?> root;
-        try (InputStream input = Files.newInputStream(applicationYml)) {
-            Object loaded = new Yaml().load(input);
-            if (!(loaded instanceof Map)) {
-                throw new BootstrapException("application.yml 根节点必须是对象");
-            }
-            root = (Map<?, ?>) loaded;
-        } catch (IOException exception) {
-            throw new BootstrapException("无法读取后端数据库配置：" + applicationYml, exception);
-        }
-        Map<?, ?> spring = childMap(root, "spring");
-        Map<?, ?> datasource = childMap(spring, "datasource");
-        String url = resolveEnvironmentPlaceholder(stringValue(datasource.get("url"), "spring.datasource.url"));
-        String username = resolveEnvironmentPlaceholder(
-                stringValue(datasource.get("username"), "spring.datasource.username"));
-        String password = resolveEnvironmentPlaceholder(
-                stringValue(datasource.get("password"), "spring.datasource.password"));
-        if (url == null || url.trim().isEmpty()) {
-            throw new BootstrapException("application.yml 缺少 spring.datasource.url");
-        }
-        if (username == null || username.trim().isEmpty()) {
-            throw new BootstrapException("application.yml 缺少 spring.datasource.username");
-        }
-        return new DataSourceSettings(url, username, password);
-    }
-
-    private static Map<?, ?> childMap(Map<?, ?> parent, String key) {
-        Object child = parent.get(key);
-        if (!(child instanceof Map)) {
-            throw new BootstrapException("application.yml 缺少对象节点：" + key);
-        }
-        return (Map<?, ?>) child;
-    }
-
-    private static String stringValue(Object value, String field) {
-        if (!(value instanceof String)) {
-            throw new BootstrapException("application.yml 的 " + field + " 必须是字符串");
-        }
-        return (String) value;
-    }
-
-    private static String resolveEnvironmentPlaceholder(String value) {
-        if (!value.startsWith("${") || !value.endsWith("}")) {
-            return value;
-        }
-        String expression = value.substring(2, value.length() - 1);
-        int separator = expression.indexOf(':');
-        String variable = separator >= 0 ? expression.substring(0, separator) : expression;
-        String environmentValue = System.getenv(variable);
-        if (environmentValue != null) {
-            return environmentValue;
-        }
-        if (separator >= 0) {
-            return expression.substring(separator + 1);
-        }
-        throw new BootstrapException("缺少 application.yml 引用的环境变量：" + variable);
+        return result;
     }
 
     private static Map<String, Set<String>> requiredColumns() {
@@ -360,7 +360,7 @@ public final class AuthorizationBootstrapCommand {
                 statement.setString(1, LOCK_NAME);
                 statement.executeQuery();
             } catch (SQLException exception) {
-                System.err.println("警告：释放 Bootstrap 锁失败：" + exception.getMessage());
+                System.err.println("警告：释放 Bootstrap 锁失败：" + exception.getClass().getSimpleName());
             }
         }
 
@@ -572,16 +572,18 @@ public final class AuthorizationBootstrapCommand {
         private final Path application;
         private final Path ddl;
         private final Path applicationYml;
+        private final String profile;
         private final String dbUrl;
         private final String dbUser;
         private final boolean dryRun;
 
         private Arguments(Path technicalPlan, Path application, Path ddl, Path applicationYml,
-                          String dbUrl, String dbUser, boolean dryRun) {
+                          String dbUrl, String dbUser, boolean dryRun, String profile) {
             this.technicalPlan = technicalPlan;
             this.application = application;
             this.ddl = ddl;
             this.applicationYml = applicationYml;
+            this.profile = profile;
             this.dbUrl = dbUrl;
             this.dbUser = dbUser;
             this.dryRun = dryRun;
@@ -590,10 +592,11 @@ public final class AuthorizationBootstrapCommand {
         private static Arguments parse(String[] args) {
             Path backend = Paths.get("").toAbsolutePath().normalize();
             Path demo = backend.getParent();
-            Path technicalPlan = demo.resolve(".xcodeagent/plans/technical-plan.json");
-            Path application = demo.resolve(".xcodeagent/application.json");
-            Path ddl = backend.resolve("docs/auth/sql/ddl.sql");
+            Path technicalPlan = demo.resolve(".devagentstudio/plans/technical-plan.json");
+            Path application = demo.resolve(".devagentstudio/application.json");
+            Path ddl = backend.resolve("sql/authorization/schema.sql");
             Path applicationYml = backend.resolve("src/main/resources/application.yml");
+            String profile = null;
             String dbUrl = null;
             String dbUser = null;
             boolean dryRun = false;
@@ -608,28 +611,18 @@ public final class AuthorizationBootstrapCommand {
                     ddl = Paths.get(argument.substring("--ddl=".length()));
                 } else if (argument.startsWith("--application-yml=")) {
                     applicationYml = Paths.get(argument.substring("--application-yml=".length()));
+                } else if (argument.startsWith("--profile=")) {
+                    profile = argument.substring("--profile=".length());
                 } else if (argument.startsWith("--db-url=")) {
                     dbUrl = argument.substring("--db-url=".length());
                 } else if (argument.startsWith("--db-user=")) {
                     dbUser = argument.substring("--db-user=".length());
                 } else {
-                    throw new BootstrapException("未知参数：" + argument);
+                    throw new BootstrapException("未知 Bootstrap 参数");
                 }
             }
             return new Arguments(technicalPlan, application, ddl, applicationYml,
-                    dbUrl, dbUser, dryRun);
-        }
-    }
-
-    private static final class DataSourceSettings {
-        private final String url;
-        private final String username;
-        private final String password;
-
-        private DataSourceSettings(String url, String username, String password) {
-            this.url = url;
-            this.username = username;
-            this.password = password;
+                    dbUrl, dbUser, dryRun, profile);
         }
     }
 

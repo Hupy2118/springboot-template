@@ -17,10 +17,10 @@ export const YST: YstConfigType =
             CLIENT_ID: import.meta.env.PUBLIC_YHT_CLIENT_ID || '',
             REDIRECT_URI: `${window.location.origin}/login`,
             LOGOUT_URI: `${window.location.origin}/logout`,
-            HREF: 'https://one-account-gateway.paasuat.cmbchina.cn/auth-server/auth',
-            END_URL: `https://one-account-gateway.paasuat.cmbchina.cn/auth-server/endsession`,
+            HREF: import.meta.env.PUBLIC_YHT_AUTHORIZE_URI || '',
+            END_URL: import.meta.env.PUBLIC_YHT_END_URL || '',
             RESPONSE_TYPE: 'code',
-            LOGOUT_SHARE_JS: 'https://one-account-gateway.paasuat.cmbchina.cn/logout-share/js/logoutShare.js',
+            LOGOUT_SHARE_JS: import.meta.env.PUBLIC_YHT_LOGOUT_SHARE_JS || '',
             ENV: 'test'
           };
 

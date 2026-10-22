@@ -1,19 +1,16 @@
 server:
   port: 8080
-
 bee:
   enableMybatisPlus: true
   persistence:
-    xcode-agent:
+    ds1:
       mapperscan:
         packages: com.cmbchina
-      #      mybatis:
-      #        mapper-locations: classpath:mapper/**/*.xml
       datasource:
         driver-class-name: com.tencentcloud.tdsql.mysql.cj.jdbc.Driver
-        url: jdbc:tdsql-mysql://${xcode-agent.db.url}:${xcode-agent.db.port}/${xcode-agent.db.schema}?passwordCharacterEncoding=latin1&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useUnicode=true&useSSL=false&connectTimeout=10000&socketTimeout=600000&tdsqlSendClientInfoEnable=true
-        username: ${xcode-agent.db.username}
-        password: ${xcode-agent.db.password}
+        url: jdbc:tdsql-mysql://${datasource.ds1.url}:${datasource.ds1.port}/${datasource.ds1.schema}?passwordCharacterEncoding=latin1&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useUnicode=true&useSSL=false&connectTimeout=10000&socketTimeout=600000&tdsqlSendClientInfoEnable=true
+        username: ${datasource.ds1.username}
+        password: ${datasource.ds1.password}
         test-on-borrow: true
         test-while-idle: true
         time-between-eviction-runs-millis: 5000
@@ -32,7 +29,6 @@ bee:
   tracing:
     businessIds:
       LT5406A001B001C001D001: /api
-
 module:
   httpClient:
     maxTotal: 200
@@ -40,11 +36,3 @@ module:
     connectionRequestTimeoutInMilliseconds: 3000
     connectionTimeoutInMilliseconds: 3000
     socketTimeoutInMilliseconds: 30000
-
-xcode-agent:
-  db:
-    url: 127.0.0.1
-    port: 3306
-    schema: xcode
-    username: root
-    password:

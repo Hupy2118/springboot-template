@@ -5,10 +5,9 @@
 本文适用于 `template-source/code/backend` 的维护者。此目录是后端模板的
 **新开发维护模型**，用来组合和验证 Base、Login、Authorization 等 Extension。
 
-当前 Template Engine 仍消费旧的 `template-source/base/backend`、
-`template-source/capabilities/*/backend` 与 Strategy Registry。因此，完成本目录
-的维护与验证并不等同于将变更发布到现有 Engine；两套目录的过渡并存是当前阶段
-的既定边界，禁止通过脚本双写或手工同步它们。
+Template Engine 仅消费 `template-source/code` 下的 Base、Extension、contracts 和 Revision。Assembly、workspace、profiles 属于维护工具，不是 Runtime Release Inputs；不恢复旧 V2 Registry/Anchor。唯一维护开发指南是仓库根目录 `docs/DEVELOPMENT_GUIDE.md`，本文仅保留后端入口说明。
+
+Authorization 的 src/docs/scripts/sql（及通用 migrations）由组装器与 Core Loader 一致装载。Bootstrap 双平台入口和唯一 DDL 路径为 scripts/bootstrap-authorization.sh、scripts/bootstrap-authorization.ps1、sql/authorization/schema.sql。详细输入、Bee/TDSQL、测试和存量修复边界见根指南。
 
 ## 前置条件与入口
 
@@ -112,6 +111,14 @@ Base。若直接删除或修改生成的注解、import、Maven 坐标、版本�
 
 不要在 workspace 中通过修改注解或依赖反向维护 manifest；Contribution 的唯一真相是
 Extension 自己的 `extension.yaml`。
+
+`application.yml` 与 `application-<profile>.yml` 也支持受管增量。Extension 在
+`extension.yaml` 的 `contributes.applicationYaml` 中声明根配置，在
+`contributes.applicationProfileYaml.<profile>` 中声明环境配置。Assembly 将它们合并
+到 Base 文件；`status` 将未改动的合并结果标记为 Generated-only。开发 Authorization
+时可直接修改 workspace 中已有的 Authorization YAML 键或新增 YAML 键后执行
+`sync authorization`：既有键按原 Extension 回写，新键归属当前 editTarget。Base 的既有
+键仍回写 Base。不同 Owner 声明同一 YAML 叶子路径且值不同时，Assembly 会失败。
 
 ## 如何维护 Base
 

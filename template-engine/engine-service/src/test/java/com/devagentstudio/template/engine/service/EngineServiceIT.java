@@ -68,7 +68,13 @@ class EngineServiceIT {
         assertTrue(authState.path("effective").has("login"));
         assertTrue(authState.path("effective").has("authorization"));
         assertTrue(hasZipEntry(auth, "frontend/src/pages/Login/index.tsx"));
-        assertTrue(hasZipEntry(auth, "backend/migrations/001-schema.sql"));
+        for (String asset : authorizationAssets()) {
+            assertTrue(hasZipEntry(auth, asset), asset);
+            assertFalse(hasZipEntry(base, asset), asset);
+            assertFalse(hasZipEntry(generate(mvc, capabilities("login", true)), asset), asset);
+        }
+        assertFalse(hasZipEntry(auth, "backend/migrations/001-schema.sql"));
+        assertFalse(hasZipEntry(auth, "backend/docs/auth/sql/ddl.sql"));
         assertFalse(hasZipPrefix(auth, "backend/assembly/"));
         JsonNode maven = authState.path("managedContributions").path("maven:ZA21:bee-starter-auth");
         assertEquals("MAVEN_DEPENDENCY", maven.path("type").asText());
@@ -89,11 +95,14 @@ class EngineServiceIT {
         assertFalse(state.toString().contains("111"));
         assertTrue(hasZipEntry(generated, "frontend/.env"));
         String backendYaml = new String(zipBytes(generated, "backend/src/main/resources/application.yml"), StandardCharsets.UTF_8);
-        assertTrue(backendYaml.contains("private-key: \"111\""));
-        assertEquals(1, backendYaml.split("(?m)^auth:$", -1).length - 1);
+        String backendDevYaml = new String(zipBytes(generated, "backend/src/main/resources/application-dev.yml"), StandardCharsets.UTF_8);
+        assertTrue(backendDevYaml.contains("private-key: '111'"));
+        assertFalse(backendYaml.contains("private-key: '111'"));
+        assertFalse(backendYaml.matches("(?sm).*^auth:.*"));
         String frontendEnv = new String(zipBytes(generated, "frontend/.env"), StandardCharsets.UTF_8);
         assertTrue(frontendEnv.contains("PUBLIC_APP_NAME=\"人员管理\""));
         assertTrue(frontendEnv.contains("PUBLIC_YHT_CLIENT_ID=\"000\""));
+        assertTrue(frontendEnv.contains("PUBLIC_YHT_AUTHORIZE_URI=\"https://one-account-gateway.paasuat.cmbchina.cn/auth-server/auth\""));
         assertFalse(frontendEnv.contains("111"));
 
         Map<String, Object> updateRequest = updateRequest(state, capabilities("login", true), "APPLY");
@@ -109,6 +118,36 @@ class EngineServiceIT {
         invalidGenerate.put("requestedConfig", invalidRequested);
         mvc.perform(post("/v1/generate").contentType(MediaType.APPLICATION_JSON).content(JSON.writeValueAsBytes(invalidGenerate)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void generateProjectsLoginAndAuthorizationLeavesToDevYamlAndFrontendEnv() throws Exception {
+        MockMvc mvc = mvc();
+        Map<String, Object> application = applicationConfig("人员管理");
+        @SuppressWarnings("unchecked") Map<String, Object> yht = (Map<String, Object>) ((Map<String, Object>) application.get("auth")).get("yht");
+        yht.put("centerUri", "https://accounts.example.test/center");
+        yht.put("authorizeUri", "https://accounts.example.test/authorize");
+        yht.put("redirectUri", "https://app.example.test/login");
+        yht.put("endUrl", "https://accounts.example.test/end");
+        yht.put("logoutShareJs", "https://accounts.example.test/logout.js");
+        Map<String, Object> api = new LinkedHashMap<String, Object>(); api.put("baseUrl", "https://api.example.test"); api.put("viewId", "view-1");
+        Map<String, Object> authorization = new LinkedHashMap<String, Object>(); authorization.put("api", api); application.put("authorization", authorization);
+        Map<String, Object> requested = config(capabilities("authorization", true)); requested.put("applicationConfig", application);
+        Map<String, Object> body = new LinkedHashMap<String, Object>(); body.put("requestedConfig", requested);
+        byte[] generated = postZip(mvc, "/v1/generate", body, 200);
+        String applicationYaml = new String(zipBytes(generated, "backend/src/main/resources/application.yml"), StandardCharsets.UTF_8);
+        String devYaml = new String(zipBytes(generated, "backend/src/main/resources/application-dev.yml"), StandardCharsets.UTF_8);
+        String env = new String(zipBytes(generated, "frontend/.env"), StandardCharsets.UTF_8);
+        assertTrue(applicationYaml.contains("${yht.authentication.authorize-uri}"));
+        assertFalse(applicationYaml.matches("(?sm).*^auth:.*"));
+        assertTrue(devYaml.contains("authorize-uri: https://accounts.example.test/authorize"));
+        assertTrue(devYaml.contains("base-url: https://api.example.test"));
+        assertTrue(devYaml.contains("view-id: view-1"));
+        assertTrue(applicationYaml.contains("user-query-path:") && applicationYaml.contains("/v2/users/query"));
+        assertTrue(env.contains("PUBLIC_YHT_AUTHORIZE_URI=\"https://accounts.example.test/authorize\""));
+        assertTrue(env.contains("PUBLIC_YHT_END_URL=\"https://accounts.example.test/end\""));
+        assertTrue(env.contains("PUBLIC_YHT_LOGOUT_SHARE_JS=\"https://accounts.example.test/logout.js\""));
+        assertFalse(zipJson(generated, ".devagentstudio/template-state.json").toString().contains("111"));
     }
 
     @Test
@@ -139,10 +178,10 @@ class EngineServiceIT {
         byte[] reconcile = postZip(mvc, "/v1/update", updateRequest(JSON.readTree(targetState), capabilities("authorization", true), "RECONCILE"), 200);
         JsonNode repair = zipJson(reconcile, "extension-update-package.json");
         assertEquals(JSON.readTree(targetState), repair.path("nextTemplateState"));
-        assertEquals(7, repair.path("operations").size());
+        assertEquals(10, repair.path("operations").size());
         assertEquals(5, countOperation(repair.path("operations"), "REPLACE_MANAGED_FILE"));
         assertEquals(1, countOperation(repair.path("operations"), "ENSURE_JAVA_ANNOTATION"));
-        assertEquals(1, countOperation(repair.path("operations"), "ENSURE_MAVEN_DEPENDENCY"));
+        assertEquals(2, countOperation(repair.path("operations"), "ENSURE_MAVEN_DEPENDENCY"));
     }
 
     @Test
@@ -176,6 +215,7 @@ class EngineServiceIT {
         Map<String, Object> request = updateRequest(base, capabilities("authorization", true), "APPLY");
         request.put("protocolVersion", "4");
         JsonNode packageInfo = zipJson(postZip(mvc, "/v1/update", request, 200), "extension-update-package.json");
+        assertAuthorizationAdds(packageInfo);
         assertEquals("4", packageInfo.path("protocolVersion").asText());
         assertEquals(base.path("templateRevision").asText(), packageInfo.path("sourceRevision").asText());
         assertEquals(0, packageInfo.path("expectedStateSequence").asInt());
@@ -186,6 +226,11 @@ class EngineServiceIT {
         for (JsonNode payload : packageInfo.path("payloadManifest")) assertEquals(1, payload.size());
         for (JsonNode operation : packageInfo.path("operations"))
             assertFalse("UPSERT_MANAGED_CONFIG_BLOCK".equals(operation.path("type").asText()));
+        assertEquals(3, countOperation(packageInfo.path("operations"), "ENSURE_CAPABILITY_CONFIG"));
+        for (JsonNode operation : packageInfo.path("operations")) if ("ENSURE_CAPABILITY_CONFIG".equals(operation.path("type").asText())) {
+            assertTrue(operation.path("payloadRef").asText().startsWith("payload/"));
+            assertTrue(operation.path("parameters").path("capabilityIds").size() > 0);
+        }
         byte[] fullProject = generate(mvc, capabilities("authorization", true));
         byte[] updateZip = postZip(mvc, "/v1/update", request, 200);
         for (JsonNode operation : packageInfo.path("operations")) {
@@ -212,13 +257,68 @@ class EngineServiceIT {
         assertEquals(1, migrated.path("nextTemplateState").path("stateSequence").asInt());
         assertFalse(migrated.path("nextTemplateState").has("managedConfiguration"));
 
-        JsonNode loginState = zipJson(generate(mvc, capabilities("login", true)), ".devagentstudio/template-state.json");
-        Map<String, Object> addAuthorization = updateRequest(loginState, capabilities("authorization", true), "APPLY");
+        // Regression: an already applied login V4 package (sequence 1) must be a
+        // valid starting point for adding authorization in the next V4 package.
+        Map<String, Object> installLogin = updateRequest(base, capabilities("login", true), "APPLY");
+        installLogin.put("protocolVersion", "4");
+        JsonNode loginPackage = zipJson(postZip(mvc, "/v1/update", installLogin, 200), "extension-update-package.json");
+        JsonNode loginState = loginPackage.path("nextTemplateState");
+        assertEquals("2026.10.23.2", loginPackage.path("sourceRevision").asText());
+        assertEquals(0, loginPackage.path("expectedStateSequence").asInt());
+        assertEquals(1, loginState.path("stateSequence").asInt());
+        assertEquals(1, loginState.path("effective").size());
+        assertTrue(loginState.path("effective").has("login"));
+
+        Map<String, Object> loginAndAuthorization = capabilities("login", true);
+        loginAndAuthorization.putAll(capabilities("authorization", true));
+        Map<String, Object> addAuthorization = updateRequest(loginState, loginAndAuthorization, "APPLY");
         addAuthorization.put("protocolVersion", "4");
-        JsonNode authorization = zipJson(postZip(mvc, "/v1/update", addAuthorization, 200), "extension-update-package.json");
+        byte[] authorizationZip = postZip(mvc, "/v1/update", addAuthorization, 200);
+        JsonNode authorization = zipJson(authorizationZip, "extension-update-package.json");
+        assertAuthorizationAdds(authorization);
+        for (JsonNode operation : authorization.path("operations")) {
+            if ("backend/sql/authorization/schema.sql".equals(operation.path("target").asText()))
+                assertArrayEquals(zipBytes(fullProject, operation.path("target").asText()),
+                        zipBytes(authorizationZip, operation.path("payloadRef").asText()));
+        }
+        Map<String, Object> repeatedAuthorization = updateRequest(authorization.path("nextTemplateState"), loginAndAuthorization, "APPLY");
+        repeatedAuthorization.put("protocolVersion", "4");
+        postZip(mvc, "/v1/update", repeatedAuthorization, 204);
+        assertEquals(2, countOperation(authorization.path("operations"), "ENSURE_CAPABILITY_CONFIG"));
+        assertEquals("2026.10.23.2", authorization.path("sourceRevision").asText());
+        assertEquals(1, authorization.path("expectedStateSequence").asInt());
+        assertEquals(2, authorization.path("nextTemplateState").path("stateSequence").asInt());
+        assertEquals(2, authorization.path("nextTemplateState").path("effective").size());
+        assertTrue(authorization.path("nextTemplateState").path("effective").has("login"));
+        assertTrue(authorization.path("nextTemplateState").path("effective").has("authorization"));
         for (JsonNode operation : authorization.path("operations")) {
             if ("ADD_FILE".equals(operation.path("type").asText()))
                 assertTrue(operation.path("operationId").asText().contains("authorization"));
+        }
+    }
+
+    private static List<String> authorizationAssets() {
+        return Arrays.asList("backend/scripts/bootstrap-authorization.sh", "backend/scripts/bootstrap-authorization.ps1",
+                "backend/sql/authorization/schema.sql",
+                "backend/src/main/java/com/cmbchina/backend/auth/bootstrap/AuthorizationBootstrapCommand.java",
+                "backend/src/main/java/com/cmbchina/backend/auth/bootstrap/BootstrapDataSource.java",
+                "backend/src/main/java/com/cmbchina/backend/common/config/WebMvcConfiguration.java");
+    }
+    private void assertAuthorizationAdds(JsonNode info) {
+        assertTrue(info.path("nextTemplateState").path("installedArtifacts")
+                .has("backend:authorization:sql/authorization/schema.sql"));
+        for (JsonNode operation : info.path("operations")) {
+            assertFalse("backend/docs/auth/sql/ddl.sql".equals(operation.path("target").asText()));
+            assertFalse("backend/migrations/001-schema.sql".equals(operation.path("target").asText()));
+        }
+        for (String asset : authorizationAssets()) {
+            int found = 0;
+            for (JsonNode operation : info.path("operations")) if (asset.equals(operation.path("target").asText())) {
+                assertEquals("ADD_FILE", operation.path("type").asText());
+                assertTrue(operation.path("payloadRef").asText().startsWith("payload/"));
+                found++;
+            }
+            assertEquals(1, found, asset);
         }
     }
 

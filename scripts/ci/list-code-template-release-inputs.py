@@ -90,7 +90,7 @@ def collect_inputs(template_source):
 
     for extension in extension_directories(root, code / "backend" / "extensions"):
         add_file(root, extension.relative_to(root) / "extension.yaml", result)
-        for directory in ("src", "docs", "migrations"):
+        for directory in ("src", "docs", "migrations", "scripts", "sql"):
             candidate = extension / directory
             if candidate.exists() or candidate.is_symlink():
                 add_tree(root, candidate.relative_to(root), result)

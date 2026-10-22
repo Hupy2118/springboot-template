@@ -208,10 +208,11 @@ node frontend/scripts/devagentstudio/route-projector.mjs apply
 ### 4.3 新增/维护后端 Extension
 
 1. 复制或新增 `extensions/<id>/src/`；如需数据库资产放 `migrations/`，能力说明放其 `docs/`。保持 `extension.yaml`、源码、DDL 由同一能力维护。
-2. 在 YAML Manifest 中声明 `id`、`requires` 和可选 `applicationAnnotations`、`mavenDependencies`；两端同 ID 的 `requires` 应一致。
+2. 在 YAML Manifest 中声明 `id`、`requires` 和可选 `applicationAnnotations`、`mavenDependencies`、`applicationYaml`、`applicationProfileYaml`；两端同 ID 的 `requires` 应一致。后两项分别增量投影到 Base 的 `application.yml` 和 `application-<profile>.yml`，不能以同路径文件覆盖 Base。
 3. 启动类注解只能声明全限定类名，由 Assembly/Engine 向 `Application.java` 投影；依赖只能通过 Manifest 的 Maven 坐标投影到 `pom.xml`。**不要手工修改 Workspace 中生成的注解/依赖并期望 Sync 反向维护 Manifest**。
 4. 单个物理注解或 Maven 依赖可以由多个能力共同声明；引擎按物理资源聚合 Owners，不能按某一个 Extension 的声明去重后错误删除仍被其他能力使用的依赖。
-5. 使用 `verify-update <profile>` 验证本 Profile 及全部下游 Profile；再用 V3 Generate/Update 校验交付的完整工程。
+5. YAML 的已有受管叶子路径会在 Workspace Sync 时写回其原 Extension；在有 editTarget 的 Profile 中新增 YAML 叶子路径会写回该 Extension。Base 的既有 YAML 叶子仍写回 Base。不同 Extension 对同一叶子给出不同值会被拒绝。
+6. 使用 `verify-update <profile>` 验证本 Profile 及全部下游 Profile；再用 V3 Generate/Update 校验交付的完整工程。
 
 当前 Login Manifest 示例：
 
@@ -226,7 +227,32 @@ contributes:
       artifactId: bee-starter-auth
 ```
 
-**Authorization Bootstrap 与规划契约**：`AuthorizationBootstrapCommand` 读取已确认的 TechnicalPlan（`authorization_manifest.schema_version=authorization-manifest.v2`）及 `.devagentstudio/application.json` 中的初始管理员列表。当前代码默认 DDL 路径为 `backend/docs/auth/sql/ddl.sql`，而 Extension Release 中的源码 DDL 路径为 `backend/migrations/001-schema.sql`；在完成路径统一前，应**显式使用 `--ddl=` 指定生成工程中存在的 DDL**，并测试 `--dry-run`。该差异是现存兼容问题，不应被文档掩盖。
+**Authorization Bootstrap 与规划契约**：Authorization Extension 唯一拥有 `scripts/bootstrap-authorization.sh`、`.ps1`、`sql/authorization/schema.sql` 和 Bootstrap Java。Assembly、Core Loader、Release 输入清单统一扫描 `src/docs/migrations/scripts/sql`；不恢复 V2 Strategy/Anchor。Base/Login 不交付这些权限专属资产。Generate 与 V4 首次安装通过通用 Artifact 路径交付，脚本不会在 Engine Service 中执行。
+
+在生成工程外部执行 `/bin/bash backend/scripts/bootstrap-authorization.sh --dry-run`，Windows 使用 `powershell.exe -NoProfile -File backend/scripts/bootstrap-authorization.ps1 --dry-run`；去掉 `--dry-run` 才会连接数据库。脚本定位 backend，调用固定版本 Maven exec 插件和显式 MainClass，逐项环境参数传递保留空格、单双引号和反斜杠，并传播进程失败码。不加载 `.env`；不隐式使用宿主 DB_*。Java 仍可直接接受 `--technical-plan=`、`--application=`、`--ddl=`、`--application-yml=`、`--profile=`、`--db-url=`、`--db-user=`。密码只从目标工程 YAML 或其中显式声明的安全环境占位符读取，不通过命令参数传入。
+
+默认规划文件是工作区 `.devagentstudio/plans/technical-plan.json` 与 `.devagentstudio/application.json`。只接受 confirmed 的 `authorization-manifest.v3`，权限开关来自 application.authorization.enabled，不要求 manifest.enabled。`system_admin` 明确映射数据库 `SYSTEM_ADMIN`；唯一系统资源是 `system_authorization_management`。业务默认角色及授权只校验、不落库；系统角色仅新增管理资源授权，不自动拥有业务资源。Bootstrap 只增不改，不会清除数据库中已有的手工授权。
+
+数据源由独立 `BootstrapDataSource` 读取 `bee.persistence.ds1.datasource` 及对应 Profile YAML，使用配置指定的 TDSQL 驱动。占位符复用 Spring PropertyPlaceholderHelper，禁止静默退回 spring.datasource/MySQL。Profile 优先级为 `--profile`、JVM spring.profiles.active、SPRING_PROFILES_ACTIVE、Base 中的声明，最后默认 dev（1016 将 active 写在 dev 文件自身）。可用逗号指定多个 Profile，按顺序覆盖；缺少文件、占位符循环或错误驱动均失败。不会启动 Spring 容器，也不支持任意 Spring ConfigData imports、Profile groups 或远程配置中心；此类部署必须提供显式本地配置。Base application.yml/application-dev.yml 与既有 applicationYaml/applicationProfileYaml 贡献的值保持不变。
+
+权限拦截器的真实类为 `com.cmbchina.backend.common.config.WebMvcConfiguration`，使用 Bee TokenContextHolder/LocalToken。不能复制旧分支 MVC 类。没有 Bee 实际认证链证据时，不臆定其拦截器顺序或盲目添加 order(200)。
+
+验证入口：
+
+```sh
+mvn -f scripts/ci/authorization-bootstrap/pom.xml test
+python3 -B -m unittest scripts/ci/test_authorization_scripts.py scripts/ci/test_code_template_release_inputs.py
+mvn -f template-source/code/backend/assembly/pom.xml test
+mvn -f template-engine/pom.xml verify
+```
+
+独立 Bootstrap 测试编译真实 Runtime Source，覆盖 v3、默认工作区、Bee 配置和失败保护，不替代 Bee 运行验收。真实数据库测试仅在显式设置 `AUTHORIZATION_BOOTSTRAP_TEST_CONFIG` 后运行：以私有 Maven settings 执行 `mvn -s <settings> -f scripts/ci/authorization-bootstrap/pom.xml -Ptdsql test`，配置文件旁须有 application-test.yml。测试拒绝非空数据库及名称不以 `_bootstrap_test` 结尾的库，建表/运行两次/检查最小授权后清理本测试创建的四表。没有隔离库则跳过，不能报告为通过。权限运行测试 `AuthorizationMvcTest` 随 Extension 交付，依赖真实 Bee 类型与 test-scope mockito-inline；需在具备私有依赖的生成工程执行 `mvn test`。Windows PowerShell 测试需在 Windows CI 上运行；本机没有 PowerShell 时明确跳过。
+
+**历史资产回检（cb3c779 → 1016）**：本地 `git ls-tree -r cb3c779 template-source/capabilities/authorization` 枚举 75 项，无 GitHub Compare 300 项截断。旧后端生产 Java 与 Mapper XML 在新 Authorization Extension 中均有同相对路径资产；Bootstrap 存在但 v2/路径/数据源合同失配，本次修复。旧脚本恢复为新 Extension 静态资产，增加 Windows 入口；旧 migrations/001-schema.sql 内容不变，唯一移至 sql/authorization/schema.sql（曾临时置于 docs/auth/sql/ddl.sql，现已归一）。旧 capability-v2.yaml 的 Registry/Strategy/Anchor 不恢复，Extension manifest 和通用文件所有权替代其交付职责。
+
+其他路径差异清单：旧 docs/README.md、backend.md、frontend.md 由当前 Extension docs/authorization.md 与本指南说明替代；9 个旧后端测试（ControllerResponse、MemberApplicationService、ResourceApplicationService、RoleApplicationService、ResourcePermissionInterceptor、AuthErrorCode、MapperIntegration、ResourcePOMetadata、RolePOMetadata）未随重构保留，不能当作已通过的历史回归，本次仅补当前 Bootstrap/MVC 及交付合同测试。前端 AuthProvider 由 AuthorizationProvider 替代，Permission 目录大小写调整；旧 RouteGuard/createAuthorizationRouteGuard/useAuthorizationMenuTransform、authorization.css、generated/authorizationApiTypes 不再有同路径资产，当前 Provider/Registry/页面及内联 typings 承接相关职责；本次不复制旧实现，也不据路径存在性宣称全部旧行为等价。上述剩余前端及旧 Mapper/服务测试覆盖差异需要独立行为回归。
+
+**存量安全修复边界**：V4 已安装 Capability 仍不可自动升级，同集合 APPLY 为 204，RECONCILE 不回填 Artifact。旧工程补资产须另行设计受控 repair：先检查 State 与磁盘、所有权、目标缺失状态及来源 Revision；目标存在或已被用户修改时拒绝覆盖，展示补丁预览；仅允许确定的缺失资产，外部事务更新 StateSequence/回滚日志，禁止手改 State 绕过校验。本次不新增 repair API。
 
 ## 5. Template Engine 与外部工作流
 
@@ -309,14 +335,14 @@ java -jar template-engine/engine-service/target/engine-service-1.0.0-SNAPSHOT.ja
 | 可视化源码定位 | `frontend/base/devtools/elementInspector.ts`、`scripts/sourcePathPlugin.mjs`、`sourcePathLoader.cjs`、`src/index.tsx` 的开发态初始化 |
 | 前端 Extension | Loader/Materializer 中五个 Registry 固定目标以及 Base 中对它们的引用 |
 | 后端 Contribution | `backend/base/.../Application.java`、`backend/base/pom.xml`、相关 `extension.yaml` |
-| 权限初始化 | Authorization 的 `AuthorizationBootstrapCommand.java`、`migrations/001-schema.sql` 和对应规划输入 |
+| 权限初始化 | Authorization 的 `AuthorizationBootstrapCommand.java`、`sql/authorization/schema.sql`、双平台 scripts 和对应规划输入 |
 | 增量更新 | `code/template-revision.txt`、V3 Schema、生成的 `.devagentstudio/template-state.json` |
 
 以下属于**当前已知的检查点**，不要把它们写成“已解决”：
 
 - 页面模块上下文 Key 在不同打包路径下可能与 `moduleImportPath` 不一致；页面投影测试应包含实际加载检查。
 - 前端 Base 的 `AGENTS.md` 引用了不存在的前端 `docs/project-structure.md`；如需补齐，必须与生成工程中 Agent 指引同步修改。
-- 部分旧模块 README / 能力说明中提及 `CapabilityWebMvcConfiguration`；当前后端实际由 `LoginWebMvcConfiguration` 与 `AuthorizationWebMvcConfiguration` 注册拦截器。
+- 后端权限 MVC 入口为 Authorization 自有 `com.cmbchina.backend.common.config.WebMvcConfiguration`；Login 认证由 Bee EnableAuthClient 接入，其实际顺序需要 Bee 环境验证。
 - 不要把 `backend/docs/development-guide.md` 中旧的“Engine 尚消费 Legacy 模板”结论继续传播；V3 当前只消费 `template-source/code/`。
 
 ## 8. 文档维护原则

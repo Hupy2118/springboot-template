@@ -17,10 +17,11 @@ public final class BackendAssembler {
         List<ExtensionManifestLoader.Manifest> manifests = new ExtensionManifestLoader(root.resolve("extensions")).resolve(profile.requested);
         WorkspaceState state = new WorkspaceState(); state.profile = profile.name; state.editTarget = profile.editTarget;
         copyTree(root.resolve("base"), workspace, "base", state);
-        List<String> annotations = new ArrayList<String>(); List<MavenDependency> dependencies = new ArrayList<MavenDependency>(); List<Map<String,Object>> yamlContributions = new ArrayList<Map<String,Object>>();
+        List<String> annotations = new ArrayList<String>(); List<MavenDependency> dependencies = new ArrayList<MavenDependency>(); List<Map<String,Object>> yamlContributions = new ArrayList<Map<String,Object>>(); Map<String,List<Map<String,Object>>> profileYamlContributions = new TreeMap<String,List<Map<String,Object>>>();
         for (ExtensionManifestLoader.Manifest manifest : manifests) {
-            state.extensions.add(manifest.id); annotations.addAll(manifest.annotations); dependencies.addAll(manifest.dependencies); yamlContributions.add(manifest.applicationYaml);
-            for (String directory : Arrays.asList("src", "docs", "migrations")) if (Files.exists(manifest.root.resolve(directory)))
+            state.extensions.add(manifest.id); annotations.addAll(manifest.annotations); dependencies.addAll(manifest.dependencies); if (!manifest.applicationYaml.isEmpty()) yamlContributions.add(manifest.applicationYaml); addYamlContribution(state, "src/main/resources/application.yml", manifest.id, manifest.applicationYaml);
+            for (Map.Entry<String,Map<String,Object>> item : manifest.applicationProfileYaml.entrySet()) { String target="src/main/resources/application-" + item.getKey() + ".yml"; if (!item.getValue().isEmpty()) profileYamlContributions.computeIfAbsent(item.getKey(), ignored -> new ArrayList<Map<String,Object>>()).add(item.getValue()); addYamlContribution(state, target, manifest.id, item.getValue()); }
+            for (String directory : Arrays.asList("src", "docs", "migrations", "scripts", "sql")) if (Files.exists(manifest.root.resolve(directory)))
                 copyTree(manifest.root.resolve(directory), workspace.resolve(directory), manifest.id, state);
         }
         state.applicationAnnotations = new ArrayList<String>(new LinkedHashSet<String>(annotations));
@@ -28,7 +29,13 @@ public final class BackendAssembler {
         ApplicationAnnotationCompiler.apply(workspace.resolve("src/main/java/com/cmbchina/backend/Application.java"), state.applicationAnnotations);
         PomDependencyCompiler.apply(workspace.resolve("pom.xml"), state.mavenDependencies);
         ApplicationYamlCompiler.apply(workspace.resolve("src/main/resources/application.yml"), yamlContributions);
+        for (Map.Entry<String,List<Map<String,Object>>> item : profileYamlContributions.entrySet()) ApplicationYamlCompiler.apply(workspace.resolve("src/main/resources/application-" + item.getKey() + ".yml"), item.getValue());
         state.write(workspace); AssemblyContract.verify(workspace); return state;
+    }
+    private static void addYamlContribution(WorkspaceState state, String target, String owner, Map<String,Object> value) {
+        if (value.isEmpty()) return;
+        Map<String,Map<String,Object>> owners=state.yamlContributions.get(target); if (owners==null) { owners=new TreeMap<String,Map<String,Object>>(); state.yamlContributions.put(target, owners); }
+        owners.put(owner, YamlContributionCompiler.copy(value));
     }
     private void copyTree(final Path from, final Path to, final String owner, final WorkspaceState state) {
         try { Files.walkFileTree(from, new SimpleFileVisitor<Path>() {

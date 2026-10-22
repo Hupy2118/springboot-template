@@ -1,11 +1,20 @@
 id: authorization
 requires:
-  - login
+- login
 contributes:
   applicationAnnotations: []
   applicationYaml:
-    bee:
-      persistence:
-        xcode-agent:
-          mybatis:
-            mapper-locations: classpath:mapper/**/*.xml
+    yht:
+      api:
+        user-query-path: /v2/users/query
+  applicationProfileYaml:
+    dev:
+      yht:
+        api:
+          base-url: http://one-account-gateway.paasuat.cmbchina.cn/api-server
+          view-id: 2c9f50c875c0dfce0175de6a4df1057e
+  mavenDependencies:
+    - groupId: org.mockito
+      artifactId: mockito-inline
+      version: 4.5.1
+      scope: test

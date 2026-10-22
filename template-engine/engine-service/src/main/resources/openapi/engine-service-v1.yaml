@@ -92,6 +92,22 @@ components:
                 privateKey: { type: string, minLength: 1, maxLength: 16384 }
                 publicKey: { type: string, minLength: 1, maxLength: 16384 }
                 centerPublicKey: { type: string, minLength: 1, maxLength: 16384 }
+                centerUri: { type: string, minLength: 1, maxLength: 2048 }
+                authorizeUri: { type: string, minLength: 1, maxLength: 2048 }
+                redirectUri: { type: string, minLength: 1, maxLength: 2048 }
+                endUrl: { type: string, minLength: 1, maxLength: 2048 }
+                logoutShareJs: { type: string, minLength: 1, maxLength: 2048 }
+        authorization:
+          type: object
+          required: [api]
+          additionalProperties: false
+          properties:
+            api:
+              type: object
+              additionalProperties: false
+              properties:
+                baseUrl: { type: string, minLength: 1, maxLength: 2048 }
+                viewId: { type: string, minLength: 1, maxLength: 512 }
     CapabilityRequest:
       type: object
       required: [enabled, config]

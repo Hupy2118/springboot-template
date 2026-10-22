@@ -12,6 +12,8 @@ public final class WorkspaceState {
     public Map<String, String> owners = new TreeMap<String, String>();
     public List<String> applicationAnnotations = new ArrayList<String>();
     public List<MavenDependency> mavenDependencies = new ArrayList<MavenDependency>();
+    /** target -> Extension id -> YAML fragment; values are used to preserve YAML ownership during sync. */
+    public Map<String, Map<String, Map<String,Object>>> yamlContributions = new TreeMap<String, Map<String, Map<String,Object>>>();
     public static Path file(Path workspace) { return workspace.resolve(".xcodeagent/backend-workspace-state.json"); }
     public void write(Path workspace) {
         try { Files.createDirectories(file(workspace).getParent()); new ObjectMapper().writerWithDefaultPrettyPrinter().writeValue(file(workspace).toFile(), this); }

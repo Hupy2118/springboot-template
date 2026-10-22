@@ -59,7 +59,18 @@ PROTECTED_SURFACES = (
     )),
     ("template-source/code/backend/extensions/authorization/src/main/java/com/cmbchina/backend/auth/bootstrap/AuthorizationBootstrapCommand.java", (
         'public final class AuthorizationBootstrapCommand', 'public static void main(String[] args)',
-        'loadBootstrapInput', 'authorization-manifest.v2', 'xcode_authorization_bootstrap',
+        'loadBootstrapInput', 'authorization-manifest.v3', 'xcode_authorization_bootstrap',
+    )),
+    ("template-source/code/backend/extensions/authorization/scripts/bootstrap-authorization.sh", (
+        'org.codehaus.mojo:exec-maven-plugin:3.1.0:java',
+        'com.cmbchina.backend.auth.bootstrap.AuthorizationBootstrapCommand',
+    )),
+    ("template-source/code/backend/extensions/authorization/scripts/bootstrap-authorization.ps1", (
+        'org.codehaus.mojo:exec-maven-plugin:3.1.0:java',
+        'com.cmbchina.backend.auth.bootstrap.AuthorizationBootstrapCommand',
+    )),
+    ("template-source/code/backend/extensions/authorization/sql/authorization/schema.sql", (
+        'CREATE TABLE', 'role_resource', 'role_member',
     )),
     ("template-engine/engine-core/src/main/java/com/devagentstudio/template/engine/core/v3/V3ProjectMaterializer.java", (
         'REGISTRY_TARGETS', 'public Map<String, Object> templateState',

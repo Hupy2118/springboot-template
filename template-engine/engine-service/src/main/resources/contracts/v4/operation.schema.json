@@ -31,7 +31,8 @@
         "ENSURE_JAVA_ANNOTATION",
         "REMOVE_JAVA_ANNOTATION",
         "ENSURE_MAVEN_DEPENDENCY",
-        "REMOVE_MAVEN_DEPENDENCY"
+        "REMOVE_MAVEN_DEPENDENCY",
+        "ENSURE_CAPABILITY_CONFIG"
       ]
     },
     "target": {
@@ -51,6 +52,36 @@
   },
   "additionalProperties": false,
   "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "ENSURE_CAPABILITY_CONFIG"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "enum": [
+              "backend/src/main/resources/application.yml",
+              "backend/src/main/resources/application-dev.yml",
+              "frontend/.env"
+            ]
+          },
+          "parameters": {
+            "$ref": "#/$defs/capabilityConfigParameters"
+          },
+          "payloadRef": {
+            "type": "string",
+            "pattern": "^payload/(?:backend/src/main/resources/application(?:-dev)?\\.yml|frontend/\\.env)$"
+          }
+        }
+      }
+    },
     {
       "if": {
         "properties": {
@@ -212,6 +243,28 @@
             "system",
             null
           ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "capabilityConfigParameters": {
+      "type": "object",
+      "required": [
+        "format",
+        "capabilityIds"
+      ],
+      "properties": {
+        "format": {
+          "enum": ["yaml", "dotenv"]
+        },
+        "capabilityIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]*$"
+          }
         }
       },
       "additionalProperties": false

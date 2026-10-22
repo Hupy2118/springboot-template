@@ -1,0 +1,61 @@
+{
+  "artifact_type": "technical-plan",
+  "confirmation_status": "confirmed",
+  "authorization_manifest": {
+    "schema_version": "authorization-manifest.v3",
+    "resources": [
+      {
+        "resourceKey": "orders",
+        "origin": "business",
+        "type": "page",
+        "name": "订单",
+        "description": "订单查询",
+        "sourceRuleIds": [
+          "rule_orders"
+        ],
+        "targetResourceRef": "page:orders"
+      },
+      {
+        "resourceKey": "system_authorization_management",
+        "origin": "system",
+        "type": "system",
+        "name": "权限管理",
+        "description": "管理角色、成员角色与角色资源关系。",
+        "sourceRuleIds": [],
+        "targetResourceRef": "system:authorization_management"
+      }
+    ],
+    "bindings": {
+      "pages": [
+        {
+          "pageId": "orders",
+          "resourceKey": "orders"
+        }
+      ],
+      "actions": [],
+      "endpoints": []
+    },
+    "systemAuthorization": {
+      "adminRoleSeedKey": "system_admin",
+      "managementResourceKey": "system_authorization_management"
+    },
+    "defaultRoleAuthorization": {
+      "roles": [
+        {
+          "roleSeedKey": "reader",
+          "name": "阅读者",
+          "description": "只读"
+        }
+      ],
+      "roleResourceGrants": [
+        {
+          "roleSeedKey": "reader",
+          "resourceKeys": [
+            "orders"
+          ]
+        }
+      ]
+    },
+    "fingerprint": "sha256:fdaf836ca27f87aba9c1b43d7a6461b280c8770f959fce3097533822e70a7776"
+  }
+}

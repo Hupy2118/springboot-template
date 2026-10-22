@@ -45,12 +45,70 @@ class V3UpdatePlannerTest {
         assertEquals("2026.09.21.1", install.nextState().get("templateRevision"));
         assertFalse(install.nextState().containsKey("managedConfiguration"));
         assertFalse(operationTypes(install.operations()).contains("UPSERT_MANAGED_CONFIG_BLOCK"));
+        assertEquals(3, count(install.operations(), "ENSURE_CAPABILITY_CONFIG"));
+        assertTrue(operationTargets(install.operations()).contains("frontend/.env"));
         assertEquals(5, count(install.operations(), "REPLACE_MANAGED_FILE"));
         assertEquals(V3UpdateResult.Kind.NO_CHANGE, planner.planCapabilities(install.nextState(),
                 new ExtensionResolver(r2).resolve(requested("authorization", Collections.<String, Object>emptyMap())), "APPLY").kind());
         V3Exception removal = assertThrows(V3Exception.class, () -> planner.planCapabilities(install.nextState(),
                 new ExtensionResolver(r2).resolve(Collections.<String, Object>emptyMap()), "APPLY"));
         assertEquals("CAPABILITY_REMOVAL_UNSUPPORTED", removal.code());
+    }
+
+    @Test
+    void v4DoesNotRepairAssetsMissingFromAlreadyInstalledAuthorization() throws Exception {
+        Path oldRoot = temporary.resolve("missing-old/code"); copyRuntime(codeRoot(), oldRoot); writeRevision(oldRoot, "2026.10.22.2");
+        byte[] legacyDdl = Files.readAllBytes(oldRoot.resolve("backend/extensions/authorization/sql/authorization/schema.sql"));
+        for (String asset : Arrays.asList("scripts/bootstrap-authorization.sh", "scripts/bootstrap-authorization.ps1", "sql/authorization/schema.sql"))
+            Files.delete(oldRoot.resolve("backend/extensions/authorization/" + asset));
+        Path oldDdl = oldRoot.resolve("backend/extensions/authorization/docs/auth/sql/ddl.sql");
+        Files.createDirectories(oldDdl.getParent()); Files.write(oldDdl, legacyDdl);
+        CodeTemplateRelease old = new CodeTemplateReleaseLoader(oldRoot).load();
+        Map<String, Object> request = requested("authorization", Collections.<String, Object>emptyMap());
+        Map<String, Object> installed = new V3ProjectMaterializer(old).templateState(new ExtensionResolver(old).resolve(request));
+        assertTrue(((Map<?, ?>) installed.get("installedArtifacts")).containsKey("backend:authorization:docs/auth/sql/ddl.sql"));
+        assertFalse(((Map<?, ?>) installed.get("installedArtifacts")).containsKey("backend:authorization:sql/authorization/schema.sql"));
+        CodeTemplateRelease current = new CodeTemplateReleaseLoader(codeRoot()).load();
+        ResolvedExtensions resolved = new ExtensionResolver(current).resolve(request);
+        V3UpdatePlanner planner = new V3UpdatePlanner(current);
+        assertEquals(V3UpdateResult.Kind.NO_CHANGE, planner.planCapabilities(installed, resolved, "APPLY").kind());
+        assertEquals("RECONCILE_STATE_CHANGE_REQUIRED", assertThrows(V3Exception.class,
+                () -> planner.planCapabilities(installed, resolved, "RECONCILE")).code());
+    }
+
+    @Test
+    void runtimeScriptsRejectCrossExtensionCollisionsAndSymlinks() throws Exception {
+        Path root = temporary.resolve("script-collision/code"); copyRuntime(codeRoot(), root);
+        Path collision = root.resolve("backend/extensions/login/scripts/bootstrap-authorization.sh");
+        Files.createDirectories(collision.getParent()); Files.write(collision, "collision".getBytes(StandardCharsets.UTF_8));
+        assertThrows(V3Exception.class, () -> new CodeTemplateReleaseLoader(root).load());
+        Files.delete(collision);
+        Files.createSymbolicLink(collision, root.resolve("backend/extensions/authorization/scripts/bootstrap-authorization.sh"));
+        assertThrows(V3Exception.class, () -> new CodeTemplateReleaseLoader(root).load());
+    }
+
+    @Test
+    void runtimeSqlRejectsCrossExtensionCollisionsUnsafeDirectoriesAndBinaryContent() throws Exception {
+        Path root = temporary.resolve("sql-boundary/code"); copyRuntime(codeRoot(), root);
+        Path source = root.resolve("backend/extensions/authorization/sql/authorization/schema.sql");
+        Path collision = root.resolve("backend/extensions/login/sql/authorization/schema.sql");
+        Files.createDirectories(collision.getParent()); Files.write(collision, Files.readAllBytes(source));
+        assertThrows(V3Exception.class, () -> new CodeTemplateReleaseLoader(root).load());
+        Files.delete(collision);
+        Files.createSymbolicLink(collision, source);
+        assertThrows(V3Exception.class, () -> new CodeTemplateReleaseLoader(root).load());
+        Files.delete(collision);
+        Files.write(source, new byte[] {0});
+        assertThrows(V3Exception.class, () -> new CodeTemplateReleaseLoader(root).load());
+        Files.write(source, new byte[] {(byte) 0xff});
+        assertThrows(V3Exception.class, () -> new CodeTemplateReleaseLoader(root).load());
+        Files.delete(source);
+        Files.delete(source.getParent()); Files.delete(source.getParent().getParent());
+        Path sql = source.getParent().getParent();
+        Files.createSymbolicLink(sql, root.resolve("backend/extensions/login/sql"));
+        assertThrows(V3Exception.class, () -> new CodeTemplateReleaseLoader(root).load());
+        Files.delete(sql); Files.write(sql, "not a directory".getBytes(StandardCharsets.UTF_8));
+        assertThrows(V3Exception.class, () -> new CodeTemplateReleaseLoader(root).load());
     }
 
     @Test
@@ -99,7 +157,8 @@ class V3UpdatePlannerTest {
         Path r1Root = temporary.resolve("owners-r1/code"); copyRuntime(codeRoot(), r1Root); writeRevision(r1Root, "2026.09.20.1");
         Path authManifest = r1Root.resolve("backend/extensions/authorization/extension.yaml");
         String auth = read(authManifest);
-        auth = auth.replace("applicationAnnotations: []", "applicationAnnotations:\n    - annotationClass: com.cmb.bee.auth.client.config.EnableAuthClient\n  mavenDependencies:\n    - groupId: ZA21\n      artifactId: bee-starter-auth");
+        auth = auth.replace("applicationAnnotations: []", "applicationAnnotations:\n    - annotationClass: com.cmb.bee.auth.client.config.EnableAuthClient");
+        auth = auth.replace("  mavenDependencies:\n", "  mavenDependencies:\n    - groupId: ZA21\n      artifactId: bee-starter-auth\n");
         Files.write(authManifest, auth.getBytes(StandardCharsets.UTF_8));
         CodeTemplateRelease r1 = new CodeTemplateReleaseLoader(r1Root).load();
         ResolvedExtensions resolved = new ExtensionResolver(r1).resolve(requested("authorization", Collections.<String, Object>emptyMap()));
@@ -107,12 +166,12 @@ class V3UpdatePlannerTest {
         assertEquals(Arrays.asList("authorization", "login"), owners);
         @SuppressWarnings("unchecked") List<String> mavenOwners = (List<String>) resolved.managedContributions().get("maven:ZA21:bee-starter-auth").get("owners");
         assertEquals(Arrays.asList("authorization", "login"), mavenOwners);
-        assertEquals(2, resolved.managedContributions().size());
+        assertEquals(3, resolved.managedContributions().size());
 
         Map<String, Object> currentState = new V3ProjectMaterializer(r1).templateState(resolved);
         Path r2Root = temporary.resolve("owners-r2/code"); copyRuntime(r1Root, r2Root); writeRevision(r2Root, "2026.09.21.1");
         Path changedLoginManifest = r2Root.resolve("backend/extensions/login/extension.yaml");
-        String login = read(changedLoginManifest).replace("artifactId: bee-starter-auth", "artifactId: bee-starter-auth\n      version: 4.2.0");
+        String login = read(changedLoginManifest).replace("artifactId: bee-starter-auth", "artifactId: bee-starter-auth\n    version: 4.2.0");
         Files.write(changedLoginManifest, login.getBytes(StandardCharsets.UTF_8));
         Path changedAuthManifest = r2Root.resolve("backend/extensions/authorization/extension.yaml");
         String authorization = read(changedAuthManifest).replace("artifactId: bee-starter-auth", "artifactId: bee-starter-auth\n      version: 4.2.0");
@@ -142,7 +201,25 @@ class V3UpdatePlannerTest {
         assertEquals(V3UpdateResult.Kind.CHANGE, result.kind());
         assertTrue(result.operations().isEmpty());
         assertEquals(Boolean.TRUE, ((Map<?, ?>) ((Map<?, ?>) ((Map<?, ?>) result.nextState().get("requested")).get("authorization")).get("config")).get("vendorOption"));
-        assertEquals(7, planner.plan(firstState, firstResolved, "RECONCILE").operations().size());
+        assertEquals(10, planner.plan(firstState, firstResolved, "RECONCILE").operations().size());
+    }
+
+    @Test
+    void v4ConfigurationFragmentsAreUniquePerTargetAndContainOnlyNewCapabilityDefaults() throws Exception {
+        CodeTemplateRelease release = new CodeTemplateReleaseLoader(codeRoot()).load();
+        ExtensionResolver resolver = new ExtensionResolver(release);
+        Map<String, Object> base = new V3ProjectMaterializer(release).templateState(resolver.resolve(Collections.<String, Object>emptyMap()));
+        V3UpdateResult both = new V3UpdatePlanner(release).planCapabilities(base,
+                resolver.resolve(requested("authorization", Collections.<String, Object>emptyMap())), "APPLY");
+        assertEquals(3, count(both.operations(), "ENSURE_CAPABILITY_CONFIG"));
+        for (Map<String, Object> operation : both.operations()) if ("ENSURE_CAPABILITY_CONFIG".equals(operation.get("type"))) {
+            assertTrue(((String) operation.get("payloadRef")).startsWith("payload/"));
+            @SuppressWarnings("unchecked") List<String> owners = (List<String>) ((Map<String, Object>) operation.get("parameters")).get("capabilityIds");
+            assertFalse(owners.isEmpty());
+        }
+        V3UpdateResult authorizationOnly = new V3UpdatePlanner(release).planCapabilities(both.nextState(),
+                resolver.resolve(requested("authorization", Collections.<String, Object>emptyMap())), "APPLY");
+        assertEquals(V3UpdateResult.Kind.NO_CHANGE, authorizationOnly.kind());
     }
 
     private int count(List<Map<String, Object>> operations, String type) { int total = 0; for (Map<String, Object> operation : operations) if (type.equals(operation.get("type"))) total++; return total; }

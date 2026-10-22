@@ -2,19 +2,30 @@ id: login
 requires: []
 contributes:
   applicationAnnotations:
-    - annotationClass: com.cmb.bee.auth.client.config.EnableAuthClient
+  - annotationClass: com.cmb.bee.auth.client.config.EnableAuthClient
   mavenDependencies:
-    - groupId: ZA21
-      artifactId: bee-starter-auth
+  - groupId: ZA21
+    artifactId: bee-starter-auth
   applicationYaml:
     bee:
       auth:
-        client-id: ${BEE_AUTH_CLIENT_ID:development-client-id}
-        private-key: ${BEE_AUTH_PRIVATE_KEY:}
-        public-key: ${BEE_AUTH_PUBLIC_KEY:}
-        center-public-key: ${BEE_AUTH_CENTER_PUBLIC_KEY:}
-        center-uri: ${BEE_AUTH_CENTER_URI:http://localhost:8081/auth-server}
+        client-id: ${yht.authentication.client-id}
+        private-key: ${yht.authentication.private-key}
+        public-key: ${yht.authentication.public-key}
+        center-public-key: ${yht.authentication.center-public-key}
+        center-uri: ${yht.authentication.center-uri}
         login:
-          authorize-uri: ${BEE_AUTH_AUTHORIZE_URI:http://localhost:8081/auth-server/auth}
-          redirect-uri: ${BEE_AUTH_REDIRECT_URI:http://localhost/login}
+          authorize-uri: ${yht.authentication.authorize-uri}
+          redirect-uri: ${yht.authentication.redirect-uri}
           filter-patterns: /*
+  applicationProfileYaml:
+    dev:
+      yht:
+        authentication:
+          client-id: client-id
+          private-key: private-key
+          public-key: public-key
+          center-public-key: center-public-key
+          center-uri: http://one-account-gateway.paasuat.cmbchina.cn/auth-server
+          authorize-uri: https://one-account-gateway.paasuat.cmbchina.cn/auth-server/auth
+          redirect-uri: http://localhost

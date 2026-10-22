@@ -25,6 +25,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.Yaml;
 
 /** Deterministically materializes frontend and backend Base + Extension Runtime Source. */
 public final class V3ProjectMaterializer {
@@ -53,9 +55,25 @@ public final class V3ProjectMaterializer {
         for (Map.Entry<String, byte[]> registry : registries(resolved).entrySet()) files.put(registry.getKey(), registry.getValue());
         projectAnnotations(files, resolved.order());
         projectMavenDependencies(files, resolved.order());
+        projectApplicationYaml(files, resolved.order());
         ApplicationConfigProjector.applyToProject(files, applicationConfig);
         return files;
     }
+
+    @SuppressWarnings("unchecked") private void projectApplicationYaml(Map<String, byte[]> files, List<String> order) {
+        projectYamlTarget(files, "backend/src/main/resources/application.yml", contributions(order, null));
+        Set<String> profiles=new java.util.TreeSet<String>(); for(String id:order) profiles.addAll(release.extensions().get(id).applicationProfileYaml().keySet());
+        for(String profile:profiles) projectYamlTarget(files, "backend/src/main/resources/application-" + profile + ".yml", contributions(order, profile));
+    }
+    private List<Map<String,Object>> contributions(List<String> order, String profile) { List<Map<String,Object>> result=new ArrayList<Map<String,Object>>(); for(String id:order) { ExtensionRelease extension=release.extensions().get(id); Map<String,Object> value=profile==null ? extension.applicationYaml() : extension.applicationProfileYaml().get(profile); if(value!=null && !value.isEmpty()) result.add(value); } return result; }
+    @SuppressWarnings("unchecked") private void projectYamlTarget(Map<String,byte[]> files, String path, List<Map<String,Object>> contributions) {
+        if(contributions.isEmpty()) return; byte[] source=files.get(path); if(source==null) throw sourceError("backend YAML target is required: " + path);
+        Object loaded=new Yaml().load(new String(source, StandardCharsets.UTF_8)); if(!(loaded instanceof Map)) throw sourceError("backend YAML root must be an object: " + path);
+        Map<String,Object> target=copyYaml((Map<String,Object>)loaded); for(Map<String,Object> contribution:contributions) mergeYaml(target, contribution, "");
+        DumperOptions options=new DumperOptions(); options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK); options.setPrettyFlow(false); files.put(path, new Yaml(options).dump(target).getBytes(StandardCharsets.UTF_8));
+    }
+    @SuppressWarnings("unchecked") private Map<String,Object> copyYaml(Map<String,Object> source) { Map<String,Object> result=new LinkedHashMap<String,Object>(); for(Map.Entry<String,Object> entry:source.entrySet()) { Object value=entry.getValue(); if(value instanceof Map) value=copyYaml((Map<String,Object>)value); else if(value instanceof List) value=new ArrayList<Object>((List<Object>)value); result.put(entry.getKey(),value); } return result; }
+    @SuppressWarnings("unchecked") private void mergeYaml(Map<String,Object> target, Map<String,Object> source, String prefix) { for(Map.Entry<String,Object> entry:source.entrySet()) { String key=entry.getKey(); String path=prefix.isEmpty()?key:prefix+"."+key; Object incoming=entry.getValue(); Object existing=target.get(key); if(incoming instanceof Map) { if(existing==null) target.put(key,copyYaml((Map<String,Object>)incoming)); else if(existing instanceof Map) mergeYaml((Map<String,Object>)existing,(Map<String,Object>)incoming,path); else throw sourceError("application YAML conflict: "+path); } else if(existing==null) target.put(key,incoming); else if(!existing.equals(incoming)) throw sourceError("application YAML conflict: "+path); } }
 
     public Map<String, Object> templateState(ExtensionResolver.ResolvedExtensions resolved) { return templateState(resolved, null); }
     public Map<String, Object> templateState(ExtensionResolver.ResolvedExtensions resolved, Map<String, Object> applicationConfig) {

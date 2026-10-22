@@ -18,6 +18,14 @@ public final class WorkspaceStatus {
         try { Files.walkFileTree(workspace, new SimpleFileVisitor<Path>() {
             @Override public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                 String key=workspace.relativize(file).toString().replace('\\','/'); if(key.startsWith(".xcodeagent/")) return FileVisitResult.CONTINUE; seen.add(key);
+                if (state.yamlContributions.containsKey(key)) {
+                    try {
+                        Map<String,Object> stripped=YamlContributionCompiler.strip(YamlContributionCompiler.read(file), state.yamlContributions.get(key).values());
+                        Map<String,Object> base=YamlContributionCompiler.read(source(root, "base", key));
+                        if (stripped.equals(base)) report.generated.add(key); else report.modified.add(key);
+                    } catch (TemplateException e) { report.modified.add(key); }
+                    return FileVisitResult.CONTINUE;
+                }
                 String owner=state.owners.get(key); if(owner==null) { report.created.add(key); return FileVisitResult.CONTINUE; }
                 Path source=source(root, owner, key); if(!Files.exists(source)) { report.modified.add(key); return FileVisitResult.CONTINUE; }
                 if(key.endsWith("Application.java") && normalizedApplication(file, state).equals(read(source))) { if(!read(file).equals(read(source))) report.generated.add(key); }

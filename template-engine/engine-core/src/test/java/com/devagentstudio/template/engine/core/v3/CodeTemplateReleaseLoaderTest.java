@@ -36,7 +36,19 @@ class CodeTemplateReleaseLoaderTest {
 
         Map<String, byte[]> project = new V3ProjectMaterializer(release).materialize(resolved);
         assertTrue(project.containsKey("frontend/src/pages/Login/index.tsx"));
-        assertTrue(project.containsKey("backend/migrations/001-schema.sql"));
+        assertTrue(project.containsKey("backend/sql/authorization/schema.sql"));
+        org.junit.jupiter.api.Assertions.assertArrayEquals(
+                Files.readAllBytes(root.resolve("template-source/code/backend/extensions/authorization/sql/authorization/schema.sql")),
+                release.extensions().get("authorization").backendFiles().get("sql/authorization/schema.sql"));
+        org.junit.jupiter.api.Assertions.assertArrayEquals(
+                release.extensions().get("authorization").backendFiles().get("sql/authorization/schema.sql"),
+                project.get("backend/sql/authorization/schema.sql"));
+        assertFalse(project.containsKey("backend/docs/auth/sql/ddl.sql"));
+        assertFalse(project.containsKey("backend/migrations/001-schema.sql"));
+        for (String script : java.util.Arrays.asList("bootstrap-authorization.sh", "bootstrap-authorization.ps1")) {
+            assertTrue(release.extensions().get("authorization").backendFiles().containsKey("scripts/" + script));
+            assertTrue(project.containsKey("backend/scripts/" + script));
+        }
         String application = utf8(project.get("backend/src/main/java/com/cmbchina/backend/Application.java"));
         String pom = utf8(project.get("backend/pom.xml"));
         String pageRoutes = utf8(project.get("frontend/src/extensions/systemPageRoutes.ts"));
@@ -61,6 +73,9 @@ class CodeTemplateReleaseLoaderTest {
         assertFalse(baseProject.containsKey("frontend/.devagentstudio/template-contracts/route-projector.json"));
         assertFalse(baseProject.containsKey("frontend/src/pages/Login/index.tsx"));
         assertFalse(utf8(baseProject.get("backend/pom.xml")).contains("bee-starter-auth"));
+        assertFalse(baseProject.containsKey("backend/sql/authorization/schema.sql"));
+        assertFalse(baseProject.containsKey("backend/scripts/bootstrap-authorization.sh"));
+        assertFalse(baseProject.containsKey("backend/scripts/bootstrap-authorization.ps1"));
     }
 
     @SuppressWarnings("unchecked")
