@@ -1,0 +1,33 @@
+{
+  "artifact_type": "technical-plan",
+  "confirmation_status": "confirmed",
+  "authorization_manifest": {
+    "schema_version": "authorization-manifest.v3",
+    "systemAuthorization": {
+      "adminRoleSeedKey": "system_admin",
+      "managementResourceKey": "system_authorization_management"
+    },
+    "resources": [
+      {
+        "resourceKey": "system_authorization_management",
+        "name": "授权管理",
+        "description": "Local integration fixture",
+        "origin": "system",
+        "type": "system",
+        "targetResourceRef": "system:authorization_management"
+      },
+      {
+        "resourceKey": "orders",
+        "name": "订单",
+        "origin": "business",
+        "type": "page",
+        "targetResourceRef": "page:orders"
+      }
+    ],
+    "defaultRoleAuthorization": {
+      "roles": [],
+      "roleResourceGrants": []
+    },
+    "fingerprint": "sha256:2cb33bb61001c51a9d3a9f0437eba18f026407d061e0ddc12fd5f14b39074283"
+  }
+}

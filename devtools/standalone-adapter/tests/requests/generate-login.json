@@ -1,0 +1,10 @@
+{
+  "requestedConfig": {
+    "capabilities": {
+      "login": {
+        "enabled": true,
+        "config": {}
+      }
+    }
+  }
+}

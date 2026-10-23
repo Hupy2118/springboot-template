@@ -1,0 +1,27 @@
+{
+  "requestedConfig": {
+    "applicationConfig": {
+      "appIcon": "AppstoreOutlined",
+      "appName": "Standalone 测试工程",
+      "auth": {
+        "authnSource": "yst",
+        "enable": true,
+        "yht": {
+          "centerPublicKey": "test-value-only",
+          "clientId": "standalone-test-client",
+          "privateKey": "test-value-only",
+          "publicKey": "test-value-only"
+        }
+      },
+      "theme": {
+        "primaryColor": "#3366CC"
+      }
+    },
+    "capabilities": {
+      "authorization": {
+        "config": {},
+        "enabled": true
+      }
+    }
+  }
+}

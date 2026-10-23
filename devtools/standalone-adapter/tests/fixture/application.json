@@ -1,0 +1,8 @@
+{
+  "authorization": {
+    "enabled": true,
+    "initialAdministratorSubjects": [
+      "member-001"
+    ]
+  }
+}

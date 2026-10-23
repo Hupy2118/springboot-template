@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 1,
+  "operations": [
+    {
+      "type": "replace",
+      "target": "frontend/extensions/login/src/apis/login.ts",
+      "source": "overlays/frontend/extensions/login/src/apis/login.ts",
+      "expectedSourceSha256": "0211f181c01feb26e980214878362e2ac9d53cb519ede9da61307579221c7e71",
+      "reason": "Export logoutApi using the existing Standalone cookie logout endpoint"
+    },
+    {
+      "type": "replace",
+      "target": "frontend/extensions/login/src/pages/Logout/index.tsx",
+      "source": "overlays/frontend/extensions/login/src/pages/Logout/index.tsx",
+      "expectedSourceSha256": "4f6cb79998552c06cf71da4e7762e8ddf77573307a509db3ffbac75dad1d2920",
+      "reason": "Clear local identity after server logout and return to the local application"
+    },
+    {
+      "type": "replace",
+      "target": "backend/base/pom.xml",
+      "source": "overlays/backend/base/pom.xml",
+      "expectedSourceSha256": "ed0a54877a0124c850f647bab0c775098022e81318405ae37ec126c370cd81c6",
+      "reason": "Use public Maven/MySQL locally; preserve formal source and projection contract"
+    },
+    {
+      "type": "replace",
+      "target": "backend/base/src/main/resources/application-dev.yml",
+      "source": "overlays/backend/base/src/main/resources/application-dev.yml",
+      "expectedSourceSha256": "403b1f82efbebc9595a7ccab288548f332c316cb9ce7182906898b90daefc86b",
+      "reason": "Use public Maven/MySQL locally; preserve formal source and projection contract"
+    },
+    {
+      "type": "replace",
+      "target": "backend/base/src/main/resources/application.yml",
+      "source": "overlays/backend/base/src/main/resources/application.yml",
+      "expectedSourceSha256": "2b71f5dee95490417c15bb8182b719d919a59ce008183e766dbc7a5a75a9a6e0",
+      "reason": "Use public Maven/MySQL locally; preserve formal source and projection contract"
+    },
+    {
+      "type": "replace",
+      "target": "backend/extensions/authorization/src/main/java/com/cmbchina/backend/auth/bootstrap/BootstrapDataSource.java",
+      "source": "overlays/backend/extensions/authorization/src/main/java/com/cmbchina/backend/auth/bootstrap/BootstrapDataSource.java",
+      "expectedSourceSha256": "5461d75d38615413d996321695014b58e45315a19d32eea1c3f50b5b0e79fd2c",
+      "reason": "Use public Maven/MySQL locally; preserve formal source and projection contract"
+    },
+    {
+      "type": "replace",
+      "target": "backend/extensions/login/extension.yaml",
+      "source": "overlays/backend/extensions/login/extension.yaml",
+      "expectedSourceSha256": "7be5fa4cff0593091724168c8780d7519310cc2c3c80076addffdd164ca9b7c5",
+      "reason": "Use public Maven/MySQL locally; preserve formal source and projection contract"
+    },
+    {
+      "type": "add",
+      "target": "backend/base/src/main/java/com/cmb/bee/commons/errorcodes/IBizErrorCode.java",
+      "source": "sources/base/src/main/java/com/cmb/bee/commons/errorcodes/IBizErrorCode.java",
+      "reason": "Limited compatibility API consumed by unchanged 1016 Java source"
+    },
+    {
+      "type": "add",
+      "target": "backend/base/src/main/java/com/cmb/bee/commons/errorcodes/ISysErrorCode.java",
+      "source": "sources/base/src/main/java/com/cmb/bee/commons/errorcodes/ISysErrorCode.java",
+      "reason": "Limited compatibility API consumed by unchanged 1016 Java source"
+    },
+    {
+      "type": "add",
+      "target": "backend/base/src/main/java/com/cmb/bee/commons/exceptions/BizException.java",
+      "source": "sources/base/src/main/java/com/cmb/bee/commons/exceptions/BizException.java",
+      "reason": "Limited compatibility API consumed by unchanged 1016 Java source"
+    },
+    {
+      "type": "add",
+      "target": "backend/base/src/main/java/com/cmb/bee/commons/exceptions/SysException.java",
+      "source": "sources/base/src/main/java/com/cmb/bee/commons/exceptions/SysException.java",
+      "reason": "Limited compatibility API consumed by unchanged 1016 Java source"
+    },
+    {
+      "type": "add",
+      "target": "backend/base/src/main/java/com/cmb/bee/web/entity/BeeResponseEntity.java",
+      "source": "sources/base/src/main/java/com/cmb/bee/web/entity/BeeResponseEntity.java",
+      "reason": "Limited compatibility API consumed by unchanged 1016 Java source"
+    },
+    {
+      "type": "patch",
+      "target": "backend/extensions/authorization/src/main/java/com/cmbchina/backend/auth/bootstrap/AuthorizationBootstrapCommand.java",
+      "source": "patches/bootstrap-datasource.patch",
+      "expectedSourceSha256": "dbb525922df2b12e15bb4f0efcf39ff70624c3f43965bc0e370f22cd4354ac7f",
+      "expectedResultSha256": "f37a7e1bf3eb36994d7824c9b1e761b6952f34c3f450b7998fedfe9f834013f1",
+      "reason": "Change only JDBC URL family and its error label; retain manifest v3 business validation"
+    },
+    {
+      "type": "add",
+      "target": "backend/extensions/login/src/main/java/com/cmb/oa/one/account/oauth/client/login/context/TokenContextHolder.java",
+      "source": "sources/login/src/main/java/com/cmb/oa/one/account/oauth/client/login/context/TokenContextHolder.java",
+      "reason": "Development-only signed identity and limited request context compatibility; unchanged RBAC enforcement"
+    },
+    {
+      "type": "add",
+      "target": "backend/extensions/login/src/main/java/com/cmb/oa/one/account/oauth/client/login/model/LocalToken.java",
+      "source": "sources/login/src/main/java/com/cmb/oa/one/account/oauth/client/login/model/LocalToken.java",
+      "reason": "Development-only signed identity and limited request context compatibility; unchanged RBAC enforcement"
+    },
+    {
+      "type": "add",
+      "target": "backend/extensions/login/src/main/java/com/cmbchina/backend/standalone/login/MockIdentityFilter.java",
+      "source": "sources/login/src/main/java/com/cmbchina/backend/standalone/login/MockIdentityFilter.java",
+      "reason": "Development-only signed identity and limited request context compatibility; unchanged RBAC enforcement"
+    },
+    {
+      "type": "add",
+      "target": "backend/extensions/login/src/main/java/com/cmbchina/backend/standalone/login/MockIdentityService.java",
+      "source": "sources/login/src/main/java/com/cmbchina/backend/standalone/login/MockIdentityService.java",
+      "reason": "Development-only signed identity and limited request context compatibility; unchanged RBAC enforcement"
+    },
+    {
+      "type": "add",
+      "target": "backend/extensions/login/src/main/java/com/cmbchina/backend/standalone/login/MockLoginConfiguration.java",
+      "source": "sources/login/src/main/java/com/cmbchina/backend/standalone/login/MockLoginConfiguration.java",
+      "reason": "Development-only signed identity and limited request context compatibility; unchanged RBAC enforcement"
+    },
+    {
+      "type": "add",
+      "target": "backend/extensions/login/src/main/java/com/cmbchina/backend/standalone/login/MockLoginController.java",
+      "source": "sources/login/src/main/java/com/cmbchina/backend/standalone/login/MockLoginController.java",
+      "reason": "Development-only signed identity and limited request context compatibility; unchanged RBAC enforcement"
+    },
+    {
+      "type": "add",
+      "target": "backend/base/src/main/resources/application-local.yml",
+      "source": "overlays/backend/base/src/main/resources/application-local.yml",
+      "reason": "Explicit local profile for Mock login and standalone Bootstrap"
+    },
+    {
+      "type": "replace",
+      "target": "backend/extensions/login/docs/login.md",
+      "source": "overlays/backend/extensions/login/docs/login.md",
+      "expectedSourceSha256": "0b7e9ebbecd9c281be2aae27b3430d79124e3ce8450a1178d2df4d84b8386e99",
+      "reason": "Document the local /api/sso/login response and cookie contract without retaining enterprise-only login guidance"
+    }
+  ]
+}

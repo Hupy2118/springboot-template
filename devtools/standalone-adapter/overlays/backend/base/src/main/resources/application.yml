@@ -1,0 +1,13 @@
+server:
+  address: 127.0.0.1
+  port: ${BACKEND_PORT:8080}
+spring:
+  profiles:
+    default: local
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml

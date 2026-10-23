@@ -1,0 +1,4 @@
+{
+  "before": "            if (!dbUrl.startsWith(\"jdbc:tdsql-mysql://\") || dbUser.trim().isEmpty())\n                throw new BootstrapException(\"Bootstrap 必须使用有效的 Bee/TDSQL 数据源\");",
+  "after": "            if (!dbUrl.startsWith(\"jdbc:mysql://\") || dbUser.trim().isEmpty())\n                throw new BootstrapException(\"Bootstrap 必须使用有效的 MySQL 数据源\");"
+}

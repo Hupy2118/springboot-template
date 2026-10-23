@@ -1,0 +1,14 @@
+{
+  "requestedConfig": {
+    "capabilities": {
+      "login": {
+        "enabled": true,
+        "config": {}
+      },
+      "authorization": {
+        "enabled": true,
+        "config": {}
+      }
+    }
+  }
+}

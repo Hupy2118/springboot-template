@@ -9,6 +9,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -21,7 +23,8 @@ import java.util.zip.ZipOutputStream;
 
 /** Builds the V3 generate and update ZIPs without touching a caller Workspace. */
 final class PackageBuilder {
-    private static final long ZIP_TIMESTAMP = 0L;
+    // A fixed DOS-local timestamp avoids epoch-zero resource copies and ZIP timezone extras.
+    private static final LocalDateTime ZIP_TIMESTAMP = LocalDateTime.of(1980, 1, 2, 0, 0);
     private final ObjectMapper json;
     private final CodeTemplateRelease release;
     PackageBuilder(ObjectMapper json, CodeTemplateRelease release) { this.json = json; this.release = release; }
@@ -90,9 +93,10 @@ final class PackageBuilder {
             List<String> paths = new ArrayList<String>(values.keySet()); Collections.sort(paths);
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             ZipOutputStream zip = new ZipOutputStream(output, StandardCharsets.UTF_8);
+            long timestamp = ZIP_TIMESTAMP.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
             for (String path : paths) {
                 if (!safe(path)) throw packageError("unsafe V3 package path " + path);
-                ZipEntry entry = new ZipEntry(path); entry.setTime(ZIP_TIMESTAMP);
+                ZipEntry entry = new ZipEntry(path); entry.setTime(timestamp);
                 zip.putNextEntry(entry); zip.write(values.get(path)); zip.closeEntry();
             }
             zip.finish(); zip.close(); return output.toByteArray();

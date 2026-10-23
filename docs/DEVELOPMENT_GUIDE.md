@@ -282,6 +282,8 @@ mvn -f template-engine/pom.xml verify
 
 Generate ZIP 包含 `frontend/`、`backend/`、`.devagentstudio/template-state.json` 及 Route Projector Contracts。首次 Generate 可在 `requestedConfig.applicationConfig` 中提交应用参数，投影到 `frontend/.env` 与 `backend/src/main/resources/application.yml`；State 仅保存能力及修订信息，不保存认证参数。后续参数更新由调用方定点修改这两个文件。
 
+Generate 与 Update 的 ZIP entry 按路径固定排序，时间固定为 ZIP DOS 本地时间 `1980-01-02 00:00:00`，保持跨时区字节稳定。不要使用 Unix epoch 0：部分 Maven 资源复制实现会把源文件和不存在的目标均视作时间戳 0，跳过复制后因目标不存在而报错。验收解压工程时也应保留该固定时间，避免用写文件时的当前时间掩盖此类问题。
+
 新版增量安装向原 `POST /v1/update` 提交完整 `currentTemplateState`、只含 `capabilities` 的 `requestedConfig`、`protocolVersion: "4"` 与 `mode: "APPLY" | "RECONCILE"`。省略 Capability 等同禁用，已安装能力不可卸载或升级。V4 仅安装缺失 Extension 及其受管 Registry/Contribution；单纯参数或 Release 版本变化返回 `204`。V4 包的 `sourceRevision` 为传入 State 的修订，`expectedStateSequence` 缺省为 0；成功安装后 `nextTemplateState.stateSequence` 加一。包内 payload 清单只含大小，不含摘要。调用方仍须验证 ZIP 路径、大小、条目唯一性和操作白名单，以工作区锁、原始字节比较及恢复事务防止覆盖用户修改。`RECONCILE` 只修复受管代码，不改参数。旧 V3 合同暂保留兼容；新配置与 Capability 增量链路必须使用 V4。
 
 ### 5.2 编译与启动 Engine

@@ -1,0 +1,34 @@
+{
+  "id": "login",
+  "requires": [],
+  "contributes": {
+    "applicationAnnotations": [],
+    "mavenDependencies": [],
+    "applicationYaml": {
+      "standalone": {
+        "mock": {
+          "enabled": "${STANDALONE_MOCK_ENABLED:true}",
+          "signing-key": "${STANDALONE_MOCK_SIGNING_KEY:}",
+          "login-secret": "${STANDALONE_MOCK_LOGIN_SECRET:}",
+          "users-json": "${STANDALONE_MOCK_USERS:}",
+          "sso-user-id": "${STANDALONE_MOCK_SSO_USER_ID:}"
+        }
+      }
+    },
+    "applicationProfileYaml": {
+      "dev": {
+        "yht": {
+          "authentication": {
+            "client-id": "standalone-test-client",
+            "private-key": "test-value-only",
+            "public-key": "test-value-only",
+            "center-public-key": "test-value-only",
+            "center-uri": "http://127.0.0.1",
+            "authorize-uri": "http://127.0.0.1",
+            "redirect-uri": "http://127.0.0.1"
+          }
+        }
+      }
+    }
+  }
+}
