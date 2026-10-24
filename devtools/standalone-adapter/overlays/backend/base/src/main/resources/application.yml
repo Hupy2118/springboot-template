@@ -11,3 +11,10 @@ spring:
     password: ${DB_PASSWORD}
 mybatis-plus:
   mapper-locations: classpath*:mapper/**/*.xml
+standalone:
+  mock:
+    enabled: ${STANDALONE_MOCK_ENABLED:true}
+    signing-key: ${STANDALONE_MOCK_SIGNING_KEY:}
+    login-secret: ${STANDALONE_MOCK_LOGIN_SECRET:}
+    users-json: ${STANDALONE_MOCK_USERS:}
+    sso-user-id: ${STANDALONE_MOCK_SSO_USER_ID:}

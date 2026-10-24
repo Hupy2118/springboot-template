@@ -20,6 +20,37 @@ def caps(*names):
     return {'capabilities':{name:{'enabled':True,'config':{}} for name in names}}
 
 
+def check_config_operations(files, package, newly_installed):
+    """Check actual V4 payloads and fixed configuration operation surfaces."""
+    main = 'backend/src/main/resources/application.yml'
+    dev = 'backend/src/main/resources/application-dev.yml'
+    env = 'frontend/.env'
+    coverage = set()
+    for op in package['operations']:
+        if op['target'] in (main, dev, env):
+            require(op['type'] == 'ENSURE_CAPABILITY_CONFIG', 'configuration must use Ensure')
+        if op['type'] != 'ENSURE_CAPABILITY_CONFIG':
+            continue
+        target = op['target']
+        require(target in (main, dev, env), 'unknown config target')
+        parameters = op['parameters']
+        ids = parameters['capabilityIds']
+        expected = newly_installed - ({'authorization'} if target == env else set())
+        require(set(ids) == expected and len(ids) == len(expected), 'incorrect config capabilityIds')
+        require(parameters['format'] == ('dotenv' if target == env else 'yaml'), 'incorrect config format')
+        text = files[op['payloadRef']].decode()
+        require('standalone' not in text.lower() and 'STANDALONE_MOCK' not in text, 'Mock leaked into contribution')
+        if target == main:
+            require(('bee:' in text) == ('login' in ids), 'wrong Login main contribution')
+            require(('user-query-path:' in text) == ('authorization' in ids), 'wrong Authorization main contribution')
+        if target == dev:
+            require(('authentication:' in text) == ('login' in ids), 'wrong Login dev contribution')
+            require(('view-id:' in text) == ('authorization' in ids), 'wrong Authorization dev contribution')
+        coverage.add(target)
+    require(coverage == ({main, dev, env} if 'login' in newly_installed else {main, dev}),
+            'incomplete config surfaces')
+
+
 def check_update(files, current, expected, sequence, mode='APPLY'):
     require('extension-update-package.json' in files,'missing update metadata')
     data=json.loads(files['extension-update-package.json'])
@@ -85,6 +116,8 @@ def run(base,mode,out):
             if mode=='standalone':
                 require('spring-boot-starter-parent' in pom and 'ZA21' not in pom,'wrong standalone parent')
                 audit_files(files)
+                require('${STANDALONE_MOCK_ENABLED:true}' in files['backend/src/main/resources/application.yml'].decode(),
+                        'Base must supply local Mock configuration')
                 if name=='base':require(not any('/auth/' in key or '/standalone/login/' in key for key in files),'Base contains Login/Authorization')
                 else:
                     require(any('/standalone/login/MockIdentityService.java' in key for key in files),'missing Mock login')
@@ -93,7 +126,13 @@ def run(base,mode,out):
                     require("export function logoutApi()" in files['frontend/src/apis/login.ts'].decode()
                             and "'/api/standalone/logout'" in files['frontend/src/apis/login.ts'].decode(),
                             'Standalone frontend logout contract is missing')
-            else:require('ZA21' in pom and 'bee-starter-parent' in pom,'wrong native parent')
+            else:
+                require('ZA21' in pom and 'bee-starter-parent' in pom,'wrong native parent')
+                require(not any('/standalone/' in key or b'STANDALONE_MOCK' in value for key,value in files.items()),
+                        'Native contains Standalone runtime')
+            if expected:
+                require('bee:' in files['backend/src/main/resources/application.yml'].decode(), 'missing native Login YAML')
+                require('authentication:' in files['backend/src/main/resources/application-dev.yml'].decode(), 'missing native Login profile YAML')
             if 'authorization' in names:
                 for key in ASSETS:require(key in files,'missing authorization asset: '+key)
             (out/'metadata'/(name+'-state.json')).write_bytes(encode(state))
@@ -120,6 +159,7 @@ def run(base,mode,out):
                 body={'protocolVersion':'4','currentTemplateState':current,'requestedConfig':caps(*names),'mode':'APPLY'}
                 files=zip_response(*request('update-'+name,'/v1/update',body))
                 package=check_update(files,current,names,seq)
+                check_config_operations(files,package,set(names)-set(current['effective']))
                 (out/'metadata'/('update-'+name+'.json')).write_bytes(encode(package))
                 if name=='login':
                     logout_target='frontend/src/apis/login.ts'
@@ -128,8 +168,8 @@ def run(base,mode,out):
                             'V4 Login API differs from Generate')
                     configs=[op for op in package['operations'] if op['type']=='ENSURE_CAPABILITY_CONFIG'
                              and op['target']=='backend/src/main/resources/application.yml']
-                    require(len(configs)==1 and '${STANDALONE_MOCK_ENABLED:true}' in files[configs[0]['payloadRef']].decode(),
-                            'V4 Login contribution does not enable Mock by default')
+                    require(len(configs)==1 and 'bee:' in files[configs[0]['payloadRef']].decode(),
+                            'V4 Login must inherit native configuration')
                 if name=='authorization':
                     targets={op['target']:op for op in package['operations']}
                     for asset in ASSETS:
@@ -139,6 +179,12 @@ def run(base,mode,out):
                         require(files[op['payloadRef']]==projects['authorization'][asset],'update asset differs from Generate')
                 current=package['nextTemplateState']
                 checks.append('V4 '+name+' planning: PASS sequence '+str(seq)+'→'+str(seq+1))
+            direct=zip_response(*request('update-base-authorization','/v1/update',{
+                'protocolVersion':'4','currentTemplateState':states['base'],
+                'requestedConfig':caps('authorization'),'mode':'APPLY'}))
+            direct_package=check_update(direct,states['base'],('login','authorization'),0)
+            check_config_operations(direct,direct_package,{'login','authorization'})
+            checks.append('V4 Base→Authorization: PASS dependency closure and native config surfaces')
             body={'protocolVersion':'4','currentTemplateState':current,'requestedConfig':caps('login','authorization'),'mode':'APPLY'}
             status,_,data=request('update-no-change','/v1/update',body)
             require(status==204 and data==b'','expected HTTP 204 with empty body')
@@ -155,6 +201,23 @@ def run(base,mode,out):
             require(json.loads(files['extension-update-package.json'])['protocolVersion']=='3','wrong V3 protocol')
             audit_files({key.removeprefix('payload/'):value for key,value in files.items() if key.startswith('payload/backend/')})
             checks.append('V3 planning regression: PASS')
+        else:
+            body={'protocolVersion':'4','currentTemplateState':states['base'],
+                  'requestedConfig':caps('authorization'),'mode':'APPLY'}
+            files=zip_response(*request('native-update-authorization','/v1/update',body))
+            package=json.loads(files['extension-update-package.json'])
+            check_config_operations(files,package,{'login','authorization'})
+            current=package['nextTemplateState']
+            require(current['stateSequence']==1 and set(current['effective'])=={'login','authorization'}, 'wrong Native next State')
+            body['currentTemplateState']=current
+            status,_,data=request('native-update-no-change','/v1/update',body)
+            require(status==204 and not data,'Native repeat APPLY must return 204')
+            body['mode']='RECONCILE'
+            files=zip_response(*request('native-update-reconcile','/v1/update',body))
+            repaired=json.loads(files['extension-update-package.json'])
+            require(repaired['nextTemplateState']==current,'Native RECONCILE changed state')
+            require(not any(op['type']=='ENSURE_CAPABILITY_CONFIG' for op in repaired['operations']), 'Native RECONCILE config mutation')
+            checks.append('Native V4 install/repeat/RECONCILE: PASS')
         require(inventory(runtime_files(REPO/'template-source/code'))==before,'formal Runtime Source changed')
         checks.append('Formal Runtime Source hashes: PASS unchanged')
         return projects

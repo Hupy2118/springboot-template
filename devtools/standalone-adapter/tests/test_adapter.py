@@ -77,7 +77,8 @@ class OverlayTests(unittest.TestCase):
         return code
 
     @patch.object(a,'git_sha',return_value='baseline')
-    def test_reproducible_prepare_audit_and_rollback(self, _):
+    @patch.object(a,'validate_contract_parity')
+    def test_reproducible_prepare_audit_and_rollback(self, _parity, _sha):
         code=self.fixture()
         build=self.root/'.standalone-build'
         a.ensure_output(self.root,build)

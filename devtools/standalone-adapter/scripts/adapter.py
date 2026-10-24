@@ -190,6 +190,38 @@ def audit_files(files):
             require(not match, 'private runtime dependency/config remains: ' + path + ' (' + (match.group() if match else '') + ')')
 
 
+def validate_contract_parity(original, adapted):
+    """Fail closed on manifest drift without implementing another YAML parser.
+
+    Exact equality outside the two reviewed runtime contributions also protects
+    id/requires and every current or future configuration subtree and value.
+    The real Engine Loader is exercised separately by HTTP verification.
+    """
+    login = 'backend/extensions/login/extension.yaml'
+    private = (b'  applicationAnnotations:\n'
+               b'  - annotationClass: com.cmb.bee.auth.client.config.EnableAuthClient\n'
+               b'  mavenDependencies:\n'
+               b'  - groupId: ZA21\n    artifactId: bee-starter-auth\n')
+    public = b'  applicationAnnotations: []\n  mavenDependencies: []\n'
+    require(login in original and original[login].count(private) == 1,
+            'Login runtime contribution changed; review adapter allowlist')
+    require(adapted.get(login) == original[login].replace(private, public, 1),
+            'Login contract drift: only reviewed annotation/Maven removals are allowed')
+    authorization = 'backend/extensions/authorization/extension.yaml'
+    require(authorization in original and adapted.get(authorization) == original[authorization],
+            'Authorization manifest contract drift')
+    require(b'requires:\n- login\n' in original[authorization], 'Authorization must require Login')
+    for path, token in (
+        ('backend/base/pom.xml', b'<artifactId>spring-boot-starter-parent</artifactId>'),
+        ('backend/base/src/main/resources/application.yml', b'driver-class-name: com.mysql.cj.jdbc.Driver'),
+        ('backend/base/src/main/resources/application.yml', b'${STANDALONE_MOCK_ENABLED:true}'),
+        ('backend/extensions/login/src/main/java/com/cmbchina/backend/standalone/login/MockLoginConfiguration.java',
+         b'@Profile({"dev", "local"})'),
+        ('backend/extensions/login/src/main/java/com/cmbchina/backend/standalone/login/MockIdentityService.java',
+         b'class MockIdentityService')):
+        require(token in adapted.get(path, b''), 'Standalone runtime adaptation missing: ' + path)
+
+
 def git_sha(repo):
     return subprocess.check_output(['git', '-C', str(repo), 'rev-parse', 'HEAD'], text=True).strip()
 
@@ -246,6 +278,7 @@ def prepare(repo=REPO, adapter=ADAPTER, build=None):
     manifest_path = safe_file(adapter, 'manifest.yaml')
     manifest = json_read(manifest_path)
     result, changes = apply(source, adapter, manifest)
+    validate_contract_parity(source, result)
     result['template-revision.txt'] = (config['standaloneRevision'] + '\n').encode()
     audit_files(result)
     inputs = {op['source']: digest(safe_file(adapter, op['source']).read_bytes())
@@ -313,6 +346,7 @@ def audit(source=None, repo=REPO, adapter=ADAPTER):
     expected['template-revision.txt'] = (config['standaloneRevision'] + '\n').encode()
     require(inventory(expected) == inventory(actual), 'prepared source no longer matches upstream/overlay')
     require(report['manifestSha256'] == digest((adapter / 'manifest.yaml').read_bytes()), 'manifest changed since prepare')
+    validate_contract_parity(original, actual)
     audit_files(actual)
     return report
 

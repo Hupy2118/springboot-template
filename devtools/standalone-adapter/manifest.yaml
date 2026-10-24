@@ -44,11 +44,12 @@
       "reason": "Use public Maven/MySQL locally; preserve formal source and projection contract"
     },
     {
-      "type": "replace",
+      "type": "patch",
       "target": "backend/extensions/login/extension.yaml",
-      "source": "overlays/backend/extensions/login/extension.yaml",
+      "source": "patches/login-manifest-runtime.patch",
       "expectedSourceSha256": "7be5fa4cff0593091724168c8780d7519310cc2c3c80076addffdd164ca9b7c5",
-      "reason": "Use public Maven/MySQL locally; preserve formal source and projection contract"
+      "reason": "Remove only enterprise runtime annotation and Maven dependency; inherit native applicationYaml/applicationProfileYaml unchanged",
+      "expectedResultSha256": "58e0c438d5234c7e1f45136be59cfd3a92a79fe30ecfd1494486ab37c3ceea8e"
     },
     {
       "type": "add",

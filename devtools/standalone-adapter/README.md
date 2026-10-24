@@ -14,7 +14,7 @@ export TEMPLATE_ENGINE_STANDALONE_ENABLED=true
 
 引擎默认监听 `127.0.0.1:18080`，可以设置 `TEMPLATE_ENGINE_PORT`。无需设置第二个 Revision 变量；以 `release.yaml` 为准。`TEMPLATE_ENGINE_SOURCE_ROOT` 若已设置，必须与选择模式的绝对路径完全一致，否则拒绝启动。不要在 Source Root 末尾加 `/code`。
 
-当前 Standalone Revision 为 `2026.10.23.1008`。更新 Adapter 或引擎后，先构建并停止已有 Standalone 引擎，再通过上述脚本重启，才会 prepare 并加载新模板源；已下载的生成工程不会自动改写。自 1007 起，含 Login 的生成后端默认可使用模拟登录，无需额外 Mock 环境变量，数据库仍需配置，详见下文。1008 额外适配前端 logoutApi 与本地登出页面。
+当前 Standalone Revision 为 `2026.10.24.1009`（正式来源 `2026.10.23.2`）。更新 Adapter 或引擎后，先构建并停止已有 Standalone 引擎，再通过上述脚本重启，才会 prepare 并加载新模板源；已下载的生成工程不会自动改写。自 1007 起，含 Login 的生成后端默认可使用模拟登录，无需额外 Mock 环境变量，数据库仍需配置，详见下文。1008 适配前端 logoutApi 与本地登出页面；1009 恢复正式 Login 配置贡献，Mock 配置仅由 Standalone Base 提供。
 
 默认关闭：
 
@@ -33,7 +33,12 @@ unset TEMPLATE_ENGINE_STANDALONE_ENABLED TEMPLATE_ENGINE_SOURCE_ROOT
 ./devtools/standalone-adapter/build.sh prepare
 ./devtools/standalone-adapter/build.sh audit
 ./devtools/standalone-adapter/build.sh test
+./devtools/standalone-adapter/build.sh verify-contract-loader
 ```
+
+`verify-contract-loader` 要求先构建真实 Engine JAR，使用其中的生产 Loader 比较两种来源的 Manifest 语义，不改 Engine 测试或源码。Prepare/Audit 的共同 Gate 对 Login 除指定企业注解与 Maven 依赖之外的完整 Manifest 做字节对比，对 Authorization 做完整字节对比。`id/requires/applicationYaml/applicationProfileYaml`（包括默认值）必须一致；旧补丁遇到上游 SHA 变化即失败。没有新增 Python YAML 解析依赖，原私有依赖扫描继续执行。
+
+Login Manifest 从正式源精确派生，不再维护整份 Overlay。`standalone.mock.*` 位于 Standalone Base 的既有 `application.yml`；V4 的 MAIN/DEV/ENV 配置片段只承载新能力的正式贡献，不携带 Mock 节点。允许公共 Maven、兼容 Java、MySQL、Bootstrap 数据源解析差异，以及 State 内相应 Maven/Annotation 差异；两种模式的 State 不要求字节相同，也不能混用。
 
 `manifest.yaml`、`release.yaml` 使用 **JSON 语法（合法 YAML 子集）**，因此 Python 不需要 PyYAML。不能改写成任意 YAML 语法。每个覆盖/删除/补丁目标都有实测 `expectedSourceSha256`；新增目标必须不存在。同一目标只能出现一次。
 
@@ -81,6 +86,18 @@ V4 Update 顶层仅 `protocolVersion/currentTemplateState/requestedConfig/mode`�
 Postman：Body/raw/JSON，`Content-Type: application/json`，`Accept: application/zip, application/json`，使用 Send and Download 保存 ZIP。原服务在错误请求只接受 ZIP 时存在错误内容协商限制，可能返回 500；双 Accept 可以接收合同规定的 JSON 错误，非法 `standalone` 字段仍为 400。本 Adapter 没有修改服务端错误处理。
 
 L1 证明 HTTP/ZIP/规划；L2 需要真实数据库、授权与 Bootstrap；L3 需要现有 XCodeAgent Workspace Operation Executor 真正 Apply 后构建运行。脚本不会用 unzip 或自行编写的简化 Executor 冒充 L3。原生 API 没有 Variant 身份字段；独立 Revision 无法严格阻止全部跨模式 Update。自动客户端只使用本轮生成的同模式 State；生产调用方仍须做外部来源隔离。
+
+跨项目真实执行验收入口（需要本地 XCodeAgent Backend 及其可运行 Python 依赖）：
+
+```sh
+./devtools/standalone-adapter/build.sh verify-xcodeagent \
+  --xcodeagent-backend /absolute/path/to/XCodeAgent/Backend \
+  --engine-url http://127.0.0.1:18080
+```
+
+优先使用所选 Backend 的 `.venv/bin/python`，不安装依赖、不读取其 `.env`、不写入其源码或 bytecode。实际 Generate 带测试 `applicationConfig`，以便交付真实 `frontend/.env`。新建隔离工作区后验证三条 V4 安装链路，直接调用原生 ZIP/Ensure 校验器、WorkingCopy/Executor 和 V4 事务；注入事务写入失败验证恢复。还调用真实应用配置 Orchestrator 验证首次登录、首次权限、仅改参数、重复提交及本地 NO_CHANGE，确认参数更新不再请求 Engine。
+
+默认继续构建两个 Executor Apply 后的后端，检查 Mock、匿名 RBAC 与 Bootstrap dry-run；`--skip-build` 明确标记该部分 NOT_RUN。报告及真实 ZIP/State/文件差异保存于 `.standalone-build/reports/xcodeagent-contract-*/`，最新索引为 `xcodeagent-contract-latest.json`。缺仓库/依赖返回 3 并标记 BLOCKED，校验失败返回 1。成功状态 `PASS_SCOPED` 只涵盖实际执行项，真实 MySQL/数据库权限/Bootstrap SQL 执行仍需手工验收。此次实现及验收记录见 [contract-alignment-1009.md](reports/contract-alignment-1009.md)。
 
 ## 本地登录与前端边界
 

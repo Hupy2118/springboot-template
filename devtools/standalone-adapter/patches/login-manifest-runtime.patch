@@ -1,0 +1,4 @@
+{
+  "before": "  applicationAnnotations:\n  - annotationClass: com.cmb.bee.auth.client.config.EnableAuthClient\n  mavenDependencies:\n  - groupId: ZA21\n    artifactId: bee-starter-auth\n",
+  "after": "  applicationAnnotations: []\n  mavenDependencies: []\n"
+}
