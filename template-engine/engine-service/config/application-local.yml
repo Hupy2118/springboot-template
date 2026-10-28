@@ -3,5 +3,8 @@ server:
   port: ${TEMPLATE_ENGINE_PORT:18080}
 
 devagentstudio:
+  app-update:
+    latestAppVersion: "1.0.1"
+    appDownloadUrl: "http://127.0.0.1:18081/" # 前端electron通过pnpm mockcdn 启动的模拟cdn服务的端口
   template-engine:
     source-root: ${TEMPLATE_ENGINE_SOURCE_ROOT}

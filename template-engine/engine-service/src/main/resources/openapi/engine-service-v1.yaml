@@ -3,6 +3,15 @@ info:
   title: DevAgentStudio Template Engine Service
   version: v3
 paths:
+  /v1/app-updates/check:
+    post:
+      operationId: checkAppUpdate
+      description: Checks desktop app SemVer precedence. Stable clients are never offered prerelease versions. The CDN base URL is returned unchanged; the client constructs the installer path.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AppUpdateRequest' } } } }
+      responses:
+        '200': { description: App update eligibility, content: { application/json: { schema: { $ref: '#/components/schemas/AppUpdateResponse' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
   /v1/generate:
     post:
       operationId: generate
@@ -26,6 +35,28 @@ components:
   responses:
     Error: { description: Error envelope, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   schemas:
+    SemanticVersion:
+      type: string
+      description: Strict SemVer 2.0.0. Build metadata is ignored for precedence.
+      pattern: '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+    AppUpdateRequest:
+      type: object
+      required: [currentVersion]
+      additionalProperties: false
+      properties:
+        currentVersion: { $ref: '#/components/schemas/SemanticVersion' }
+    AppUpdateResponse:
+      type: object
+      required: [updateAvailable, latestAppVersion, appDownloadUrl]
+      additionalProperties: false
+      properties:
+        updateAvailable: { type: boolean }
+        latestAppVersion: { $ref: '#/components/schemas/SemanticVersion' }
+        appDownloadUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: Unchanged configured HTTP(S) CDN base URL when updateAvailable is true; null otherwise. The desktop updater reads latest.yml or latest-mac.yml from this base URL.
     GenerateRequest:
       type: object
       required: [requestedConfig]
@@ -173,7 +204,7 @@ components:
       properties:
         code:
           type: string
-          enum: [BAD_REQUEST, PROTOCOL_VERSION_UNSUPPORTED, TEMPLATE_STATE_SCHEMA_UNSUPPORTED, TEMPLATE_STATE_INVALID, CAPABILITY_UNKNOWN, CAPABILITY_REMOVAL_UNSUPPORTED, CAPABILITY_UPGRADE_UNSUPPORTED, RECONCILE_STATE_CHANGE_REQUIRED, TEMPLATE_RELEASE_DOWNGRADE_UNSUPPORTED, TEMPLATE_SOURCE_INVALID, EXTENSION_CONTRACT_MISMATCH, MAVEN_DEPENDENCY_CONFLICT, PACKAGE_BUILD_FAILED, CONFIG_TARGET_CONFLICT]
+          enum: [BAD_REQUEST, APP_UPDATE_UNAVAILABLE, PROTOCOL_VERSION_UNSUPPORTED, TEMPLATE_STATE_SCHEMA_UNSUPPORTED, TEMPLATE_STATE_INVALID, CAPABILITY_UNKNOWN, CAPABILITY_REMOVAL_UNSUPPORTED, CAPABILITY_UPGRADE_UNSUPPORTED, RECONCILE_STATE_CHANGE_REQUIRED, TEMPLATE_RELEASE_DOWNGRADE_UNSUPPORTED, TEMPLATE_SOURCE_INVALID, EXTENSION_CONTRACT_MISMATCH, MAVEN_DEPENDENCY_CONFLICT, PACKAGE_BUILD_FAILED, CONFIG_TARGET_CONFLICT]
         message: { type: string }
         details: { type: object }
         traceId: { type: string }

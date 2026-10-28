@@ -236,6 +236,7 @@ contributes:
 | --- | --- |
 | 生成 | `POST /v1/generate`；返回 `application/zip` |
 | 更新 | `POST /v1/update`；返回更新包 ZIP 或 `204` 无变化 |
+| 桌面应用版本检测 | `POST /v1/app-updates/check`；返回 JSON 更新信息与 CDN 基础地址 |
 | HTTP 契约 | `template-engine/engine-service/src/main/resources/openapi/engine-service-v1.yaml` |
 | ZIP 内部 Schema | `template-engine/engine-service/src/main/resources/contracts/v3/*.schema.json`（旧协议）与 `contracts/v4/*.schema.json`（增量安装） |
 | Release 输入 | `template-source/code/` 的 Base、Extension、Contracts、Revision |
@@ -272,6 +273,39 @@ java -jar template-engine/engine-service/target/engine-service-1.0.0-SNAPSHOT.ja
 ```
 
 本地服务监听 `127.0.0.1:18080`（由 `application-local.yml` 控制），仅面向本机。`TEMPLATE_ENGINE_SOURCE_ROOT` 必须为绝对路径；服务无应用层认证，不应直接暴露公网。应用生成后的 Workspace Apply、构建、回滚、State 持久化属于 XCodeAgent / 调用方职责。
+
+### 5.3 XCodeAgent 应用版本检测
+
+此接口为无状态发布信息查询，与模板版本、Capability 和 TemplateState 无关。配置位于 `template-engine/engine-service/config/application-local.yml`：
+
+```yaml
+devagentstudio:
+  app-update:
+    latestAppVersion: "1.0.1"
+    appDownloadUrl: "http://127.0.0.1:18081/"
+```
+
+`appDownloadUrl` 为 CDN 基础地址，本地示例对应 XCodeAgent `Frontend` 下的 `pnpm mock:cdn` 服务；公司部署时替换为实际 CDN 地址。两项配置同时省略时，模板服务可正常启动，版本检测返回 `503 APP_UPDATE_UNAVAILABLE`；只提供一项、版本不符合 SemVer 2.0.0，或下载地址不是包含 host 的绝对 HTTP/HTTPS URL 时，服务启动失败。配置修改后需重启服务。
+
+请求 `POST /v1/app-updates/check`，Content-Type 为 `application/json`，请求对象只允许一个必填字符串字段：
+
+```json
+{"currentVersion": "1.0.0"}
+```
+
+正常检查始终返回 `200 application/json`，三个字段均存在：
+
+```json
+{"updateAvailable": true, "latestAppVersion": "1.0.1", "appDownloadUrl": "http://127.0.0.1:18081/"}
+```
+
+仅当前版本优先级低于最新版本时提供更新；正式版客户端不会收到预发布版更新，即使其主版本更高。预发布版客户端可升级到更高优先级的预发布版或正式版。比较严格遵循 [SemVer 2.0.0](https://semver.org/)：数字段按数值排序，预发布版低于同版本正式版，构建元数据不影响优先级；例如 `1.10.0 > 1.9.0`、`1.2.0-beta.11 > 1.2.0-beta.2`，`1.2.0+002` 与 `1.2.0+001` 优先级相同。不支持 `v1.0.0`、缺省段数、空白或数字段前导零。
+
+无更新、当前版本更高或被预发布策略过滤时，仍返回配置中的 `latestAppVersion`，但 `updateAvailable` 为 `false`、`appDownloadUrl` 为显式 `null`。非法请求（包括额外字段、类型错误、非法版本）返回统一 `400 BAD_REQUEST` 错误结构。
+
+有更新时，服务原样返回配置的 CDN 基础地址；客户端使用 electron-updater 读取该地址下的 Windows `latest.yml` 或 Mac `latest-mac.yml`，核对清单版本后按清单下载并校验文件，再负责退出和安装。不追加版本/系统目录。此接口不代理文件下载，也不是 electron-updater 的更新清单。请求响应 Fixture 位于 `engine-service/src/test/resources/fixtures/app-update-check.json`。
+
+共享部署时，XCodeAgent 使用统一远端服务地址；本地配置仍保持回环监听，远端接入入口及认证应独立配置。发布顺序为：先上传并验证所有目标平台安装包，再修改最新版本与 CDN 配置，最后重启服务。单一 `latestAppVersion` 不提供历史版本查询或独立稳定版/测试版通道。
 
 ## 6. 构建、验证与发布
 
