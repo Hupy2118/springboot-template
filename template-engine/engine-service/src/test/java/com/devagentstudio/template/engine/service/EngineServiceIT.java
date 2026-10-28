@@ -48,6 +48,14 @@ class EngineServiceIT {
     }
 
     @Test
+    void appUpdateWithoutConfigurationDoesNotPreventTemplateEngineStartup() throws Exception {
+        MvcResult result = mvc().perform(post("/v1/app-updates/check").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentVersion\":\"1.0.0\"}"))
+                .andExpect(status().isServiceUnavailable()).andReturn();
+        assertEquals("APP_UPDATE_UNAVAILABLE", JSON.readTree(result.getResponse().getContentAsByteArray()).path("code").asText());
+    }
+
+    @Test
     void generateIsDeterministicAndIncludesDependencyClosureAndResourceOwners() throws Exception {
         MockMvc mvc = mvc();
         byte[] base = generate(mvc, capabilities());
