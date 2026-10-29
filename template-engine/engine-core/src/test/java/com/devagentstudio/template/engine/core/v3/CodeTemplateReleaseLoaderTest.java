@@ -63,6 +63,26 @@ class CodeTemplateReleaseLoaderTest {
         assertFalse(utf8(baseProject.get("backend/pom.xml")).contains("bee-starter-auth"));
     }
 
+    /** 验证 Runtime 真实源码和 State 交付，不允许混入 Java 根或登录能力。 */
+    @Test
+    void runtimeUsesExclusiveBackendAndCurrentArtifactState() {
+        CodeTemplateRelease release = new CodeTemplateReleaseLoader(repositoryRoot().resolve("template-source/code")).load();
+        Map<String, Object> request = new LinkedHashMap<String, Object>();
+        Map<String, Object> enabled = new LinkedHashMap<String, Object>();
+        enabled.put("enabled", true); enabled.put("config", Collections.emptyMap());
+        request.put("python_application_runtime", enabled);
+        ResolvedExtensions resolved = new ExtensionResolver(release).resolve(request);
+        assertTrue(resolved.effective().containsKey("python_business_mysql"));
+        Map<String, byte[]> files = new V3ProjectMaterializer(release).materialize(resolved);
+        assertTrue(files.containsKey("agent-runtime/pyproject.toml"));
+        assertTrue(files.containsKey("agent-runtime/uv.lock"));
+        assertTrue(files.containsKey("agent-runtime/src/app/infrastructure/database.py"));
+        assertFalse(files.keySet().stream().anyMatch(path -> path.startsWith("backend/")));
+        assertTrue(resolved.managedContributions().isEmpty());
+        request.put("login", enabled);
+        org.junit.jupiter.api.Assertions.assertThrows(V3Exception.class, () -> new ExtensionResolver(release).resolve(request));
+    }
+
     @SuppressWarnings("unchecked")
     private java.util.List<String> owners(Map<String, Object> value) { return (java.util.List<String>) value.get("owners"); }
     private int occurrences(String source, String token) { return (source.length() - source.replace(token, "").length()) / token.length(); }

@@ -72,7 +72,7 @@
             "pattern": "^payload/.+$"
           },
           "target": {
-            "pattern": "^(frontend|backend)/.+$"
+            "pattern": "^(frontend|backend|agent-runtime)/.+$"
           }
         }
       }

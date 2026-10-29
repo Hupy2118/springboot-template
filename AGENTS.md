@@ -2,7 +2,7 @@
 
 ## 工程目标与边界
 
-本仓库仅实现 V3 Template Engine，使用 `template-source/code` 下的双端 Base + Extension Source。
+本仓库仅实现 V3 Template Engine，使用 `template-source/code` 下的共享前端与 Java / Agent Runtime 互斥后端的 Base + Extension Source。
 
 Engine Service 是无状态计算入口，不是 Project Registry、Workspace Manager 或 ChangeSet 状态机。不得在 Service 中增加数据库、JDBC/JPA/MyBatis、Flyway、Redis、Repository/DAO、Project ID、服务端 TemplateState 或幂等记录。
 
@@ -17,6 +17,8 @@ Engine Service 是无状态计算入口，不是 Project Registry、Workspace Ma
 - `template-engine/engine-service/`：Spring HTTP、认证、Core 映射、错误映射和 Package Builder。不得实现业务 Capability 逻辑。
 - `scripts/ci/`：可重复使用的 CI Gate 与 Template Source 构建检查；脚本必须自行定位仓库根目录。
 - `docs/DEVELOPMENT_GUIDE.md`：项目架构与前后端模板的唯一维护开发指南。协议变更必须同步权威 OpenAPI / JSON Schema、Fixture 及契约测试。
+
+- `template-source/code/agent-runtime/base/`、`agent-runtime/extensions/`：Python Runtime Source；主能力依赖 MySQL 实现扩展，使用相同 Engine 和 State/更新事务，不独立 Git 拉取。登录/授权扩展当前明确拒绝；源码归属和维护方式见唯一开发指南。
 
 ## 修改规则
 

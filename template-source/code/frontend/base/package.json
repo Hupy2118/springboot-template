@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "packageManager": "pnpm@11.9.0",
-  "engines": { "node": ">=20.19 <23" },
+  "engines": {
+    "node": ">=20.19 <23"
+  },
   "description": "低代码应用模板骨架",
   "type": "module",
   "scripts": {
@@ -32,7 +34,9 @@
     "react-router": "^6.8.2",
     "react-router-dom": "^6.8.2",
     "remark-gfm": "^3.0.1",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "@ag-ui/client": "0.0.57",
+    "@ag-ui/core": "0.0.57"
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",

@@ -4,6 +4,16 @@
 >
 > 本文是模板**维护者**的统一开发文档，按当前 V3 代码描述实际行为。接口的机器可读约束以 OpenAPI / JSON Schema 为准，源码与测试是最终实现依据。历史 V2、Strategy/Patch 和阶段性迁移方案不再作为开发依据。
 
+## Runtime 后端源码（1028）
+
+`template-source/code/agent-runtime/{base,extensions}` 是第三类 Runtime Source；Java 与 Python 是互斥后端，共用 frontend 和现有 Generate/V3 State/V4 Update。Runtime 包只有 frontend、agent-runtime 和受管 .devagentstudio 文件。源码统一在本仓库维护，不依赖旧模板仓库路径或 Git fallback。
+
+Runtime `extension.yaml` 声明 `id/requires/conflicts/backendImplementation/contributes`；当前 backendImplementation 固定 agent-runtime、contributes 为 {}、config 只接受 {}。`files/` 内容按最终 Python 工程相对路径物化，文件只能由一个 Base/Extension 拥有。当前九项能力作为完整基础组合交付，Runtime 主能力依赖 python_business_mysql，其他声明依赖主能力；MySQL 的 files/ 独占连接/事务源码。扩展可选配置暂不开放，不以空声明伪造功能。
+
+Runtime 环境只读取 Studio 本轮注入：MODEL_*、AGENT_RUNTIME_DATABASE_*、LAUNCH_ID、NAMESPACE 和匿名 Cookie。业务存储为 MySQL；checkpoint SQLite 独立；不执行启动迁移或 DDL。前端通过 Rsbuild 的 AGENT_RUNTIME_PUBLIC_URL 同源代理接入。模型/数据库凭据不得进入前端配置。发布输入清单和 revision 包含第三类源码。
+
+本次未运行构建、测试或真实 JAR/Runtime 联调；实现不代表已通过动态验收。
+
 ## 1. 项目定位与架构
 
 本项目提供 **V3 Template Engine + 前后端 Base/Extension 模板**，为 XCodeAgent / DevAgent Studio 提供工程初始生成和增量能力装配。

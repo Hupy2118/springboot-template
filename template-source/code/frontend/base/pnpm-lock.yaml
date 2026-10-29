@@ -8,6 +8,12 @@ importers:
 
   .:
     dependencies:
+      '@ag-ui/client':
+        specifier: 0.0.57
+        version: 0.0.57
+      '@ag-ui/core':
+        specifier: 0.0.57
+        version: 0.0.57
       '@ant-design/cssinjs':
         specifier: ^1.21.1
         version: 1.21.1(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -137,6 +143,18 @@ packages:
 
   '@adobe/css-tools@4.5.0':
     resolution: {integrity: sha512-6OzddxPio9UiWTCemp4N8cYLV2ZN1ncRnV1cVGtve7dhPOtRkleRyx32GQCYSwDYgaHU3USMm84tNsvKzRCa1Q==}
+
+  '@ag-ui/client@0.0.57':
+    resolution: {integrity: sha512-Xap2alG9Z0/j5kb3x4D7oTpe2sw1dfrC9rgJJr2NZu5vKcm8dzIPNd31mF2B4zS3BKqYIu245yxKPhEtT30MHw==}
+
+  '@ag-ui/core@0.0.57':
+    resolution: {integrity: sha512-gho1OWjNE6E3Rl7ZEZ1wr2CEpUHjLFU0FqzCZZk439TicLu+BfLCMkMokB07bMGlRmbJ60hM6LW60iOVauCx+Q==}
+
+  '@ag-ui/encoder@0.0.57':
+    resolution: {integrity: sha512-ifD9NctR4xyPDR58xF9GK1bj/S8oECFkTeDfuYD8tXdbcOstIJ2TOqU2zhiCKnw7Vw+zR9Qv3TbsM9E7Gi9X3Q==}
+
+  '@ag-ui/proto@0.0.57':
+    resolution: {integrity: sha512-pPENOZt0P6ibH8sCTgq05wLYXi5t3P9B5r/1bWYehXjUxtyOdnukSlWM++SsCIwUXsQdm/b3aBgGjEeTF7RenA==}
 
   '@alloc/quick-lru@5.3.0':
     resolution: {integrity: sha512-U4+70Pc5ZS9osnCBCE5Jha/ciHM+Yp+CNMNC/7HvYbNRk1Ldd+f7qO65W5qfhu/TCv+/ozljlXXe9Nj8419DMA==}
@@ -434,6 +452,9 @@ packages:
   '@braintree/sanitize-url@6.0.1':
     resolution: {integrity: sha512-zr9Qs9KFQiEvMWdZesjcmRJlUck5NR+eKGS1uyKk+oYTWwlYrsoPEi6VmG6/TzBD1hKCGEimrhTgGS6hvn/xIQ==}
 
+  '@bufbuild/protobuf@2.16.0':
+    resolution: {integrity: sha512-FWa0sPlqYGJgpTs6OxBRcL/AW4JT0OIO+W1ajerluoTVh8CV0B7XM1qsNCRgnkSCkRCgOICKHRQlY17jrsm0+Q==}
+
   '@chenshuai2144/sketch-color@1.0.9':
     resolution: {integrity: sha512-obzSy26cb7Pm7OprWyVpgMpIlrZpZ0B7vbrU0RMbvRg0YAI890S5Xy02Aj1Nhl4+KTbi1lVYHt6HQP8Hm9s+1w==}
     peerDependencies:
@@ -598,6 +619,10 @@ packages:
 
   '@module-federation/webpack-bundler-runtime@0.5.1':
     resolution: {integrity: sha512-mMhRFH0k2VjwHt3Jol9JkUsmI/4XlrAoBG3E0o7HoyoPYv1UFOWyqAflfANcUPgbYpvqmyLzDcO+3IT36LXnrA==}
+
+  '@protobuf-ts/protoc@2.11.1':
+    resolution: {integrity: sha512-mUZJaV0daGO6HUX90o/atzQ6A7bbN2RSuHtdwo8SSF2Qoe3zHwa4IHyCN1evftTeHfLmdz+45qo47sL+5P8nyg==}
+    hasBin: true
 
   '@rc-component/async-validator@5.1.2':
     resolution: {integrity: sha512-WYbrZSjzznU1ekD0qFq2qRxt309VoS61MTG5npnFQlKYcoy9IzU8T+ZCIhq5bGAXRbXysABFWTspicMfmWFwow==}
@@ -977,6 +1002,9 @@ packages:
   '@types/unist@2.0.11':
     resolution: {integrity: sha512-CmBKiL6NNo/OqgmMn95Fk9Whlp2mtvIv+KNpQKN2F4SjvrEesubTRWGYSg+BnWZOnlCaSTU1sMpsBOzgbYhnsA==}
 
+  '@types/uuid@10.0.0':
+    resolution: {integrity: sha512-7gqG38EyHgyP1S+7+xomFtL+ZNHcKv6DwNaCZmJmo1vgMugyF3TCnXVg4t1uk89mLNwnLtnY3TpOpCOyp1/xHQ==}
+
   '@types/yargs-parser@21.0.3':
     resolution: {integrity: sha512-I4q9QU9MQv4oEOz4tAHJtNz1cwuLxn2F3xcc2iV5WdqLPpUnj30aUuxt1mAxYTG+oe8CZMV/+6rU4S4gRDzqtQ==}
 
@@ -1305,6 +1333,9 @@ packages:
   commander@8.3.0:
     resolution: {integrity: sha512-OkTL9umf+He2DZkUq8f8J9of7yL6RJKI24dVITBmNfZBmri9zYZQrKkuXiKhyfPSu8tUhnVBB1iKXevvnlR4Ww==}
     engines: {node: '>= 12'}
+
+  compare-versions@6.1.1:
+    resolution: {integrity: sha512-4hm4VPpIecmlg59CHXnRDnqGplJFrbLG4aFEl5vl6cK1u76ws3LLvX7ikFnTDl5vo39sjWD6AaDPYodJp/NNHg==}
 
   compute-scroll-into-view@3.1.1:
     resolution: {integrity: sha512-VRhuHOLoKYOy4UbilLbUzbYg93XLjv2PncJC50EuTWPA3gaja1UjBsUP/D/9/juV3vQFr6XBEzn9KCAHdUvOHw==}
@@ -1730,6 +1761,9 @@ packages:
 
   fast-deep-equal@3.1.3:
     resolution: {integrity: sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==}
+
+  fast-json-patch@3.1.1:
+    resolution: {integrity: sha512-vf6IHUX2SBcA+5/+4883dsIjpBTqmfBjmYiWK1savxQmFk4JfBMLa7ynTYOs1Rolp/T1betJxHiGD3g1Mn8lUQ==}
 
   fast-json-stable-stringify@2.1.0:
     resolution: {integrity: sha512-lhd/wF+Lk98HZoTCtlVraHtfh5XYijIjalXck7saUtuanSDyLMxnHhSXEDJqHxD7msR8D0uCmqlkwjCV8xvwHw==}
@@ -3247,6 +3281,9 @@ packages:
   rw@1.3.3:
     resolution: {integrity: sha512-PdhdWy89SiZogBLaw42zdeqtRJ//zFd2PgQavcICDUgJT5oW10QCRKbJ6bg4r0/UY2M6BWd5tkxuGFRvCkgfHQ==}
 
+  rxjs@7.8.1:
+    resolution: {integrity: sha512-AA3TVj+0A2iuIoQkWEK/tqFjBq2j+6PO6Y0zJcvzLAFhEFIO3HL0vls9hWLncZbAAbK0mar7oZ4V079I/qPMxg==}
+
   sade@1.8.1:
     resolution: {integrity: sha512-xal3CZX1Xlo/k4ApwCFrHVACi9fBqJ7V+mwhBsuf/1IOKbBy098Fex+Wa/5QMubw09pSZ/u8EY8PWgevJsXp1A==}
     engines: {node: '>=6'}
@@ -3642,6 +3679,9 @@ packages:
   universal-deep-strict-equal@1.2.2:
     resolution: {integrity: sha512-UpnFi3/IF3jZHIHTdQXTHLCqpBP3805OFFRPHgvCS7k0oob2YVXxMTjS0U0g9qJTzqFRMwEnFFSlFLqt6zwjTQ==}
 
+  untruncate-json@0.0.1:
+    resolution: {integrity: sha512-4W9enDK4X1y1s2S/Rz7ysw6kDuMS3VmRjMFg7GZrNO+98OSe+x5Lh7PKYoVjy3lW/1wmhs6HW0lusnQRHgMarA==}
+
   update-browserslist-db@1.3.2:
     resolution: {integrity: sha512-UQ+MSxlhRm1bzjhU+DcuXfjFO1FzNtqhK5+9Yvlp90ItDLk5vT932A0rFu619nf7RVS+Y/VeaUW1jaRDqZ8VJw==}
     hasBin: true
@@ -3656,13 +3696,17 @@ packages:
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
+  uuid@11.1.1:
+    resolution: {integrity: sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ==}
+    hasBin: true
+
   uuid@13.0.2:
     resolution: {integrity: sha512-vzi9uRZ926x4XV73S/4qQaTwPXM2JBj6/6lI/byHH1jOpCzb0zDbfytgA9LcN/hzb2l7WQSQnxITOVx5un/wGw==}
     hasBin: true
 
   uuid@3.3.2:
     resolution: {integrity: sha512-yXJmeNaw3DnnKAOKJE51sL/ZaYfWJRl1pK9dr19YFCu0ObS231AB1/LbqTKRAQ5kw8A90rA6fr4riOUpTZvQZA==}
-    deprecated: Please upgrade  to version 7 or higher.  Older versions may use Math.random() in certain circumstances, which is known to be problematic.  See https://v8.dev/blog/math-random for details.
+    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
     hasBin: true
 
   uvu@0.5.6:
@@ -3711,6 +3755,7 @@ packages:
 
   whatwg-encoding@1.0.5:
     resolution: {integrity: sha512-b5lim54JOPN9HtzvK9HFXvBma/rnfFeqsic0hSpjtDbVxR3dJKLc+KB4V6GgiGOvl7CY/KNh8rxSo9DKQrnUEw==}
+    deprecated: Use @exodus/bytes instead for a more spec-conformant and faster implementation
 
   whatwg-mimetype@2.3.0:
     resolution: {integrity: sha512-M4yMwr6mAnQz76TbJm914+gPpB/nCwvZbJU28cUD6dR004SAxDLOOSUaB1JDRqLtaOV/vi0IC5lEAGFgrjGv/g==}
@@ -3794,12 +3839,43 @@ packages:
     resolution: {integrity: sha512-Nt9ZJjXTv5R8MHbqby/wXQ6Gi0Bb3TcYZkR1bzuL4yB2OxWPkXknz513gEF0GoA6tn00UpbPvERW8rzCuWCA6w==}
     engines: {node: '>=10'}
 
+  zod@3.25.76:
+    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
 snapshots:
 
   '@adobe/css-tools@4.5.0': {}
+
+  '@ag-ui/client@0.0.57':
+    dependencies:
+      '@ag-ui/core': 0.0.57
+      '@ag-ui/encoder': 0.0.57
+      '@ag-ui/proto': 0.0.57
+      '@types/uuid': 10.0.0
+      compare-versions: 6.1.1
+      fast-json-patch: 3.1.1
+      rxjs: 7.8.1
+      untruncate-json: 0.0.1
+      uuid: 11.1.1
+      zod: 3.25.76
+
+  '@ag-ui/core@0.0.57':
+    dependencies:
+      zod: 3.25.76
+
+  '@ag-ui/encoder@0.0.57':
+    dependencies:
+      '@ag-ui/core': 0.0.57
+      '@ag-ui/proto': 0.0.57
+
+  '@ag-ui/proto@0.0.57':
+    dependencies:
+      '@ag-ui/core': 0.0.57
+      '@bufbuild/protobuf': 2.16.0
+      '@protobuf-ts/protoc': 2.11.1
 
   '@alloc/quick-lru@5.3.0': {}
 
@@ -4254,6 +4330,8 @@ snapshots:
 
   '@braintree/sanitize-url@6.0.1': {}
 
+  '@bufbuild/protobuf@2.16.0': {}
+
   '@chenshuai2144/sketch-color@1.0.9(react@18.2.0)':
     dependencies:
       react: 18.2.0
@@ -4447,11 +4525,7 @@ snapshots:
       jest-runner: 27.0.0
       jest-runtime: 27.0.0
     transitivePeerDependencies:
-      - bufferutil
-      - canvas
       - supports-color
-      - ts-node
-      - utf-8-validate
 
   '@jest/transform@27.0.0':
     dependencies:
@@ -4548,6 +4622,8 @@ snapshots:
     dependencies:
       '@module-federation/runtime': 0.5.1
       '@module-federation/sdk': 0.5.1
+
+  '@protobuf-ts/protoc@2.11.1': {}
 
   '@rc-component/async-validator@5.1.2':
     dependencies:
@@ -4927,6 +5003,8 @@ snapshots:
     optional: true
 
   '@types/unist@2.0.11': {}
+
+  '@types/uuid@10.0.0': {}
 
   '@types/yargs-parser@21.0.3': {}
 
@@ -5323,6 +5401,8 @@ snapshots:
   commander@7.0.0: {}
 
   commander@8.3.0: {}
+
+  compare-versions@6.1.1: {}
 
   compute-scroll-into-view@3.1.1: {}
 
@@ -5817,6 +5897,8 @@ snapshots:
 
   fast-deep-equal@3.1.3: {}
 
+  fast-json-patch@3.1.1: {}
+
   fast-json-stable-stringify@2.1.0: {}
 
   fast-levenshtein@2.0.6: {}
@@ -6228,7 +6310,11 @@ snapshots:
       stack-utils: 2.0.6
       throat: 6.0.2
     transitivePeerDependencies:
+      - bufferutil
+      - canvas
       - supports-color
+      - ts-node
+      - utf-8-validate
 
   jest-cli@27.0.0:
     dependencies:
@@ -7909,6 +7995,10 @@ snapshots:
 
   rw@1.3.3: {}
 
+  rxjs@7.8.1:
+    dependencies:
+      tslib: 2.8.1
+
   sade@1.8.1:
     dependencies:
       mri: 1.2.0
@@ -8358,6 +8448,8 @@ snapshots:
       indexof: 0.0.1
       object-keys: 1.1.1
 
+  untruncate-json@0.0.1: {}
+
   update-browserslist-db@1.3.2(browserslist@4.28.9):
     dependencies:
       browserslist: 4.28.9
@@ -8371,6 +8463,8 @@ snapshots:
   use-sync-external-store@1.7.0(react@18.2.0):
     dependencies:
       react: 18.2.0
+
+  uuid@11.1.1: {}
 
   uuid@13.0.2: {}
 
@@ -8528,5 +8622,7 @@ snapshots:
       string-width: 4.2.0
       y18n: 5.0.8
       yargs-parser: 20.2.9
+
+  zod@3.25.76: {}
 
   zwitch@2.0.4: {}

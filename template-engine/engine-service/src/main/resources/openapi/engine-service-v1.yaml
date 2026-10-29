@@ -17,7 +17,7 @@ paths:
       operationId: generate
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/GenerateRequest' } } } }
       responses:
-        '200': { description: "Complete project package containing frontend/backend, V3 TemplateState and the three Route Projector contract JSON files at .devagentstudio/template-contracts/", content: { application/zip: { schema: { type: string, format: binary } } } }
+        '200': { description: "Complete project package containing frontend and exactly one of backend or agent-runtime, V3 TemplateState and the three Route Projector contract JSON files at .devagentstudio/template-contracts/", content: { application/zip: { schema: { type: string, format: binary } } } }
         '400': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
         '500': { $ref: '#/components/responses/Error' }

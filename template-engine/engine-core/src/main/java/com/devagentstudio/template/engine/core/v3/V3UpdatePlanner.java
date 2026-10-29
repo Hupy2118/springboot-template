@@ -18,6 +18,7 @@ public final class V3UpdatePlanner {
     /** V4 only installs capabilities absent from the caller's state. Parameters and release refreshes are excluded. */
     @SuppressWarnings("unchecked")
     public V3UpdateResult planCapabilities(Map<String, Object> current, ExtensionResolver.ResolvedExtensions resolved, String mode) {
+        validateImplementationTransition(current, resolved);
         RevisionVersion currentRevision = RevisionVersion.parse((String) current.get("templateRevision"));
         if (currentRevision.compareTo(RevisionVersion.parse(release.revision())) > 0)
             throw new V3Exception("TEMPLATE_RELEASE_DOWNGRADE_UNSUPPORTED", "current TemplateState is newer than this server Release", 409);
@@ -76,6 +77,7 @@ public final class V3UpdatePlanner {
 
     @SuppressWarnings("unchecked")
     public V3UpdateResult plan(Map<String, Object> current, ExtensionResolver.ResolvedExtensions resolved, String mode, Map<String, Object> applicationConfig) {
+        validateImplementationTransition(current, resolved);
         RevisionVersion currentRevision = RevisionVersion.parse((String) current.get("templateRevision"));
         RevisionVersion releaseRevision = RevisionVersion.parse(release.revision());
         if (currentRevision.compareTo(releaseRevision) > 0)
@@ -130,12 +132,35 @@ public final class V3UpdatePlanner {
         return compile(current, nextState, mode, operations);
     }
 
+    /** 更新只允许同一后端实现内装配，禁止留下两个互相矛盾的工程根。 */
+    @SuppressWarnings("unchecked")
+    private void validateImplementationTransition(Map<String, Object> current, ExtensionResolver.ResolvedExtensions resolved) {
+        Map<String, Map<String, Object>> effective = (Map<String, Map<String, Object>>) current.get("effective");
+        boolean runtime = false;
+        for (String id : effective.keySet()) {
+            ExtensionRelease extension = release.extensions().get(id);
+            if (extension == null) throw new V3Exception("CAPABILITY_UNKNOWN", "installed capability is unknown: " + id, 409);
+            runtime |= "agent-runtime".equals(extension.backendImplementation());
+        }
+        if (runtime != "agent-runtime".equals(resolved.backendImplementation()))
+            throw new V3Exception("BACKEND_IMPLEMENTATION_CHANGE_UNSUPPORTED", "create a new application to change backend implementation", 409);
+        if (runtime && !((Map<?, ?>) current.get("managedContributions")).isEmpty())
+            throw new V3Exception("TEMPLATE_STATE_INVALID", "Runtime cannot contain Java contributions", 409);
+        Map<String, Map<String, Object>> artifacts = (Map<String, Map<String, Object>>) current.get("installedArtifacts");
+        for (Map<String, Object> artifact : artifacts.values()) {
+            String target = (String) artifact.get("target");
+            if (target.startsWith(runtime ? "backend/" : "agent-runtime/"))
+                throw new V3Exception("TEMPLATE_STATE_INVALID", "Artifact crosses backend implementation root", 409);
+        }
+    }
+
     private Map<String, Map<String, Object>> artifactStates(List<String> order) {
         Map<String, Map<String, Object>> result = new TreeMap<String, Map<String, Object>>();
         for (String id : order) {
             ExtensionRelease extension = release.extensions().get(id);
             addArtifacts(result, id, "frontend", extension.frontendFiles());
             addArtifacts(result, id, "backend", extension.backendFiles());
+            addArtifacts(result, id, "agent-runtime", extension.runtimeFiles());
         }
         return result;
     }
@@ -151,7 +176,10 @@ public final class V3UpdatePlanner {
         String[] parts = artifactId.split(":", 3);
         if (parts.length != 3) throw packageError("invalid Artifact ID " + artifactId);
         ExtensionRelease extension = release.extensions().get(parts[1]);
-        byte[] value = "frontend".equals(parts[0]) ? extension.frontendFiles().get(parts[2]) : extension.backendFiles().get(parts[2]);
+        if (extension == null) throw packageError("Artifact owner disappeared: " + artifactId);
+        byte[] value = "frontend".equals(parts[0]) ? extension.frontendFiles().get(parts[2])
+                : "agent-runtime".equals(parts[0]) ? extension.runtimeFiles().get(parts[2])
+                : "backend".equals(parts[0]) ? extension.backendFiles().get(parts[2]) : null;
         if (value == null) throw packageError("Artifact source disappeared: " + artifactId);
         return value;
     }

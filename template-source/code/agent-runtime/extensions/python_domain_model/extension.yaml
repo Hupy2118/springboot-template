@@ -1,0 +1,12 @@
+{
+  "id": "python_domain_model",
+  "requires": [
+    "python_application_runtime"
+  ],
+  "conflicts": [
+    "login",
+    "authorization"
+  ],
+  "backendImplementation": "agent-runtime",
+  "contributes": {}
+}

@@ -56,7 +56,33 @@ public final class ExtensionResolver {
             }
             effective.put(id, state);
         }
-        return new ResolvedExtensions(requested, effective, order, aggregate(order));
+        validateImplementation(order, effective);
+        return new ResolvedExtensions(requested, effective, order, aggregate(order), backendImplementation(order));
+    }
+
+    /** 从源码约束推导唯一后端类型，不在 HTTP 层判断能力 ID。 */
+    private String backendImplementation(List<String> order) {
+        String implementation = "backend";
+        for (String id : order) {
+            String declared = release.extensions().get(id).backendImplementation();
+            if (!declared.isEmpty()) implementation = declared;
+        }
+        return implementation;
+    }
+
+    /** 校验实现根、互斥能力与当前尚未开放的 Runtime 配置参数。 */
+    private void validateImplementation(List<String> order, Map<String, Map<String, Object>> effective) {
+        String implementation = backendImplementation(order);
+        for (String id : order) {
+            ExtensionRelease extension = release.extensions().get(id);
+            for (String conflict : extension.conflicts()) if (effective.containsKey(conflict))
+                throw new V3Exception("CAPABILITY_CONFLICT", id + " conflicts with " + conflict, 400);
+            if ("agent-runtime".equals(extension.backendImplementation()) && !((Map<?, ?>) effective.get(id).get("config")).isEmpty())
+                throw new V3Exception("BAD_REQUEST", "Runtime capability config is not yet configurable: " + id, 400);
+            if ("agent-runtime".equals(implementation) && (!extension.backendFiles().isEmpty()
+                    || !extension.applicationAnnotations().isEmpty() || !extension.mavenDependencies().isEmpty()))
+                throw new V3Exception("CAPABILITY_CONFLICT", "Java capability cannot be installed into Runtime: " + id, 400);
+        }
     }
 
     private void select(String id, Set<String> selected) {
@@ -142,10 +168,13 @@ public final class ExtensionResolver {
         private final Map<String, Map<String, Object>> effective;
         private final List<String> order;
         private final Map<String, Map<String, Object>> managedContributions;
+        private final String backendImplementation;
         private ResolvedExtensions(Map<String, Map<String, Object>> requested, Map<String, Map<String, Object>> effective,
-                                   List<String> order, Map<String, Map<String, Object>> contributions) {
-            this.requested = requested; this.effective = effective; this.order = order; this.managedContributions = contributions;
+                                   List<String> order, Map<String, Map<String, Object>> contributions, String backendImplementation) {
+            this.requested = requested; this.effective = effective; this.order = order; this.managedContributions = contributions; this.backendImplementation = backendImplementation;
         }
+        /** 返回本次解析的唯一后端源码根。 */
+        public String backendImplementation() { return backendImplementation; }
         public Map<String, Map<String, Object>> requested() { return requested; }
         public Map<String, Map<String, Object>> effective() { return effective; }
         public List<String> order() { return order; }

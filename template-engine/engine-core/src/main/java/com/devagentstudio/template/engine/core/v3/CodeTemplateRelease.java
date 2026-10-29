@@ -10,15 +10,17 @@ public final class CodeTemplateRelease {
     private final Map<String, byte[]> contracts;
     private final Map<String, byte[]> frontendBase;
     private final Map<String, byte[]> backendBase;
+    private final Map<String, byte[]> runtimeBase;
     private final Map<String, ExtensionRelease> extensions;
 
     /** 保存模板根目录契约与双端源码的不可变快照。 */
     public CodeTemplateRelease(String revision, Map<String, byte[]> contracts, Map<String, byte[]> frontendBase, Map<String, byte[]> backendBase,
-                               Map<String, ExtensionRelease> extensions) {
+                               Map<String, byte[]> runtimeBase, Map<String, ExtensionRelease> extensions) {
         this.revision = revision;
         this.contracts = copyBytes(contracts);
         this.frontendBase = copyBytes(frontendBase);
         this.backendBase = copyBytes(backendBase);
+        this.runtimeBase = copyBytes(runtimeBase);
         this.extensions = Collections.unmodifiableMap(new LinkedHashMap<String, ExtensionRelease>(extensions));
     }
     private static Map<String, byte[]> copyBytes(Map<String, byte[]> source) {
@@ -31,5 +33,7 @@ public final class CodeTemplateRelease {
     public String revision() { return revision; }
     public Map<String, byte[]> frontendBase() { return copyBytes(frontendBase); }
     public Map<String, byte[]> backendBase() { return copyBytes(backendBase); }
+    /** 返回独立 Python 后端的基础源码。 */
+    public Map<String, byte[]> runtimeBase() { return copyBytes(runtimeBase); }
     public Map<String, ExtensionRelease> extensions() { return extensions; }
 }

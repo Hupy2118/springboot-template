@@ -13,6 +13,12 @@ import pathlib
 # integration point that makes one usable; ordinary pages and business code are
 # intentionally absent.
 PROTECTED_SURFACES = (
+    ("template-source/code/agent-runtime/extensions/python_application_runtime/extension.yaml", (
+        '"backendImplementation": "agent-runtime"', '"python_business_mysql"',
+    )),
+    ("template-source/code/frontend/base/rsbuild.config.ts", (
+        'AGENT_RUNTIME_PUBLIC_URL', '/__runtime/health', '/agents',
+    )),
     ("template-source/code/contracts/route-projector.json", (
         '"schemaVersion": "route-projector-contract.v2"',
         '"protocol": "route-projector.v2"',

@@ -1,0 +1,12 @@
+{
+  "id": "agent_runtime_public_edge",
+  "requires": [
+    "python_application_runtime"
+  ],
+  "conflicts": [
+    "login",
+    "authorization"
+  ],
+  "backendImplementation": "agent-runtime",
+  "contributes": {}
+}

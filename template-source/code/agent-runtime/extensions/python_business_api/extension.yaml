@@ -1,0 +1,12 @@
+{
+  "id": "python_business_api",
+  "requires": [
+    "python_application_runtime"
+  ],
+  "conflicts": [
+    "login",
+    "authorization"
+  ],
+  "backendImplementation": "agent-runtime",
+  "contributes": {}
+}

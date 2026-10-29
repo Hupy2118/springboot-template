@@ -44,15 +44,18 @@ public final class V3ProjectMaterializer {
         // 契约沿用既有工作区路径，供调用方在 Build 收尾读取。
         add(files, ".devagentstudio/template-contracts/", release.contracts());
         add(files, "frontend/", release.frontendBase());
-        add(files, "backend/", release.backendBase());
+        boolean runtime = "agent-runtime".equals(resolved.backendImplementation());
+        add(files, runtime ? "agent-runtime/" : "backend/", runtime ? release.runtimeBase() : release.backendBase());
         for (String id : resolved.order()) {
             ExtensionRelease extension = release.extensions().get(id);
             add(files, "frontend/", extension.frontendFiles());
-            add(files, "backend/", extension.backendFiles());
+            add(files, runtime ? "agent-runtime/" : "backend/", runtime ? extension.runtimeFiles() : extension.backendFiles());
         }
         for (Map.Entry<String, byte[]> registry : registries(resolved).entrySet()) files.put(registry.getKey(), registry.getValue());
-        projectAnnotations(files, resolved.order());
-        projectMavenDependencies(files, resolved.order());
+        if (!runtime) {
+            projectAnnotations(files, resolved.order());
+            projectMavenDependencies(files, resolved.order());
+        }
         ApplicationConfigProjector.applyToProject(files, applicationConfig);
         return files;
     }
@@ -64,6 +67,7 @@ public final class V3ProjectMaterializer {
             ExtensionRelease extension = release.extensions().get(id);
             addArtifactStates(artifacts, id, "frontend", extension.frontendFiles());
             addArtifactStates(artifacts, id, "backend", extension.backendFiles());
+            addArtifactStates(artifacts, id, "agent-runtime", extension.runtimeFiles());
         }
         Map<String, Object> state = new LinkedHashMap<String, Object>();
         state.put("schemaVersion", 3); state.put("templateRevision", release.revision());

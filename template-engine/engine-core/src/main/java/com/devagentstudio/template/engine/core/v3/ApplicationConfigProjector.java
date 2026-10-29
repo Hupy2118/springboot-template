@@ -24,6 +24,8 @@ public final class ApplicationConfigProjector {
         if (authRaw == null) return result;
         Map<String, Object> auth = map(authRaw, "auth"); requireKeys(auth, "enable", "authnSource", "yht");
         if (!(auth.get("enable") instanceof Boolean)) bad("auth.enable must be boolean");
+        if (Boolean.TRUE.equals(auth.get("enable")) && capabilities.containsKey("python_application_runtime"))
+            bad("Runtime currently requires auth.enable=false");
         String source = value(auth.get("authnSource"), "auth.authnSource", 32);
         if (!Boolean.TRUE.equals(auth.get("enable"))) {
             Map<String, Object> login = capabilities.get("login");

@@ -1,0 +1,12 @@
+{
+  "id": "agent_runtime_local_debug",
+  "requires": [
+    "python_application_runtime"
+  ],
+  "conflicts": [
+    "login",
+    "authorization"
+  ],
+  "backendImplementation": "agent-runtime",
+  "contributes": {}
+}

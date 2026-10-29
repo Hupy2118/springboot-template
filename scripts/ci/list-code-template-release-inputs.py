@@ -67,11 +67,11 @@ def extension_directories(root, relative_root):
 
 def ignored_runtime_entry(path, root):
     """Dependency installations and Finder metadata are not V3 Runtime Source."""
-    return path.name == ".DS_Store" or any(part in ("node_modules", "build") for part in path.relative_to(root).parts)
+    return path.name == ".DS_Store" or any(part in ("node_modules", "build", ".venv", "__pycache__", ".pytest_cache", ".agent-runtime") for part in path.relative_to(root).parts)
 
 
-def collect_inputs(template_source):
-    """枚举双端源码与路由契约，供当前发布输入和 Revision 校验使用。"""
+def collect_inputs(template_source, *, allow_legacy_runtime=False):
+    """枚举发布输入；仅历史基线允许整个 agent-runtime 源码根尚不存在。"""
     root = pathlib.Path(template_source).resolve()
     if not root.is_dir() or root.name != "template-source":
         fail("expected a template-source directory, got %s" % root)
@@ -83,6 +83,15 @@ def collect_inputs(template_source):
         add_tree(root, code / "contracts", result)
     add_tree(root, code / "frontend" / "base", result)
     add_tree(root, code / "backend" / "base", result)
+    runtime = root / code / "agent-runtime"
+    if not allow_legacy_runtime or runtime.exists() or runtime.is_symlink():
+        if runtime.is_symlink():
+            fail("symlink is not allowed in Runtime Source: code/agent-runtime")
+        add_tree(root, code / "agent-runtime" / "base", result)
+        for extension in extension_directories(root, code / "agent-runtime" / "extensions"):
+            add_file(root, extension.relative_to(root) / "extension.yaml", result)
+            if (extension / "files").exists():
+                add_tree(root, (extension / "files").relative_to(root), result)
 
     for extension in extension_directories(root, code / "frontend" / "extensions"):
         add_file(root, extension.relative_to(root) / "extension.yaml", result)

@@ -56,17 +56,19 @@ public final class CodeTemplateReleaseLoader {
             Map<String, byte[]> contracts = readTree(codeRoot.resolve("contracts"), "contracts");
             Map<String, byte[]> frontendBase = readTree(codeRoot.resolve("frontend/base"), "frontend/base");
             Map<String, byte[]> backendBase = readTree(codeRoot.resolve("backend/base"), "backend/base");
+            Map<String, byte[]> runtimeBase = readTree(codeRoot.resolve("agent-runtime/base"), "agent-runtime/base");
             for (String path : frontendBase.keySet()) if (REGISTRIES.contains(path)) sourceError("Base may not own generated registry " + path);
 
             Map<String, PartialExtension> partials = new TreeMap<String, PartialExtension>();
             loadExtensions(codeRoot.resolve("frontend/extensions"), true, partials);
             loadExtensions(codeRoot.resolve("backend/extensions"), false, partials);
+            loadRuntimeExtensions(partials);
             Map<String, ExtensionRelease> extensions = new TreeMap<String, ExtensionRelease>();
             for (PartialExtension partial : partials.values()) extensions.put(partial.id, partial.finish());
             validateGraph(extensions);
             validateGlobalContracts(extensions);
-            validateBaseAndExtensionCollisions(frontendBase, backendBase, extensions);
-            return new CodeTemplateRelease(revision, contracts, frontendBase, backendBase, extensions);
+            validateBaseAndExtensionCollisions(frontendBase, backendBase, runtimeBase, extensions);
+            return new CodeTemplateRelease(revision, contracts, frontendBase, backendBase, runtimeBase, extensions);
         } catch (V3Exception e) {
             throw e;
         } catch (Exception e) {
@@ -102,6 +104,39 @@ public final class CodeTemplateReleaseLoader {
             if (frontend) loadFrontend(directory, manifest, partial);
             else loadBackend(directory, manifest, partial);
             validateExtensionRoot(directory, frontend);
+        }
+    }
+
+    /** 装载 Python 能力声明及独占源码，不借用 Java Contribution 协议。 */
+    private void loadRuntimeExtensions(Map<String, PartialExtension> partials) throws IOException {
+        Path parent = codeRoot.resolve("agent-runtime/extensions");
+        requireDirectory(parent, "agent-runtime/extensions");
+        List<Path> directories = new ArrayList<Path>();
+        try (java.util.stream.Stream<Path> stream = Files.list(parent)) { stream.forEach(directories::add); }
+        Collections.sort(directories, Comparator.comparing(path -> path.getFileName().toString()));
+        for (Path directory : directories) {
+            if (ignored(directory, parent)) continue;
+            requireDirectory(directory, relative(directory));
+            JsonNode manifest = readDocument(directory.resolve("extension.yaml"));
+            String id = scalarString(manifest, "id", true);
+            if (!ID.matcher(id).matches() || !directory.getFileName().toString().equals(id) || partials.containsKey(id))
+                sourceError("invalid or duplicate Runtime capability: " + id);
+            PartialExtension partial = new PartialExtension(id);
+            partial.requires = stringArray(manifest.path("requires"), "requires");
+            partial.conflicts = stringArray(manifest.path("conflicts"), "conflicts");
+            partial.backendImplementation = scalarString(manifest, "backendImplementation", true);
+            if (!"agent-runtime".equals(partial.backendImplementation)) sourceError("invalid Runtime backendImplementation");
+            JsonNode contributes = manifest.path("contributes");
+            if (!contributes.isObject() || contributes.size() != 0) sourceError("Runtime contributes currently requires an empty object");
+            try (java.util.stream.Stream<Path> stream = Files.list(directory)) {
+                for (Path child : (Iterable<Path>) stream::iterator) {
+                    if (Files.isSymbolicLink(child)) sourceError("symlink is not allowed: " + relative(child));
+                    if (ignored(child, directory) || "extension.yaml".equals(child.getFileName().toString())) continue;
+                    if (!"files".equals(child.getFileName().toString())) sourceError("unexpected Runtime extension entry: " + relative(child));
+                    partial.runtimeFiles = readTree(child, relative(child));
+                }
+            }
+            partials.put(id, partial);
         }
     }
 
@@ -259,13 +294,15 @@ public final class CodeTemplateReleaseLoader {
         }
     }
 
-    private void validateBaseAndExtensionCollisions(Map<String, byte[]> feBase, Map<String, byte[]> beBase,
+    private void validateBaseAndExtensionCollisions(Map<String, byte[]> feBase, Map<String, byte[]> beBase, Map<String, byte[]> runtimeBase,
                                                      Map<String, ExtensionRelease> extensions) {
         Set<String> feTargets = new HashSet<String>(feBase.keySet());
         Set<String> beTargets = new HashSet<String>(beBase.keySet());
+        Set<String> runtimeTargets = new HashSet<String>(runtimeBase.keySet());
         for (ExtensionRelease extension : extensions.values()) {
             for (String path : extension.frontendFiles().keySet()) if (!feTargets.add(path)) sourceError("frontend file collision at " + path);
             for (String path : extension.backendFiles().keySet()) if (!beTargets.add(path)) sourceError("backend file collision at " + path);
+            for (String path : extension.runtimeFiles().keySet()) if (!runtimeTargets.add(path)) sourceError("agent-runtime file collision at " + path);
         }
     }
 
@@ -293,7 +330,7 @@ public final class CodeTemplateReleaseLoader {
     /** Development dependency trees and macOS metadata are never Runtime Source or release inputs. */
     private boolean ignored(Path path, Path root) {
         Path relative = root.relativize(path);
-        for (Path segment : relative) if ("node_modules".equals(segment.toString()) || "build".equals(segment.toString())) return true;
+        for (Path segment : relative) if (Arrays.asList("node_modules", "build", ".venv", "__pycache__", ".pytest_cache", ".agent-runtime").contains(segment.toString())) return true;
         return ".DS_Store".equals(path.getFileName().toString());
     }
 
@@ -376,6 +413,9 @@ public final class CodeTemplateReleaseLoader {
         private List<String> requires;
         private Map<String, byte[]> frontendFiles = Collections.emptyMap();
         private Map<String, byte[]> backendFiles = Collections.emptyMap();
+        private Map<String, byte[]> runtimeFiles = Collections.emptyMap();
+        private String backendImplementation = "";
+        private List<String> conflicts = Collections.emptyList();
         private Map<String, Object> defaultConfig = Collections.emptyMap();
         private final Map<String, List<Map<String, Object>>> frontendContributions = new HashMap<String, List<Map<String, Object>>>();
         private final List<String> annotations = new ArrayList<String>();
@@ -383,7 +423,7 @@ public final class CodeTemplateReleaseLoader {
         private PartialExtension(String id) { this.id = id; }
         private ExtensionRelease finish() {
             List<String> deps = requires == null ? Collections.<String>emptyList() : requires;
-            return new ExtensionRelease(id, deps, frontendFiles, backendFiles, defaultConfig,
+            return new ExtensionRelease(id, deps, frontendFiles, backendFiles, runtimeFiles, backendImplementation, conflicts, defaultConfig,
                     frontendContributions.containsKey("providers") ? frontendContributions.get("providers") : Collections.<Map<String, Object>>emptyList(),
                     frontendContributions.containsKey("rootRoutes") ? frontendContributions.get("rootRoutes") : Collections.<Map<String, Object>>emptyList(),
                     frontendContributions.containsKey("pageRoutes") ? frontendContributions.get("pageRoutes") : Collections.<Map<String, Object>>emptyList(),

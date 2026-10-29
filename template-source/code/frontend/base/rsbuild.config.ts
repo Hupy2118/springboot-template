@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from '@rsbuild/core';
+import { defineConfig, type RsbuildConfig } from '@rsbuild/core';
 import { pluginReact } from '@rsbuild/plugin-react';
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url));
@@ -19,6 +19,18 @@ const clientDefines = {
   'process.env.BBB': JSON.stringify(''),
 };
 
+// Runtime 地址仅供开发服务器代理使用，不注入浏览器包。
+const runtimeUrl = process.env.AGENT_RUNTIME_PUBLIC_URL;
+if (runtimeUrl && !/^http:\/\/127\.0\.0\.1:\d+$/.test(runtimeUrl)) {
+  throw new Error('AGENT_RUNTIME_PUBLIC_URL 必须是本次本地 Runtime 地址');
+}
+const runtimeProxy: NonNullable<RsbuildConfig['server']>['proxy'] = runtimeUrl ? {
+  '/__runtime/health': { target: runtimeUrl, changeOrigin: true, pathRewrite: { '^/__runtime/health': '/health' } },
+  '/api': { target: runtimeUrl, changeOrigin: true },
+  '/agents': { target: runtimeUrl, changeOrigin: true, timeout: 0, proxyTimeout: 0 },
+  '/_runtime': { target: runtimeUrl, changeOrigin: true },
+} : { '/api': { target: 'http://127.0.0.1:8080', changeOrigin: true } };
+
 export default defineConfig({
   plugins: [pluginReact()],
   source: {
@@ -35,12 +47,7 @@ export default defineConfig({
   server: {
     host: '127.0.0.1',
     port: 3000,
-    proxy: {
-      '/api': {
-        changeOrigin: true,
-        target: 'http://127.0.0.1:8080',
-      },
-    },
+    proxy: runtimeProxy,
   },
   output: { distPath: { root: 'build' } },
   tools: {

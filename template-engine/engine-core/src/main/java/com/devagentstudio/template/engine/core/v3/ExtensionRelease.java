@@ -12,6 +12,9 @@ public final class ExtensionRelease {
     private final List<String> requires;
     private final Map<String, byte[]> frontendFiles;
     private final Map<String, byte[]> backendFiles;
+    private final Map<String, byte[]> runtimeFiles;
+    private final String backendImplementation;
+    private final List<String> conflicts;
     private final Map<String, Object> defaultConfig;
     private final List<Map<String, Object>> providers;
     private final List<Map<String, Object>> rootRoutes;
@@ -22,7 +25,8 @@ public final class ExtensionRelease {
     private final List<Map<String, Object>> mavenDependencies;
 
     public ExtensionRelease(String id, List<String> requires, Map<String, byte[]> frontendFiles,
-                            Map<String, byte[]> backendFiles, Map<String, Object> defaultConfig,
+                            Map<String, byte[]> backendFiles, Map<String, byte[]> runtimeFiles,
+                            String backendImplementation, List<String> conflicts, Map<String, Object> defaultConfig,
                             List<Map<String, Object>> providers, List<Map<String, Object>> rootRoutes,
                             List<Map<String, Object>> pageRoutes, List<Map<String, Object>> initializers,
                             List<Map<String, Object>> errorReporters, List<String> applicationAnnotations,
@@ -31,6 +35,9 @@ public final class ExtensionRelease {
         this.requires = immutableList(requires);
         this.frontendFiles = immutableBytesMap(frontendFiles);
         this.backendFiles = immutableBytesMap(backendFiles);
+        this.runtimeFiles = immutableBytesMap(runtimeFiles);
+        this.backendImplementation = backendImplementation;
+        this.conflicts = immutableList(conflicts);
         this.defaultConfig = Collections.unmodifiableMap(new LinkedHashMap<String, Object>(defaultConfig));
         this.providers = immutableMapList(providers);
         this.rootRoutes = immutableMapList(rootRoutes);
@@ -57,6 +64,12 @@ public final class ExtensionRelease {
     public List<String> requires() { return requires; }
     public Map<String, byte[]> frontendFiles() { return copyBytes(frontendFiles); }
     public Map<String, byte[]> backendFiles() { return copyBytes(backendFiles); }
+    /** 返回能力独占的 Runtime 文件。 */
+    public Map<String, byte[]> runtimeFiles() { return copyBytes(runtimeFiles); }
+    /** 返回源码声明的后端实现约束，空串表示共享能力。 */
+    public String backendImplementation() { return backendImplementation; }
+    /** 返回源码声明的互斥能力。 */
+    public List<String> conflicts() { return conflicts; }
     private static Map<String, byte[]> copyBytes(Map<String, byte[]> source) {
         Map<String, byte[]> result = new LinkedHashMap<String, byte[]>();
         for (Map.Entry<String, byte[]> entry : source.entrySet()) result.put(entry.getKey(), entry.getValue().clone());

@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "xcodeagent-agent-runtime"
+version = "0.1.0"
+description = "Python 3.12 + DeepAgents public runtime template for agent_runtime_direct applications."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "ag-ui-protocol>=0.1.19,<0.2",
+  "aiosqlite>=0.20,<1",
+  "deepagents>=0.5.3,<1",
+  "fastapi>=0.115,<1",
+  "langchain>=1.4,<2",
+  "langchain-anthropic>=1.7,<2",
+  "langchain-deepseek>=1.0,<2",
+  "langchain-openai>=1.3,<2",
+  "langgraph>=1.2.8,<2",
+  "langgraph-checkpoint-sqlite>=2,<4",
+  "httpx>=0.28,<1",
+  "pymysql[rsa]>=1.1,<2",
+  "uvicorn[standard]>=0.30,<1",
+]
+
+[project.scripts]
+agent-runtime = "app.main:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3,<9",
+  "pytest-asyncio>=0.25,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/app"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+asyncio_mode = "auto"
+testpaths = ["tests"]

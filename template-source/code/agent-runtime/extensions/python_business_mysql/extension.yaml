@@ -1,0 +1,10 @@
+{
+  "id": "python_business_mysql",
+  "requires": [],
+  "conflicts": [
+    "login",
+    "authorization"
+  ],
+  "backendImplementation": "agent-runtime",
+  "contributes": {}
+}

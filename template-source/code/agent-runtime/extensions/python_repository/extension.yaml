@@ -1,0 +1,12 @@
+{
+  "id": "python_repository",
+  "requires": [
+    "python_application_runtime"
+  ],
+  "conflicts": [
+    "login",
+    "authorization"
+  ],
+  "backendImplementation": "agent-runtime",
+  "contributes": {}
+}

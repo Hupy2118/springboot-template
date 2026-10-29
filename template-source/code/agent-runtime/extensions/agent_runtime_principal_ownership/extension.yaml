@@ -1,0 +1,12 @@
+{
+  "id": "agent_runtime_principal_ownership",
+  "requires": [
+    "python_application_runtime"
+  ],
+  "conflicts": [
+    "login",
+    "authorization"
+  ],
+  "backendImplementation": "agent-runtime",
+  "contributes": {}
+}

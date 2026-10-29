@@ -28,7 +28,7 @@
     "installedArtifacts": {
       "type": "object",
       "patternProperties": {
-        "^(frontend|backend):[a-z0-9][a-z0-9_-]*:.+$": {
+        "^(frontend|backend|agent-runtime):[a-z0-9][a-z0-9_-]*:.+$": {
           "$ref": "#/$defs/installedArtifact"
         }
       },

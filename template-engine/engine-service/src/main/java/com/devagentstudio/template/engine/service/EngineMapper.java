@@ -97,7 +97,7 @@ final class EngineMapper {
         Map<String, Object> values = requireMap(raw, "TEMPLATE_STATE_INVALID", "installedArtifacts must be an object", 400);
         Map<String, Map<String, Object>> result = new TreeMap<String, Map<String, Object>>();
         Set<String> targets = new TreeSet<String>();
-        Pattern id = Pattern.compile("^(frontend|backend):([a-z0-9][a-z0-9_-]*):(.+)$");
+        Pattern id = Pattern.compile("^(frontend|backend|agent-runtime):([a-z0-9][a-z0-9_-]*):(.+)$");
         for (Map.Entry<String, Object> entry : values.entrySet()) {
             java.util.regex.Matcher match = id.matcher(entry.getKey());
             if (!match.matches()) invalidState("installed Artifact ID is invalid: " + entry.getKey());

@@ -17,11 +17,62 @@ def touch(root, relative, content="text\n"):
 
 
 class CodeTemplateReleaseInputsTest(unittest.TestCase):
-    def root(self, directory):
+    def root(self, directory, include_runtime=True):
         root = directory / "template-source"
-        for relative in ("code/frontend/base", "code/frontend/extensions", "code/backend/base", "code/backend/extensions"):
+        directories = ["code/frontend/base", "code/frontend/extensions", "code/backend/base", "code/backend/extensions"]
+        if include_runtime:
+            directories.extend(("code/agent-runtime/base", "code/agent-runtime/extensions"))
+        for relative in directories:
             (root / relative).mkdir(parents=True, exist_ok=True)
         return root
+
+    def test_legacy_baseline_without_runtime_keeps_existing_inputs(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = self.root(pathlib.Path(temporary), include_runtime=False)
+            touch(root, "code/frontend/base/src/index.tsx")
+            touch(root, "code/backend/base/pom.xml")
+            touch(root, "code/template-revision.txt", "2026.10.19.1\n")
+            self.assertEqual(MODULE.collect_inputs(root, allow_legacy_runtime=True), [
+                "template-source/code/backend/base/pom.xml",
+                "template-source/code/frontend/base/src/index.tsx",
+                "template-source/code/template-revision.txt",
+            ])
+            with self.assertRaisesRegex(ValueError, "missing or unsafe Runtime Source directory"):
+                MODULE.collect_inputs(root)
+
+    def test_collects_runtime_inputs_even_in_legacy_mode(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = self.root(pathlib.Path(temporary))
+            paths = (
+                "code/agent-runtime/base/pyproject.toml",
+                "code/agent-runtime/base/uv.lock",
+                "code/agent-runtime/extensions/python_business_mysql/extension.yaml",
+                "code/agent-runtime/extensions/python_business_mysql/files/src/app/infrastructure/database.py",
+            )
+            for path in paths:
+                touch(root, path)
+            expected = sorted("template-source/" + path for path in paths)
+            self.assertEqual(MODULE.collect_inputs(root), expected)
+            self.assertEqual(MODULE.collect_inputs(root, allow_legacy_runtime=True), expected)
+
+    def test_legacy_mode_rejects_incomplete_runtime(self):
+        for directory in ("base", "extensions"):
+            with self.subTest(directory=directory), tempfile.TemporaryDirectory() as temporary:
+                root = self.root(pathlib.Path(temporary), include_runtime=False)
+                (root / "code/agent-runtime" / directory).mkdir(parents=True)
+                with self.assertRaisesRegex(ValueError, "missing or unsafe"):
+                    MODULE.collect_inputs(root, allow_legacy_runtime=True)
+
+    def test_legacy_mode_rejects_runtime_symlink(self):
+        for dangling in (False, True):
+            with self.subTest(dangling=dangling), tempfile.TemporaryDirectory() as temporary:
+                root = self.root(pathlib.Path(temporary), include_runtime=False)
+                outside = pathlib.Path(temporary) / "outside"
+                if not dangling:
+                    outside.mkdir()
+                (root / "code/agent-runtime").symlink_to(outside, target_is_directory=True)
+                with self.assertRaisesRegex(ValueError, "symlink"):
+                    MODULE.collect_inputs(root, allow_legacy_runtime=True)
 
     def test_collects_only_runtime_inputs_and_includes_revision(self):
         with tempfile.TemporaryDirectory() as temporary:

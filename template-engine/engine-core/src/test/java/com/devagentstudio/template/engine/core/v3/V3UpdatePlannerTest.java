@@ -158,7 +158,7 @@ class V3UpdatePlannerTest {
     /** 为更新测试复制完整的当前 Runtime Source，包括根目录路由契约。 */
     private void copyRuntime(Path source, Path target) throws Exception {
         Files.createDirectories(target);
-        for (String relative : Arrays.asList("contracts", "frontend/base", "frontend/extensions", "backend/base", "backend/extensions")) copyDirectory(source.resolve(relative), target.resolve(relative));
+        for (String relative : Arrays.asList("contracts", "frontend/base", "frontend/extensions", "backend/base", "backend/extensions", "agent-runtime/base", "agent-runtime/extensions")) copyDirectory(source.resolve(relative), target.resolve(relative));
         Files.copy(source.resolve("template-revision.txt"), target.resolve("template-revision.txt"));
     }
     private void copyDirectory(Path source, Path target) throws Exception {

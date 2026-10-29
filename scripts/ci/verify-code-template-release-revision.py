@@ -105,7 +105,7 @@ def main():
             managed_inputs = set(CODE_RELEASE_INPUTS.collect_inputs(root / "template-source"))
             base_source = base_tree / "template-source"
             if (base_source / "code").is_dir() and not (base_source / "code").is_symlink():
-                managed_inputs.update(CODE_RELEASE_INPUTS.collect_inputs(base_source))
+                managed_inputs.update(CODE_RELEASE_INPUTS.collect_inputs(base_source, allow_legacy_runtime=True))
         except (OSError, ValueError) as exc:
             fail(str(exc))
 

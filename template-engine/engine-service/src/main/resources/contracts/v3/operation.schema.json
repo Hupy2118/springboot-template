@@ -17,7 +17,7 @@
   "allOf": [
     {
       "if": { "properties": { "type": { "const": "ADD_FILE" } }, "required": ["type"] },
-      "then": { "properties": { "parameters": { "const": {} }, "payloadRef": { "type": "string", "pattern": "^payload/.+$" }, "target": { "pattern": "^(frontend|backend)/.+$" } } }
+      "then": { "properties": { "parameters": { "const": {} }, "payloadRef": { "type": "string", "pattern": "^payload/.+$" }, "target": { "pattern": "^(frontend|backend|agent-runtime)/.+$" } } }
     },
     {
       "if": { "properties": { "type": { "const": "REPLACE_MANAGED_FILE" } }, "required": ["type"] },
