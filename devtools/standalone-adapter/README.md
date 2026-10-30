@@ -14,7 +14,7 @@ export TEMPLATE_ENGINE_STANDALONE_ENABLED=true
 
 引擎默认监听 `127.0.0.1:18080`，可以设置 `TEMPLATE_ENGINE_PORT`。无需设置第二个 Revision 变量；以 `release.yaml` 为准。`TEMPLATE_ENGINE_SOURCE_ROOT` 若已设置，必须与选择模式的绝对路径完全一致，否则拒绝启动。不要在 Source Root 末尾加 `/code`。
 
-当前 Standalone Revision 为 `2026.10.24.1009`（正式来源 `2026.10.23.2`）。更新 Adapter 或引擎后，先构建并停止已有 Standalone 引擎，再通过上述脚本重启，才会 prepare 并加载新模板源；已下载的生成工程不会自动改写。自 1007 起，含 Login 的生成后端默认可使用模拟登录，无需额外 Mock 环境变量，数据库仍需配置，详见下文。1008 适配前端 logoutApi 与本地登出页面；1009 恢复正式 Login 配置贡献，Mock 配置仅由 Standalone Base 提供。
+当前 Standalone Revision 为 `2026.10.30.1001`（正式来源 `2026.10.30.1`）。更新 Adapter 或引擎后，先构建并停止已有 Standalone 引擎，再通过上述脚本重启，才会 prepare 并加载新模板源；已下载的生成工程不会自动改写。自 1007 起，含 Login 的生成后端默认可使用模拟登录，无需额外 Mock 环境变量，数据库仍需配置，详见下文。1008 适配前端 logoutApi 与本地登出页面；1009 恢复正式 Login 配置贡献，Mock 配置仅由 Standalone Base 提供。
 
 默认关闭：
 
@@ -41,6 +41,8 @@ unset TEMPLATE_ENGINE_STANDALONE_ENABLED TEMPLATE_ENGINE_SOURCE_ROOT
 Login Manifest 从正式源精确派生，不再维护整份 Overlay。`standalone.mock.*` 位于 Standalone Base 的既有 `application.yml`；V4 的 MAIN/DEV/ENV 配置片段只承载新能力的正式贡献，不携带 Mock 节点。允许公共 Maven、兼容 Java、MySQL、Bootstrap 数据源解析差异，以及 State 内相应 Maven/Annotation 差异；两种模式的 State 不要求字节相同，也不能混用。
 
 `manifest.yaml`、`release.yaml` 使用 **JSON 语法（合法 YAML 子集）**，因此 Python 不需要 PyYAML。不能改写成任意 YAML 语法。每个覆盖/删除/补丁目标都有实测 `expectedSourceSha256`；新增目标必须不存在。同一目标只能出现一次。
+
+上游变更后，先审核对应 Overlay 或精确补丁是否仍适用，再更新清单中的上游 SHA；不要直接批量刷新 SHA 来跳过审核。未被清单覆盖的 Runtime 文件由 prepare 自动复制。`2026.10.30.1001` 已审核正式 Base `application.yml` 的 Bee 数据源节点改名、JDBC 参数与默认数据源配置变化：Standalone 继续使用 `spring.datasource`、`DB_URL/DB_USERNAME/DB_PASSWORD` 和原有 Mock 配置，不复制 Bee 数据源节点或正式默认凭据；如需相应 JDBC 参数，由调用方在 `DB_URL` 中显式配置。同步后运行 test、prepare、audit；已有进程必须先正常停止，禁止删除活动锁或版本台账。
 
 `patch` 文件采用 JSON 精确片段格式 `{ "before": "...", "after": "..." }`：旧片段必须出现恰好一次，结果还必须匹配 `expectedResultSha256`，不调用模糊补丁工具。Bootstrap 主体未复制重写，仅修改 JDBC URL 家族和对应错误标签。
 

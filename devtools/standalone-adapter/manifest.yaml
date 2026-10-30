@@ -33,7 +33,7 @@
       "type": "replace",
       "target": "backend/base/src/main/resources/application.yml",
       "source": "overlays/backend/base/src/main/resources/application.yml",
-      "expectedSourceSha256": "2b71f5dee95490417c15bb8182b719d919a59ce008183e766dbc7a5a75a9a6e0",
+      "expectedSourceSha256": "d03159ef900714fd355b238088ee0ccf3480a3098d6075d54af30684429fd6c9",
       "reason": "Use public Maven/MySQL locally; preserve formal source and projection contract"
     },
     {

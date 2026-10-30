@@ -1,14 +1,15 @@
 server:
   port: 8080
+
 bee:
   enableMybatisPlus: true
   persistence:
-    ds1:
+    xcode-agent:
       mapperscan:
         packages: com.cmbchina
       datasource:
         driver-class-name: com.tencentcloud.tdsql.mysql.cj.jdbc.Driver
-        url: jdbc:tdsql-mysql://${datasource.ds1.url}:${datasource.ds1.port}/${datasource.ds1.schema}?passwordCharacterEncoding=latin1&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useUnicode=true&useSSL=false&connectTimeout=10000&socketTimeout=600000&tdsqlSendClientInfoEnable=true
+        url: jdbc:tdsql-mysql://${datasource.ds1.url}:${datasource.ds1.port}/${datasource.ds1.schema}?passwordCharacterEncoding=latin1&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useUnicode=true&useSSL=false&connectTimeout=10000&socketTimeout=600000&tdsqlSendClientInfoEnable=true&allowPublicKeyRetrieval=true
         username: ${datasource.ds1.username}
         password: ${datasource.ds1.password}
         test-on-borrow: true
@@ -29,6 +30,7 @@ bee:
   tracing:
     businessIds:
       LT5406A001B001C001D001: /api
+
 module:
   httpClient:
     maxTotal: 200
@@ -36,3 +38,11 @@ module:
     connectionRequestTimeoutInMilliseconds: 3000
     connectionTimeoutInMilliseconds: 3000
     socketTimeoutInMilliseconds: 30000
+
+datasource:
+  ds1:
+    url: 127.0.0.1
+    port: 3306
+    schema: database
+    username: root
+    password: password

@@ -19,7 +19,7 @@ Engine Service 是无状态计算入口：返回工程 ZIP 或更新操作包；
 需要 JDK 11+、Maven 3.9+，编译目标为 Java 8。在仓库根目录执行：
 
 ```sh
-mvn -f template-engine/pom.xml -pl engine-service -am package
+mvn -f template-engine/pom.xml -pl engine-service -am package -DskipTests
 export TEMPLATE_ENGINE_SOURCE_ROOT="$(cd template-source && pwd)"
 java -jar template-engine/engine-service/target/engine-service-1.0.0-SNAPSHOT.jar \
   --spring.config.additional-location="file:$(pwd)/template-engine/engine-service/config/application-local.yml"
@@ -37,7 +37,7 @@ export TEMPLATE_ENGINE_STANDALONE_ENABLED=true
 ./devtools/standalone-adapter/run-engine.sh
 ```
 
-脚本在 `.standalone-build/template-source/` 构造独立模板，使用公开 Maven 依赖、MySQL 和本地模拟登录，不修改正式 Base/Extension。当前正式 Revision 为 `2026.10.23.2`，Standalone 为 `2026.10.23.1008`，分别以 `template-revision.txt` 与 Adapter 的 `release.yaml` 为准。
+脚本在 `.standalone-build/template-source/` 构造独立模板，使用公开 Maven 依赖、MySQL 和本地模拟登录，不修改正式 Base/Extension。当前正式 Revision 为 `2026.10.30.1`，Standalone 为 `2026.10.30.1001`，分别以 `template-revision.txt` 与 Adapter 的 `release.yaml` 为准。
 
 含 Login 的 Standalone 后端默认使用 local Profile 和 `127.0.0.1:8080`；配置数据库后可调用 `GET /api/sso/login?code=mock-code` 完成模拟回调。前端登出调用本地接口。真实数据库权限、Bootstrap 初始化和 Workspace Executor Apply 需单独验收；完整配置、验证与回退步骤见 [Adapter 指南](devtools/standalone-adapter/README.md)。
 

@@ -23,7 +23,8 @@ import java.util.Set;
 @RestController
 public class EngineController {
     private static final Set<String> GENERATE_FIELDS = new HashSet<String>(Arrays.asList("requestedConfig"));
-    private static final Set<String> UPDATE_FIELDS = new HashSet<String>(Arrays.asList("protocolVersion", "currentTemplateState", "requestedConfig", "mode"));
+    private static final Set<String> UPDATE_FIELDS = new HashSet<String>(
+            Arrays.asList("protocolVersion", "currentTemplateState", "requestedConfig", "mode"));
 
     private final ObjectMapper json;
     private final CodeTemplateRelease release;
@@ -33,8 +34,12 @@ public class EngineController {
     private final PackageBuilder packages;
 
     EngineController(ObjectMapper json, CodeTemplateRelease release, ExtensionResolver resolver,
-                         V3ProjectMaterializer materializer, V3UpdatePlanner planner) {
-        this.json = json; this.release = release; this.resolver = resolver; this.materializer = materializer; this.planner = planner;
+            V3ProjectMaterializer materializer, V3UpdatePlanner planner) {
+        this.json = json;
+        this.release = release;
+        this.resolver = resolver;
+        this.materializer = materializer;
+        this.planner = planner;
         this.packages = new PackageBuilder(json, release);
     }
 
@@ -42,7 +47,8 @@ public class EngineController {
     public ResponseEntity<byte[]> generate(@RequestBody Map<String, Object> request) {
         requireOnly(request, GENERATE_FIELDS);
         Map<String, Object> requested = EngineMapper.requestedConfig(request.get("requestedConfig"));
-        @SuppressWarnings("unchecked") Map<String, Object> suppliedApplication = (Map<String, Object>) requested.remove("applicationConfig");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> suppliedApplication = (Map<String, Object>) requested.remove("applicationConfig");
         ExtensionResolver.ResolvedExtensions resolved = resolver.resolve(requested);
         Map<String, Object> application = ApplicationConfigProjector.resolve(suppliedApplication, resolved.effective());
         Map<String, byte[]> project = materializer.materialize(resolved, application);
@@ -54,30 +60,42 @@ public class EngineController {
     public ResponseEntity<byte[]> update(@RequestBody Map<String, Object> request) {
         requireOnly(request, UPDATE_FIELDS);
         Object protocolVersion = request.get("protocolVersion");
-        if (!(protocolVersion instanceof String)) throw bad("protocolVersion must be a string");
-        if (!"3".equals(protocolVersion) && !"4".equals(protocolVersion)) throw new V3Exception("PROTOCOL_VERSION_UNSUPPORTED", "protocolVersion must be 3 or 4", 400);
+        if (!(protocolVersion instanceof String))
+            throw bad("protocolVersion must be a string");
+        if (!"3".equals(protocolVersion) && !"4".equals(protocolVersion))
+            throw new V3Exception("PROTOCOL_VERSION_UNSUPPORTED", "protocolVersion must be 3 or 4", 400);
         Map<String, Object> current = EngineMapper.templateState(request.get("currentTemplateState"));
         Map<String, Object> requested = EngineMapper.requestedConfig(request.get("requestedConfig"));
         boolean v4 = "4".equals(protocolVersion);
-        if (v4 && requested.containsKey("applicationConfig")) throw bad("V4 requestedConfig cannot contain applicationConfig");
+        if (v4 && requested.containsKey("applicationConfig"))
+            throw bad("V4 requestedConfig cannot contain applicationConfig");
         Object rawMode = request.get("mode");
         if (!(rawMode instanceof String) || !("APPLY".equals(rawMode) || "RECONCILE".equals(rawMode)))
             throw bad("mode must be APPLY or RECONCILE");
-        @SuppressWarnings("unchecked") Map<String, Object> suppliedApplication = (Map<String, Object>) requested.remove("applicationConfig");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> suppliedApplication = (Map<String, Object>) requested.remove("applicationConfig");
         ExtensionResolver.ResolvedExtensions resolved = resolver.resolve(requested);
-        @SuppressWarnings("unchecked") Map<String, Object> previousApplication = (Map<String, Object>) current.get("managedConfiguration");
-        Map<String, Object> application = suppliedApplication == null ? previousApplication : ApplicationConfigProjector.resolve(suppliedApplication, resolved.effective());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> previousApplication = (Map<String, Object>) current.get("managedConfiguration");
+        Map<String, Object> application = suppliedApplication == null ? previousApplication
+                : ApplicationConfigProjector.resolve(suppliedApplication, resolved.effective());
         V3UpdateResult result = v4 ? planner.planCapabilities(current, resolved, (String) rawMode)
                 : planner.plan(current, resolved, (String) rawMode, application);
-        if (result.kind() == V3UpdateResult.Kind.NO_CHANGE) return ResponseEntity.noContent().build();
+        if (result.kind() == V3UpdateResult.Kind.NO_CHANGE)
+            return ResponseEntity.noContent().build();
         return zip(v4 ? packages.updatePackageV4(result) : packages.updatePackage(result));
     }
 
     private void requireOnly(Map<String, Object> request, Set<String> fields) {
-        if (request == null || !request.keySet().equals(fields)) throw bad("request fields are invalid");
+        if (request == null || !request.keySet().equals(fields))
+            throw bad("request fields are invalid");
     }
+
     private ResponseEntity<byte[]> zip(byte[] bytes) {
         return ResponseEntity.ok().contentType(MediaType.parseMediaType("application/zip")).body(bytes);
     }
-    private V3Exception bad(String message) { return new V3Exception("BAD_REQUEST", message, 400); }
+
+    private V3Exception bad(String message) {
+        return new V3Exception("BAD_REQUEST", message, 400);
+    }
 }

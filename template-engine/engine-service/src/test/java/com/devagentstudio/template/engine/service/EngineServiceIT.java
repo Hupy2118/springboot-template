@@ -263,7 +263,7 @@ class EngineServiceIT {
         installLogin.put("protocolVersion", "4");
         JsonNode loginPackage = zipJson(postZip(mvc, "/v1/update", installLogin, 200), "extension-update-package.json");
         JsonNode loginState = loginPackage.path("nextTemplateState");
-        assertEquals("2026.10.23.2", loginPackage.path("sourceRevision").asText());
+        assertEquals(base.path("templateRevision").asText(), loginPackage.path("sourceRevision").asText());
         assertEquals(0, loginPackage.path("expectedStateSequence").asInt());
         assertEquals(1, loginState.path("stateSequence").asInt());
         assertEquals(1, loginState.path("effective").size());
@@ -285,7 +285,7 @@ class EngineServiceIT {
         repeatedAuthorization.put("protocolVersion", "4");
         postZip(mvc, "/v1/update", repeatedAuthorization, 204);
         assertEquals(2, countOperation(authorization.path("operations"), "ENSURE_CAPABILITY_CONFIG"));
-        assertEquals("2026.10.23.2", authorization.path("sourceRevision").asText());
+        assertEquals(loginState.path("templateRevision").asText(), authorization.path("sourceRevision").asText());
         assertEquals(1, authorization.path("expectedStateSequence").asInt());
         assertEquals(2, authorization.path("nextTemplateState").path("stateSequence").asInt());
         assertEquals(2, authorization.path("nextTemplateState").path("effective").size());

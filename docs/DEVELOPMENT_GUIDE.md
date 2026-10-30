@@ -336,8 +336,8 @@ export TEMPLATE_ENGINE_STANDALONE_ENABLED=true
 
 | 模式 | Source Root | Revision 来源 |
 | --- | --- | --- |
-| native（开关缺省或 false） | `<repo>/template-source` | `code/template-revision.txt`，当前 `2026.10.23.2` |
-| standalone（开关 true） | `<repo>/.standalone-build/template-source` | `devtools/standalone-adapter/release.yaml`，当前 `2026.10.23.1008` |
+| native（开关缺省或 false） | `<repo>/template-source` | `code/template-revision.txt`，当前 `2026.10.30.1` |
+| standalone（开关 true） | `<repo>/.standalone-build/template-source` | `devtools/standalone-adapter/release.yaml`，当前 `2026.10.30.1001` |
 
 `run-engine.sh` 仅接受 true/false，发现已设置的 Source Root 与模式不一致会拒绝启动。Standalone 会 prepare/audit 后执行同一个 Engine JAR 与 `application-local.yml`；关闭时不执行 Python 或访问 Adapter 清单/临时目录。直接 `java -jar` 不解析此开关，HTTP 也不接受 standalone 字段。切换模式或修订前先停止已有进程，再重启加载 Source 和新 JAR；已下载工程不会自动更新。
 
