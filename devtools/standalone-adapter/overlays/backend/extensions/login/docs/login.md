@@ -51,4 +51,4 @@ Cookie 由浏览器接收，前端无需读取 HttpOnly Cookie。现有 `/api` �
 
 ## 权限边界
 
-模拟认证不固定放行权限。userId/sapId 必须与 role_member.member_id 一致，后续 Authorization 仍查真实角色和资源数据。默认 member-001 与 fixture Bootstrap 管理员一致，但不会自动获得数据库权限。DB_URL、DB_USERNAME、DB_PASSWORD 和首次 Bootstrap 初始化仍由调用方准备；免 Mock 配置不代表数据库零配置。首次初始化及真实数据库授权由调用方手工验收。
+模拟认证不固定放行权限。userId/sapId 必须与 role_member.member_id 一致，后续 Authorization 仍查真实角色和资源数据。默认 member-001 与 fixture Bootstrap 管理员一致，但不会自动获得数据库权限。DATASOURCE_DS1_URL、DATASOURCE_DS1_PORT、DATASOURCE_DS1_SCHEMA、DATASOURCE_DS1_USERNAME、DATASOURCE_DS1_PASSWORD 和首次 Bootstrap 初始化仍由调用方准备；免 Mock 配置不代表数据库零配置。首次初始化及真实数据库授权由调用方手工验收。

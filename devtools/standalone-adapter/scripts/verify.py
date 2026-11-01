@@ -33,11 +33,10 @@ def maven_args(pom):
 def start_smoke(project,name,logs,scenario='defaults'):
     # This intentionally uses a CLOSED port and placeholder identity, never the user's MySQL.
     env={key:value for key,value in os.environ.items()
-         if not key.startswith('STANDALONE_MOCK_') and key!='SPRING_PROFILES_ACTIVE'}
-    env.update(DB_URL='jdbc:mysql://127.0.0.1:1/not_connected_standalone_test?connectTimeout=1000&socketTimeout=1000',
-               DB_USERNAME='manual_verification_only',DB_PASSWORD='not-a-database-credential')
-    env.update(SPRING_DATASOURCE_URL=env['DB_URL'],SPRING_DATASOURCE_USERNAME=env['DB_USERNAME'],
-               SPRING_DATASOURCE_PASSWORD=env['DB_PASSWORD'])
+         if not key.startswith(('STANDALONE_MOCK_', 'SPRING_DATASOURCE_')) and key!='SPRING_PROFILES_ACTIVE'}
+    env.update(DATASOURCE_DS1_URL='127.0.0.1',DATASOURCE_DS1_PORT='1',
+               DATASOURCE_DS1_SCHEMA='not_connected_standalone_test',
+               DATASOURCE_DS1_USERNAME='manual_verification_only',DATASOURCE_DS1_PASSWORD='not-a-database-credential')
     login_secret=secrets.token_urlsafe(36)
     expected_identity={'userId':'member-001','userName':'Local Admin'}
     if scenario=='overrides':
@@ -118,8 +117,9 @@ def start_smoke(project,name,logs,scenario='defaults'):
 
 def bootstrap_regression(project, name, logs):
     """Exercise the real Bootstrap entry point with --dry-run; no connection or SQL execution."""
-    env=dict(os.environ,DB_URL='jdbc:mysql://127.0.0.1:1/not_connected_standalone_test',
-             DB_USERNAME='fixture-only',DB_PASSWORD='test-placeholder')
+    env=dict(os.environ,DATASOURCE_DS1_URL='127.0.0.1',DATASOURCE_DS1_PORT='1',
+             DATASOURCE_DS1_SCHEMA='not_connected_standalone_test',
+             DATASOURCE_DS1_USERNAME='fixture-only',DATASOURCE_DS1_PASSWORD='test-placeholder')
     backend=project/'backend'
     jar=backend/'target/xcode-agent-backend-1.0.0-SNAPSHOT.jar'
     arguments=['java','-Dloader.main=com.cmbchina.backend.auth.bootstrap.AuthorizationBootstrapCommand',
@@ -180,6 +180,8 @@ def main():
             import shutil
             shutil.copytree(fixtures,target/'backend/src/test/java',dirs_exist_ok=True)
             if name!='base':shutil.copytree(ADAPTER/'tests/java/login',target/'backend/src/test/java',dirs_exist_ok=True)
+            if name in ('authorization','full'):
+                shutil.copytree(ADAPTER/'tests/java/authorization',target/'backend/src/test/java',dirs_exist_ok=True)
             command(maven_args(target/'backend/pom.xml')+['clean','package'],logs/(name+'-package.log'))
             notes.append(name+' public Maven build/unit tests: PASS')
             command(maven_args(target/'backend/pom.xml')+['dependency:tree','-DoutputFile='+str(logs/(name+'-dependencies.txt'))],logs/(name+'-dependency-tree.log'))

@@ -29,6 +29,7 @@ final class BootstrapDataSource {
                 throw new IllegalArgumentException("Invalid Bootstrap profile");
             read(application.resolveSibling("application-" + profile + ".yml"), properties);
         }
+        validateComponents(properties);
         String prefix = "spring.datasource.";
         String driver = resolve(required(properties, prefix + "driver-class-name"), properties);
         String url = resolve(required(properties, prefix + "url"), properties);
@@ -37,6 +38,19 @@ final class BootstrapDataSource {
         if (!"com.mysql.cj.jdbc.Driver".equals(driver) || !url.startsWith("jdbc:mysql://")
                 || username.trim().isEmpty()) throw new IllegalArgumentException("Invalid MySQL datasource configuration");
         return new Settings(driver, url, username, password);
+    }
+
+    private static void validateComponents(Map<String, String> properties) {
+        String url = required(properties, "spring.datasource.url");
+        if (url.contains("${datasource.ds1.url}")) {
+            String host = resolve(required(properties, "datasource.ds1.url"), properties);
+            String port = resolve(required(properties, "datasource.ds1.port"), properties);
+            String schema = resolve(required(properties, "datasource.ds1.schema"), properties);
+            if (!host.matches("[A-Za-z0-9.-]+|\\[[0-9A-Fa-f:]+\\]")
+                    || !port.matches("[0-9]{1,5}") || Integer.parseInt(port) < 1 || Integer.parseInt(port) > 65535
+                    || !schema.matches("[A-Za-z0-9_-]+"))
+                throw new IllegalArgumentException("Invalid MySQL connection component");
+        }
     }
 
     private static void read(Path path, Map<String, String> properties) throws Exception {
@@ -64,7 +78,7 @@ final class BootstrapDataSource {
     private static String resolve(String input, Map<String, String> properties) {
         return PLACEHOLDER.replacePlaceholders(input, key -> {
             String value = properties.get(key);
-            // Only explicit YAML references consult the environment; DB_* is supported locally.
+            // Only explicit YAML references consult the environment; DATASOURCE_DS1_* supplies the local overrides.
             if (value == null) value = System.getenv(key);
             return value;
         });

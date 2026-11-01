@@ -18,13 +18,17 @@ def main():
     state=json_read(safe_file(project,'.devagentstudio/template-state.json'))
     release=json_read(ADAPTER/'release.yaml')
     require(state['templateRevision']==release['standaloneRevision'] and 'authorization' in state['effective'],'requires current standalone Authorization project')
-    raw=os.environ.get('DB_URL','')
+    host=os.environ.get('DATASOURCE_DS1_URL','')
+    port=os.environ.get('DATASOURCE_DS1_PORT','3306')
+    schema=os.environ.get('DATASOURCE_DS1_SCHEMA','')
+    require(port.isdigit() and 1 <= int(port) <= 65535,'invalid DATASOURCE_DS1_PORT')
+    raw='jdbc:mysql://'+host+':'+port+'/'+schema
     uri=urlparse(raw.removeprefix('jdbc:'))
     query={k.lower() for k in parse_qs(uri.query)}
     require(raw.startswith('jdbc:mysql://') and uri.hostname in ('127.0.0.1','localhost','::1') and uri.path.endswith('_standalone_test')
             and uri.path[1:].replace('_','').isalnum() and not uri.username and not query.intersection({'user','username','password','allowloadlocalinfile','autodeserialize'}),
-            'DB_URL must identify a local *_standalone_test database without inline credentials')
-    require(os.environ.get('DB_USERNAME') and 'DB_PASSWORD' in os.environ,'set DB_USERNAME and DB_PASSWORD in this terminal')
+            'DATASOURCE_DS1_URL/PORT/SCHEMA must identify a local *_standalone_test database without inline credentials')
+    require(os.environ.get('DATASOURCE_DS1_USERNAME') and 'DATASOURCE_DS1_PASSWORD' in os.environ,'set DATASOURCE_DS1_USERNAME and DATASOURCE_DS1_PASSWORD in this terminal')
     backend=project/'backend'
     command=[str(safe_file(backend,'scripts/bootstrap-authorization.sh')),
              '--technical-plan='+str(ADAPTER/'tests/fixture/technical-plan.json'),

@@ -350,7 +350,7 @@ export TEMPLATE_ENGINE_STANDALONE_ENABLED=true
 ./devtools/standalone-adapter/build.sh audit
 ```
 
-**生成后端与模拟登录**：Standalone 后端使用 `spring.datasource`，通过 `DB_URL/DB_USERNAME/DB_PASSWORD` 配置 MySQL，默认 local Profile、`127.0.0.1:8080`（可用 BACKEND_PORT 覆盖）。含 Login 的工程默认开启 Mock，dev/local 下注册且要求 loopback；仅 prod Profile 不注册，也可用 `STANDALONE_MOCK_ENABLED=false` 关闭。默认回调 `GET /api/sso/login?code=mock-code` 返回白名单首位 `member-001 / Local Admin` 并设置 Cookie；code 仅是非空占位参数，不代表企业授权码校验。可用 STANDALONE_MOCK_SSO_USER_ID/STANDALONE_MOCK_USERS 覆盖固定身份/白名单，不能通过请求任意冒充用户。
+**生成后端与模拟登录**：Standalone 后端使用 `spring.datasource`，数据库参数沿用正式版 `datasource.ds1.url/port/schema/username/password`（url 仅表示主机），通过 `DATASOURCE_DS1_URL/PORT/SCHEMA/USERNAME/PASSWORD` 覆盖 YAML 默认值；连接仍拼接为 `jdbc:mysql://`，使用 MySQL 驱动，默认 local Profile、`127.0.0.1:8080`（可用 BACKEND_PORT 覆盖）。含 Login 的工程默认开启 Mock，dev/local 下注册且要求 loopback；仅 prod Profile 不注册，也可用 `STANDALONE_MOCK_ENABLED=false` 关闭。默认回调 `GET /api/sso/login?code=mock-code` 返回白名单首位 `member-001 / Local Admin` 并设置 Cookie；code 仅是非空占位参数，不代表企业授权码校验。可用 STANDALONE_MOCK_SSO_USER_ID/STANDALONE_MOCK_USERS 覆盖固定身份/白名单，不能通过请求任意冒充用户。
 
 签名和旧 POST 登录密钥缺省在每次后端启动时独立随机生成，仅保留在内存，重启后旧 Cookie 失效；如使用 `POST /api/standalone/login`，需显式设置至少 32 字符的 STANDALONE_MOCK_LOGIN_SECRET。`GET /api/standalone/me` 读取当前身份，`POST /api/standalone/logout` 清 Cookie。1008 的前端 Overlay 补齐 logoutApi 和本地登出页面：等待服务端成功后清理身份/权限缓存并返回首页。模拟身份不绕过原始 RBAC；系统管理员的实际资源仍由数据库与 Bootstrap 决定。
 

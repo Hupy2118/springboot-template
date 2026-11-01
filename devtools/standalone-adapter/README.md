@@ -42,7 +42,7 @@ Login Manifest 从正式源精确派生，不再维护整份 Overlay。`standalo
 
 `manifest.yaml`、`release.yaml` 使用 **JSON 语法（合法 YAML 子集）**，因此 Python 不需要 PyYAML。不能改写成任意 YAML 语法。每个覆盖/删除/补丁目标都有实测 `expectedSourceSha256`；新增目标必须不存在。同一目标只能出现一次。
 
-上游变更后，先审核对应 Overlay 或精确补丁是否仍适用，再更新清单中的上游 SHA；不要直接批量刷新 SHA 来跳过审核。未被清单覆盖的 Runtime 文件由 prepare 自动复制。`2026.10.30.1001` 已审核正式 Base `application.yml` 的 Bee 数据源节点改名、JDBC 参数与默认数据源配置变化：Standalone 继续使用 `spring.datasource`、`DB_URL/DB_USERNAME/DB_PASSWORD` 和原有 Mock 配置，不复制 Bee 数据源节点或正式默认凭据；如需相应 JDBC 参数，由调用方在 `DB_URL` 中显式配置。同步后运行 test、prepare、audit；已有进程必须先正常停止，禁止删除活动锁或版本台账。
+上游变更后，先审核对应 Overlay 或精确补丁是否仍适用，再更新清单中的上游 SHA；不要直接批量刷新 SHA 来跳过审核。未被清单覆盖的 Runtime 文件由 prepare 自动复制。`2026.11.01.1001` 将数据库参数对齐正式版 `datasource.ds1.url/port/schema/username/password`，其中 url 是主机地址；Standalone 仍用 `spring.datasource` 和 MySQL 驱动，完整连接以 `jdbc:mysql://` 拼接。两端 YAML 默认值一致（本地占位值，并非真实数据库验收），可用 `DATASOURCE_DS1_URL/PORT/SCHEMA/USERNAME/PASSWORD` 显式覆盖；不再读取旧 `DB_URL/DB_USERNAME/DB_PASSWORD`。同步后运行 test、prepare、audit；已有进程必须先正常停止，禁止删除活动锁或版本台账。
 
 `patch` 文件采用 JSON 精确片段格式 `{ "before": "...", "after": "..." }`：旧片段必须出现恰好一次，结果还必须匹配 `expectedResultSha256`，不调用模糊补丁工具。Bootstrap 主体未复制重写，仅修改 JDBC URL 家族和对应错误标签。
 
@@ -140,9 +140,11 @@ export STANDALONE_MOCK_USERS='{"member-001":"Local Admin","member-002":"Local Me
 不要对原 `xcode` 业务库执行此测试。自行创建 `xcode_standalone_test` 空测试库并准备有权访问该库的测试用户，然后在终端设置：
 
 ```sh
-export DB_URL='jdbc:mysql://127.0.0.1:3306/xcode_standalone_test?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai'
-export DB_USERNAME='<测试用户>'
-export DB_PASSWORD='<在本机填入密码，不写入仓库>'
+export DATASOURCE_DS1_URL='127.0.0.1' # 仅主机，不含 jdbc:mysql://
+export DATASOURCE_DS1_PORT='3306'
+export DATASOURCE_DS1_SCHEMA='xcode_standalone_test'
+export DATASOURCE_DS1_USERNAME='<测试用户>'
+export DATASOURCE_DS1_PASSWORD='<在本机填入密码，不写入仓库>'
 ```
 
 先运行 `verify-full`，从 `.standalone-build/reports/verification-latest.md` 取得本次工程目录，再执行：

@@ -6,9 +6,9 @@ spring:
     default: local
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: jdbc:mysql://${datasource.ds1.url}:${datasource.ds1.port}/${datasource.ds1.schema}?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&connectTimeout=10000&socketTimeout=600000&allowPublicKeyRetrieval=true
+    username: ${datasource.ds1.username}
+    password: ${datasource.ds1.password}
 mybatis-plus:
   mapper-locations: classpath*:mapper/**/*.xml
 standalone:
@@ -18,3 +18,10 @@ standalone:
     login-secret: ${STANDALONE_MOCK_LOGIN_SECRET:}
     users-json: ${STANDALONE_MOCK_USERS:}
     sso-user-id: ${STANDALONE_MOCK_SSO_USER_ID:}
+datasource:
+  ds1:
+    url: ${DATASOURCE_DS1_URL:127.0.0.1}
+    port: ${DATASOURCE_DS1_PORT:3306}
+    schema: ${DATASOURCE_DS1_SCHEMA:database}
+    username: ${DATASOURCE_DS1_USERNAME:root}
+    password: ${DATASOURCE_DS1_PASSWORD:password}

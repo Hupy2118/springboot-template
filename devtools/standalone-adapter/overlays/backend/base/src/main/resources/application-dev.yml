@@ -1,7 +1,9 @@
 server:
   address: 127.0.0.1
-spring:
-  datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+datasource:
+  ds1:
+    url: ${DATASOURCE_DS1_URL:127.0.0.1}
+    port: ${DATASOURCE_DS1_PORT:3306}
+    schema: ${DATASOURCE_DS1_SCHEMA:database}
+    username: ${DATASOURCE_DS1_USERNAME:root}
+    password: ${DATASOURCE_DS1_PASSWORD:password}
