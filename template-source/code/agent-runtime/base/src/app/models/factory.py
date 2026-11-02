@@ -11,6 +11,7 @@ from pydantic import SecretStr
 
 from app.settings import RuntimeSettings
 from app.models.anthropic_transport import RuntimeChatAnthropic
+from app.server.execution import apply_request_budget, apply_async_request_budget
 
 _CLIENTS: list[tuple[httpx.Client, httpx.AsyncClient]] = []
 
@@ -22,8 +23,10 @@ def create_chat_model(settings: RuntimeSettings) -> BaseChatModel:
     headers = json.loads(settings.model_custom_headers)
     if settings.model_provider == "anthropic":
         headers["anthropic-version"] = settings.anthropic_api_version
-    sync_client = httpx.Client(trust_env=settings.model_trust_env, timeout=settings.model_timeout_seconds)
-    async_client = httpx.AsyncClient(trust_env=settings.model_trust_env, timeout=settings.model_timeout_seconds)
+    sync_client = httpx.Client(trust_env=settings.model_trust_env, timeout=settings.model_timeout_seconds,
+                              event_hooks={"request": [apply_request_budget]})
+    async_client = httpx.AsyncClient(trust_env=settings.model_trust_env, timeout=settings.model_timeout_seconds,
+                                    event_hooks={"request": [apply_async_request_budget]})
     _CLIENTS.append((sync_client, async_client))
     if settings.model_provider == "anthropic":
         return RuntimeChatAnthropic(

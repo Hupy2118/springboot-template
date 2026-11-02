@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
+from app.interaction.page_context import PageContext
 
 
 class RuntimeContextError(ValueError):
@@ -21,3 +22,5 @@ class RuntimeContext(BaseModel):
     enterprise_id: str | None = Field(default=None, max_length=256)
     authentication_mode: str = Field(pattern="^(enterprise|anonymous|debug)$")
     traceparent: str = Field(default="", max_length=512)
+    # 页面内容为非可信用户输入，不覆盖上述 Principal，也不作为授权事实。
+    page_context: PageContext | None = None

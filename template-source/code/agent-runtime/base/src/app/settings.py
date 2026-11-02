@@ -5,6 +5,7 @@ import hashlib
 import json
 import math
 import os
+import time
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -33,13 +34,13 @@ def number(name: str, default: str, *, integer: bool = False, minimum: float = 0
     return value
 
 
-def allowed_origins() -> tuple[str, ...]:
+def allowed_origins(profile: str) -> tuple[str, ...]:
     """读取 JSON Origin 白名单；同源代理默认无需 CORS。"""
     try:
         values = json.loads(os.getenv("AGENT_RUNTIME_ALLOWED_ORIGINS", "[]"))
     except ValueError:
         raise RuntimeError("AGENT_RUNTIME_ALLOWED_ORIGINS 必须为 JSON 数组。") from None
-    if not isinstance(values, list) or any(not isinstance(item, str) or not item.startswith(("http://", "https://")) or "*" in item for item in values):
+    if not isinstance(values, list) or any(not isinstance(item, str) or (not item.startswith(("http://", "https://")) and not (profile == "debug" and item == "null")) or "*" in item for item in values):
         raise RuntimeError("AGENT_RUNTIME_ALLOWED_ORIGINS 不允许通配或非法 Origin。")
     return tuple(dict.fromkeys(values))
 
@@ -73,6 +74,8 @@ class RuntimeSettings:
     model_temperature: float
     model_max_tokens: int
     database: DatabaseSettings = field(repr=False)
+    debug_token: str = field(default="", repr=False)
+    debug_expires_at: int = 0
 
     @property
     def checkpoint_db_path(self) -> Path:
@@ -101,8 +104,8 @@ def load_settings() -> RuntimeSettings:
     namespace = os.getenv("AGENT_RUNTIME_NAMESPACE", "").strip()
     host = os.getenv("AGENT_RUNTIME_HOST", "127.0.0.1").strip()
     profile = os.getenv("AGENT_RUNTIME_PROFILE", "preview").strip()
-    if not launch_id or not namespace or host != "127.0.0.1" or profile not in {"preview", "probe"}:
-        raise RuntimeError("Runtime 需要本轮 LAUNCH_ID、NAMESPACE、loopback HOST 和 preview/probe PROFILE。")
+    if not launch_id or not namespace or host != "127.0.0.1" or profile not in {"preview", "probe", "debug"}:
+        raise RuntimeError("Runtime 需要本轮 LAUNCH_ID、NAMESPACE、loopback HOST 和 preview/probe/debug PROFILE。")
     auth_enabled = boolean("AGENT_RUNTIME_AUTH_ENABLED")
     auth_mode = os.getenv("AGENT_RUNTIME_AUTH_MODE", "anonymous-session")
     if auth_enabled or auth_mode != "anonymous-session":
@@ -126,7 +129,7 @@ def load_settings() -> RuntimeSettings:
         anonymous_session_secret=os.getenv("AGENT_RUNTIME_ANONYMOUS_SESSION_SECRET", ""),
         anonymous_session_ttl_seconds=number("AGENT_RUNTIME_ANONYMOUS_SESSION_TTL_SECONDS", "86400", integer=True, minimum=1),
         anonymous_cookie_name=os.getenv("AGENT_RUNTIME_ANONYMOUS_COOKIE_NAME", "agent_runtime_session"),
-        cookie_secure=boolean("AGENT_RUNTIME_COOKIE_SECURE"), allowed_origins=allowed_origins(),
+        cookie_secure=boolean("AGENT_RUNTIME_COOKIE_SECURE"), allowed_origins=allowed_origins(profile),
         model_provider=os.getenv("MODEL_PROVIDER", ""), model_base_url=os.getenv("MODEL_BASE_URL", ""),
         model_api_key=os.getenv("MODEL_API_KEY", ""), model_name=os.getenv("MODEL_NAME", ""),
         model_custom_headers=headers, model_trust_env=boolean("MODEL_TRUST_ENV"),
@@ -136,7 +139,13 @@ def load_settings() -> RuntimeSettings:
         model_temperature=number("AGENT_TEMPERATURE", "0.2"),
         model_max_tokens=number("AGENT_MAX_TOKENS", "4096", integer=True, minimum=1),
         database=load_database_settings(),
+        debug_token=os.getenv("AGENT_RUNTIME_DEBUG_TOKEN", ""),
+        debug_expires_at=number("AGENT_RUNTIME_DEBUG_EXPIRES_AT", "0", integer=True),
     )
+    if profile == "debug" and (len(settings.debug_token) < 32 or not time.time() < settings.debug_expires_at <= time.time() + 600):
+        raise RuntimeError("Debug Profile 需要有效的本轮十分钟凭据。")
+    if profile != "debug" and (settings.debug_token or settings.debug_expires_at):
+        raise RuntimeError("普通预览不能接收 Debug 凭据。")
     settings.require_anonymous_session_secret()
     return settings
 

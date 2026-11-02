@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import time
 from typing import Any, AsyncIterator
 
-from fastapi import Body, Cookie, FastAPI, Header, HTTPException, Request
+from fastapi import Cookie, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -21,16 +22,41 @@ from app.security.adapters import (
 from app.security.service import resolve_public_principal
 from app.server.agui import build_agent_runtime_stream
 from app.server.health import router as health_router
+from app.server.deployment import DeploymentLock
+from app.server.execution import ExecutionRegistry, RunExecution, RuntimeStreamingResponse
+from app.server.request_limits import read_run_payload
 from app.settings import RuntimeSettings, load_settings
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    """在服务退出时关闭 Runtime 持有的 checkpoint 连接。"""
-
-    yield
-    await close_checkpointers()
-    await close_chat_models()
+async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+    """先取得命名空间执行权；实际请求退出后再关闭资源并释放进程锁。"""
+    deployment = application.state.deployment
+    deployment.acquire()
+    try:
+        from app.agent.factory import available_agent_ids, create_agent
+        from app.agent.execution_policy import load_execution_policies
+        from app.models.factory import create_chat_model
+        from app.persistence.checkpointer import get_checkpointer
+        settings = application.state.runtime_settings
+        policies = load_execution_policies(available_agent_ids())
+        application.state.execution_policies = policies
+        checkpointer = await get_checkpointer(settings)
+        # 只构造并核验实际图，不发送模型请求或执行业务节点。
+        context = RuntimeContext(namespace=settings.namespace, user_id="startup-inspection", authentication_mode="anonymous")
+        for agent_id, policy in policies.items():
+            create_agent(agent_id=agent_id, model=create_chat_model(settings), runtime_context=context,
+                         checkpointer=checkpointer, execution_policy=policy)
+        yield
+    finally:
+        if application.state.executions.active:
+            # 不能在实际任务仍存活时释放命名空间锁；由受控启动器回收整个进程。
+            raise RuntimeError("Runtime 仍有未收口执行，拒绝提前关闭资源或释放进程锁。")
+        try:
+            await close_checkpointers()
+            await close_chat_models()
+        finally:
+            deployment.close()
 
 
 def create_app(
@@ -48,6 +74,8 @@ def create_app(
         )
     application = FastAPI(title="XCodeAgent Agent Runtime", lifespan=lifespan)
     application.state.runtime_settings = runtime_settings
+    application.state.deployment = DeploymentLock(runtime_settings)
+    application.state.executions = ExecutionRegistry()
     application.state.public_authentication_adapter = public_authentication_adapter
     application.state.business_database = BusinessDatabase(
         runtime_settings.database
@@ -70,6 +98,7 @@ def create_app(
         runtime_context: RuntimeContext,
         accept: str,
         runtime_settings: RuntimeSettings,
+        received_at: float,
         anonymous_token: str | None = None,
     ) -> StreamingResponse:
         """构造 Direct AG-UI 流，并在需要时签发匿名会话 Cookie。"""
@@ -78,14 +107,19 @@ def create_app(
             request = parse_run_request(payload)
         except RuntimeRequestError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
-        response = StreamingResponse(
+        execution = RunExecution(application.state.executions, agent_id, runtime_context,
+                                 request.thread_id, request.inspect_interaction, received_at)
+        response = RuntimeStreamingResponse(
             build_agent_runtime_stream(
                 agent_id=agent_id,
                 request=request,
                 runtime_context=runtime_context,
                 settings=runtime_settings,
                 accept=accept,
+                execution=execution,
+                execution_policy=application.state.execution_policies.get(agent_id),
             ),
+            execution=execution,
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
@@ -105,7 +139,6 @@ def create_app(
     async def run_agent(
         request: Request,
         agent_id: str,
-        payload: dict[str, Any] = Body(...),
         accept: str = Header(default="text/event-stream"),
         authorization: str = Header(default=""),
         anonymous_session: str = Cookie(
@@ -114,7 +147,9 @@ def create_app(
         traceparent: str = Header(default=""),
     ) -> StreamingResponse:
         """建立公开 Principal 并返回业务 Agent AG-UI SSE。"""
-
+        received_at = time.monotonic()
+        # 路由不使用 Body(dict)，确保字节上限在 JSON 解码之前生效。
+        payload = await read_run_payload(request, received_at)
         try:
             resolution = await resolve_public_principal(
                 settings=runtime_settings,
@@ -132,6 +167,7 @@ def create_app(
             runtime_context=resolution.context,
             accept=accept,
             runtime_settings=runtime_settings,
+            received_at=received_at,
             anonymous_token=resolution.anonymous_token,
         )
 

@@ -12,7 +12,17 @@ Runtime `extension.yaml` 声明 `id/requires/conflicts/backendImplementation/con
 
 Runtime 环境只读取 Studio 本轮注入：MODEL_*、AGENT_RUNTIME_DATABASE_*、LAUNCH_ID、NAMESPACE 和匿名 Cookie。业务存储为 MySQL；checkpoint SQLite 独立；不执行启动迁移或 DDL。前端通过 Rsbuild 的 AGENT_RUNTIME_PUBLIC_URL 同源代理接入。模型/数据库凭据不得进入前端配置。发布输入清单和 revision 包含第三类源码。
 
-本次未运行构建、测试或真实 JAR/Runtime 联调；实现不代表已通过动态验收。
+Runtime 本地调试使用独立 debug Profile、进程和 namespace；短期 Bearer 凭据仅从本轮环境注入。普通 preview/probe 拒绝 Debug 凭据，健康响应公开 profile 和实际 agentIds，不执行模型会话。模板 revision 为 2026.10.30.1；已生成工程必须通过现有 Engine 更新并确认，不能由启动器直接修补受管文件。验证结果以本次交付记录为准，静态检查不代表真实模型或 MySQL 会话已验证。
+
+Runtime 会话的当前 AG-UI `forwardedProps` 接受 `pageId/actionId/contextItems`；三项必须一起提供，最多 20 项，单值最多 4096 字符，总上下文最多 16384 字符。数据通过普通用户消息和 `RuntimeContext.page_context` 提供给模型及工具，不得作为 Principal、授权或系统指令。`inspectInteraction: true` 为同端点只读 checkpoint 查询，不接受同时提交 `interactionResponse`，不恢复中断或执行业务操作；返回原 v1 结果、快照和完整运行生命周期。网络结果未知时先查询，禁止自动重放。
+
+Runtime R1 执行边界：启动器必须显式注入 `AGENT_RUNTIME_WORKERS=1`，`WEB_CONCURRENCY/UVICORN_WORKERS` 如存在也必须为 1。受控入口固定单 worker；lifespan 在开放路由前取得实际 checkpoint 目录的操作系统排他锁，冲突立即启动失败，退出释放内核锁而不删除锁文件。`/health.deployment` 提供 workers、实际 processId、profile、applicationSha256、namespaceSha256、processLockHeld、acceptingRuns；`checks.deployment/execution` 必须 ready，Studio 核对本轮应用和命名空间摘要。当前只保证同机受控入口，不支持跨主机或绕过入口的任意部署。
+
+`server/execution.py` 按可信 Principal 登记线程/身份容量，run、resume 和 inspect 共用线程互斥，立即拒绝、不排队。业务执行每身份最多 2、进程最多 4，只读查询不占模型容量、不构造模型；释放后删除登记。原始输入在 JSON 解析前按真实字节限制为 256 KiB，最多 128 条消息，最新 user 文本 16 KiB UTF-8；澄清回复必须非空文本且最多 16 KiB，确认/批准必须严格 bool，False 不转换为 True。
+
+整体 120 秒覆盖输入接收、checkpoint、模型/图、输出和终态发送/背压；模型每次 HTTP 请求（含 SDK 重试）取配置 timeout 与剩余期限较小值，取消后拒绝迟到请求。回答文本最多 128 KiB，超限先关闭图并返回 v1 失败。期限耗尽或断流可能无法交付终态，此时结果未知，不能重发原请求或把只读查询解释为原运行成功。取消只执行一次并等待实际任务退出，10 秒未收口时保留线程/容量、health 返回 503、发出固定 `AGENT_RUNTIME_CLEANUP_EXHAUSTED` 控制标记；Studio 的本轮日志观察器回收绑定进程一次，失败记录原因，不自动重启。日志管道必须持续由受控启动器消费；脱离启动器部署不属于当前保证。挂起任务未退出时 lifespan 不释放进程锁。同步工具/扩展必须配合取消并等待真实工作收口，自建 detached task 不在当前保证内。
+
+R1 仍使用当前 Runtime v1；平台 execution_policy、正式 Endpoint/v8、可信历史投影及页面未知结果入口属于后续合同切换，不能据本轮基础限制宣称完整升级。定向回归位于 `tests/test_execution_guards.py`、`tests/test_runtime_admission.py`，须在 Engine 装配含 MySQL 扩展的工程中执行。
 
 ## 1. 项目定位与架构
 
@@ -368,3 +378,17 @@ devagentstudio:
 **模板维护开发文档仅维护本文件** `docs/DEVELOPMENT_GUIDE.md`，更新规则、命令或架构时直接修改本文，不再新增“改造方案/实施计划/修复记录”到 `docs/`。
 
 根 `README.md` 只保留项目入口；根 `AGENTS.md` 保留 Agent 的代码约束。保留 `template-source/code/backend/base/docs/project-structure.md`、Extension 下的 `docs/login.md`、`docs/authorization.md` 等**随生成工程投放的运行时能力指引**：它们与模板维护过程文档不是同一类资产，删除会改变用户工程输出。OpenAPI、JSON Schema、Manifest、测试也不应因文档收敛而删除。
+
+
+## 纯文本运行合同（2026.10.31.1）
+
+Runtime 必须由 Studio 在已确认 DAG 的平台投影阶段交付 execution_policy.py 区域及进程摘要；缺失、过期或实际 Agent 集合不符时拒绝启动。实际图只允许受控文本节点，默认文件、task、Todo 和总结能力被替换；请求不接受系统/工具角色、非空 state/tools/context、结构化输入或交互续接。历史来自服务端 checkpoint，客户端只提交新 user 尾项；镜像历史不重复写入。
+
+目标验收使用独立 probe namespace，SDK 重试为零，真实 HTTP 请求预算为每授权 case 一次；失败或未知不退还预算。普通 Preview 保持完整注册集合门禁。此改动尚未执行构建、离线回归或真实供应商/Electron 验收，不能据源码存在宣称通过。
+
+
+## 会话公开合同与内部模块修正（2026.10.31.2）
+
+公开文本会话不再要求关闭 Tool、Skill 或 Knowledge。Studio 按正式七模块交付 executionCapabilities（业务 Tool 名称、精确资源清单、模型请求上限）和文档字节摘要。执行层允许已声明业务 Tool 及受控技能 read_file，禁止任意文件写入、子代理与未声明工具；SkillsMiddleware/MemoryMiddleware 使用独立只读资源根及精确来源，平台只读加载文件不等同于开放默认文件系统。交互仅允许 interactionKinds 中显式声明的类型，写入工具仍在实际执行前确认。无工具/技能时每 Run 最多一次模型发送，有业务工具或技能时最多八次；SDK 重试同样计数。每授权验收 case 只发起一次会话，不自动重放该会话。内部工具循环产生的公开助手正文按同一用户轮次合并校验历史。
+
+本次未做真实供应商或 Electron 验收，代码写入不代表功能验收通过。

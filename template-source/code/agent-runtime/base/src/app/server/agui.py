@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from contextlib import aclosing
 from typing import Any
 from uuid import uuid4
 
 from ag_ui.core import (
     CustomEvent,
-    RunErrorEvent,
     RunFinishedEvent,
     RunStartedEvent,
     StateSnapshotEvent,
@@ -24,10 +24,14 @@ from app.interaction.service import (
     InteractionOutcome,
     TextDelta,
     stream_agent_interaction,
+    _agent_input,
 )
+from app.interaction.inspection import inspect_interaction
 from app.models.factory import create_chat_model
 from app.persistence.checkpointer import get_checkpointer
 from app.settings import RuntimeSettings
+from app.server.execution import RunExecution, TEXT_BYTES
+from app.agent.execution_policy import ExecutionPolicy
 
 
 def _result_payload(
@@ -82,6 +86,8 @@ def build_agent_runtime_stream(
     runtime_context: RuntimeContext,
     settings: RuntimeSettings,
     accept: str,
+    execution: RunExecution,
+    execution_policy: ExecutionPolicy | None,
 ) -> AsyncIterator[str]:
     """构造具有唯一终态的业务 Agent AG-UI SSE 事件流。"""
 
@@ -98,30 +104,51 @@ def build_agent_runtime_stream(
             TextMessageStartEvent(messageId=message_id, role="assistant")
         )
         try:
+            if execution.admission_error is not None:
+                raise execution.admission_error
+            execution.remaining()
+            if execution_policy is None or execution_policy.agent_id != agent_id:
+                raise RuntimeRequestError("agent_policy_missing", "当前 Agent 未交付可执行策略。")
+            if request.interaction_response is not None and not execution_policy.interaction_kinds:
+                raise RuntimeRequestError("undeclared_interaction", "当前 Agent 未声明交互续接能力。")
             validate_agent_id(agent_id)
-            model = create_chat_model(settings)
             checkpointer = await get_checkpointer(settings)
-            agent = create_agent(
-                agent_id=agent_id,
-                model=model,
-                runtime_context=runtime_context,
-                checkpointer=checkpointer,
-            )
+            before = await inspect_interaction(checkpointer, agent_id, runtime_context, request.thread_id)
+            if before.pending_interaction is not None and before.pending_interaction.kind not in execution_policy.interaction_kinds:
+                raise RuntimeRequestError("undeclared_interaction", "当前 checkpoint 包含未声明交互，不能恢复。")
             outcome: InteractionOutcome | None = None
-            async for event in stream_agent_interaction(
-                agent=agent,
-                agent_id=agent_id,
-                request=request,
-                runtime_context=runtime_context,
-            ):
-                if isinstance(event, TextDelta):
-                    yield encoder.encode(
-                        TextMessageContentEvent(messageId=message_id, delta=event.text)
-                    )
-                else:
-                    outcome = event
+            if request.inspect_interaction:
+                outcome = before
+            else:
+                # 先复核当前待办/续接值，再构造供应商客户端；整个区间持有同一线程锁。
+                model = create_chat_model(settings)
+                agent = create_agent(
+                    agent_id=agent_id,
+                    model=model,
+                    runtime_context=runtime_context,
+                    checkpointer=checkpointer,
+                    execution_policy=execution_policy,
+                )
+                text_bytes = 0
+                async with aclosing(stream_agent_interaction(
+                    agent=agent,
+                    agent_id=agent_id,
+                    request=request,
+                    runtime_context=runtime_context,
+                )) as events:
+                    async for event in events:
+                        execution.remaining()
+                        if isinstance(event, TextDelta):
+                            text_bytes += len(event.text.encode("utf-8"))
+                            if text_bytes > TEXT_BYTES:
+                                raise RuntimeRequestError("output_limit", "本次回答超过公开文本上限，执行已停止，结果可能未知。")
+                            yield encoder.encode(TextMessageContentEvent(messageId=message_id, delta=event.text))
+                        else:
+                            outcome = event
             if outcome is None:
                 raise RuntimeError("Agent Runtime 未产生终态。")
+            if outcome.pending_interaction is not None and outcome.pending_interaction.kind not in execution_policy.interaction_kinds:
+                raise RuntimeRequestError("undeclared_interaction", "Agent 返回了正式合同未声明的交互。")
             payload = jsonable_encoder(
                 _result_payload(request=request, agent_id=agent_id, outcome=outcome)
             )

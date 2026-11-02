@@ -8,6 +8,8 @@ from deepagents import create_deep_agent
 
 from app.agent.context import RuntimeContext
 from app.interaction.schemas import RuntimeRequestError
+from app.agent.execution_policy import ExecutionPolicy
+from app.agent.execution_guard import text_only_middleware, verify_text_graph
 
 
 _AGENT_ID = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
@@ -26,6 +28,7 @@ def _create_chat_agent(
     model: Any,
     runtime_context: RuntimeContext,
     checkpointer: Any,
+    execution_policy: ExecutionPolicy,
 ) -> Any:
     """创建模板内置的最小可运行 Chat Agent。"""
 
@@ -34,6 +37,7 @@ def _create_chat_agent(
         model=model,
         context_schema=RuntimeContext,
         tools=[],
+        middleware=text_only_middleware(execution_policy),
         system_prompt="你是一个可靠的 AI 助手，请使用清晰、准确的语言回答用户。",
         checkpointer=checkpointer,
         name="chat",
@@ -62,15 +66,18 @@ def create_agent(
     model: Any,
     runtime_context: RuntimeContext,
     checkpointer: Any,
+    execution_policy: ExecutionPolicy,
 ) -> Any:
     """通过当前应用注册的 Builder 创建 Deep Agent。"""
 
     validate_agent_id(agent_id)
-    return _AGENT_BUILDERS[agent_id](
+    graph = _AGENT_BUILDERS[agent_id](
         model=model,
         runtime_context=runtime_context,
         checkpointer=checkpointer,
+        execution_policy=execution_policy,
     )
+    return verify_text_graph(graph, execution_policy)
 
 
 def available_agent_ids() -> tuple[str, ...]:

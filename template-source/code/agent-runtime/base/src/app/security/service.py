@@ -23,6 +23,9 @@ async def resolve_public_principal(
 ) -> PrincipalResolution:
     """恢复匿名会话；旧签名失效时签发新身份，不重新执行任何业务操作。"""
     validate_authentication_settings(settings)
+    if settings.runtime_profile == "debug":
+        from app.security.debug import resolve_debug_principal
+        return PrincipalResolution(resolve_debug_principal(settings, request, authorization))
     if anonymous_token:
         try:
             claims = verify_anonymous_session(settings, anonymous_token)
