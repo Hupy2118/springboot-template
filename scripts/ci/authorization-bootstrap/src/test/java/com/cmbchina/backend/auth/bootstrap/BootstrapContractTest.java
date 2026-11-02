@@ -123,6 +123,57 @@ class BootstrapContractTest {
         assertNotEquals(0, run(backend, "--dry-run", "--profile=absent").code);
         assertNotEquals(0, run(backend, "--dry-run", "--profile=../dev").code);
     }
+    @Test void explicitPlaceholdersPreferEnvironmentAndFallBackToYaml() throws Exception {
+        Map.Entry<String, String> environment = System.getenv().entrySet().stream()
+                .filter(entry -> entry.getKey().matches("[A-Za-z_][A-Za-z0-9_]*"))
+                .filter(entry -> !entry.getKey().toUpperCase(Locale.ROOT).matches("(?:DB_|MYSQL_|SPRING_DATASOURCE_).*"))
+                .findFirst().orElseThrow(() -> new IllegalStateException("Test requires an environment variable"));
+        java.lang.reflect.Method resolve = BootstrapDataSource.class.getDeclaredMethod("resolve", String.class, Map.class);
+        resolve.setAccessible(true);
+        Map<String, String> properties = new HashMap<String, String>();
+        properties.put(environment.getKey(), "yaml-value");
+        assertEquals(environment.getValue(), resolve.invoke(null, "${" + environment.getKey() + "}", properties));
+        String missing = "BOOTSTRAP_TEST_" + UUID.randomUUID().toString().replace("-", "");
+        properties.put(missing, "yaml-fallback");
+        assertEquals("yaml-fallback", resolve.invoke(null, "${" + missing + "}", properties));
+        assertEquals("placeholder-default", resolve.invoke(null, "${" + missing + "_ABSENT:placeholder-default}", properties));
+        properties.put("local.reference", "${" + environment.getKey() + "}");
+        assertEquals(environment.getValue(), resolve.invoke(null, "${local.reference}", properties));
+        for (String blocked : Arrays.asList("DB_URL", "MYSQL_PASSWORD", "SPRING_DATASOURCE_URL")) {
+            properties.put(blocked, "yaml-only");
+            assertEquals("yaml-only", resolve.invoke(null, "${" + blocked + "}", properties));
+        }
+    }
+    @Test void datasourceEnvironmentNamesOverrideYamlInActualProcess() throws Exception {
+        Path config = temporary.resolve("environment/application.yml");
+        write(config, "bee:\n  persistence:\n    ds1:\n      datasource:\n"
+                + "        driver-class-name: com.tencentcloud.tdsql.mysql.cj.jdbc.Driver\n"
+                + "        url: jdbc:tdsql-mysql://${datasource.ds1.url}:${datasource.ds1.port}/${datasource.ds1.schema}\n"
+                + "        username: ${datasource.ds1.username}\n        password: ${datasource.ds1.password}\n"
+                + "datasource:\n  ds1:\n    url: yaml-host\n    port: 3306\n    schema: yaml_schema\n"
+                + "    username: yaml-user\n    password: yaml-password\n");
+        write(config.resolveSibling("application-test.yml"), "datasource:\n  ds1:\n    port: 13306\n");
+        ProcessBuilder builder = new ProcessBuilder(Paths.get(System.getProperty("java.home"), "bin/java").toString(),
+                "-cp", System.getProperty("java.class.path"), EnvironmentProbe.class.getName(), config.toString());
+        Map<String, String> env = builder.environment();
+        env.put("DATASOURCE_DS1_URL", "environment-host");
+        env.put("DATASOURCE_DS1_PORT", "23306");
+        env.put("DATASOURCE_DS1_SCHEMA", "environment_schema");
+        env.put("DATASOURCE_DS1_USERNAME", "environment-user");
+        env.put("DATASOURCE_DS1_PASSWORD", "environment-password");
+        Path log = temporary.resolve("environment-probe.log");
+        Process process = builder.redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        assertTrue(process.waitFor(45, java.util.concurrent.TimeUnit.SECONDS));
+        assertEquals(0, process.exitValue(), "Environment configuration probe failed");
+    }
+    public static class EnvironmentProbe {
+        public static void main(String[] args) throws Exception {
+            BootstrapDataSource.Settings settings = BootstrapDataSource.load(Paths.get(args[0]), "test");
+            if (!"jdbc:tdsql-mysql://environment-host:23306/environment_schema".equals(settings.url)
+                    || !"environment-user".equals(settings.username)
+                    || !"environment-password".equals(settings.password)) throw new AssertionError("Environment override failed");
+        }
+    }
     @Test @EnabledIfEnvironmentVariable(named="AUTHORIZATION_BOOTSTRAP_TEST_CONFIG", matches=".+")
     void realTdsqlCreatesOnlyMinimalSystemGrantsAndIsIdempotent() throws Exception {
         Path config = Paths.get(System.getenv("AUTHORIZATION_BOOTSTRAP_TEST_CONFIG")).toAbsolutePath();

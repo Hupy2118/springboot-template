@@ -77,12 +77,18 @@ final class BootstrapDataSource {
 
     private static String resolve(String input, Map<String, String> properties) {
         return PLACEHOLDER.replacePlaceholders(input, key -> {
-            String value = properties.get(key);
-            // Environment is consulted only for explicit references, never as an implicit ds1 override.
-            String upper = key.toUpperCase(java.util.Locale.ROOT);
-            if (value == null && !upper.startsWith("DB_") && !upper.startsWith("MYSQL_")
-                    && !upper.startsWith("SPRING_DATASOURCE_")) value = System.getenv(key);
-            return value;
+            // The five ds1 environment names are the external database configuration contract.
+            String environmentKey = key;
+            if ("datasource.ds1.url".equals(key) || "datasource.ds1.port".equals(key)
+                    || "datasource.ds1.schema".equals(key) || "datasource.ds1.username".equals(key)
+                    || "datasource.ds1.password".equals(key)) {
+                environmentKey = key.toUpperCase(java.util.Locale.ROOT).replace('.', '_');
+            }
+            String upper = environmentKey.toUpperCase(java.util.Locale.ROOT);
+            String value = null;
+            if (!upper.startsWith("DB_") && !upper.startsWith("MYSQL_")
+                    && !upper.startsWith("SPRING_DATASOURCE_")) value = System.getenv(environmentKey);
+            return value != null ? value : properties.get(key);
         });
     }
 

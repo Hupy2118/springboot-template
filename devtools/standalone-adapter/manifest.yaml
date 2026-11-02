@@ -40,7 +40,7 @@
       "type": "replace",
       "target": "backend/extensions/authorization/src/main/java/com/cmbchina/backend/auth/bootstrap/BootstrapDataSource.java",
       "source": "overlays/backend/extensions/authorization/src/main/java/com/cmbchina/backend/auth/bootstrap/BootstrapDataSource.java",
-      "expectedSourceSha256": "5461d75d38615413d996321695014b58e45315a19d32eea1c3f50b5b0e79fd2c",
+      "expectedSourceSha256": "3f588480b0402e6b9010696717eaba815ff0a0f49102227aa643dd2a18d877c0",
       "reason": "Use public Maven/MySQL locally; preserve formal source and projection contract"
     },
     {
