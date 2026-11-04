@@ -85,8 +85,8 @@
       "type": "patch",
       "target": "backend/extensions/authorization/src/main/java/com/cmbchina/backend/auth/bootstrap/AuthorizationBootstrapCommand.java",
       "source": "patches/bootstrap-datasource.patch",
-      "expectedSourceSha256": "dbb525922df2b12e15bb4f0efcf39ff70624c3f43965bc0e370f22cd4354ac7f",
-      "expectedResultSha256": "f37a7e1bf3eb36994d7824c9b1e761b6952f34c3f450b7998fedfe9f834013f1",
+      "expectedSourceSha256": "774afc2e74865426d2119d0edbd4d106f8d992f1422f4bd1fa627e937cafd7ad",
+      "expectedResultSha256": "0572e8ce6698b75d8597b088a79803f7f9739e9d8ade1c4e01c59bd9bfb1a114",
       "reason": "Change only JDBC URL family and its error label; retain manifest v3 business validation"
     },
     {

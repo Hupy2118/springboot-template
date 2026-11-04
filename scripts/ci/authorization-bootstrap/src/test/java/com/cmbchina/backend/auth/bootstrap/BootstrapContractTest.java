@@ -60,6 +60,26 @@ class BootstrapContractTest {
         assertTrue(process.waitFor(45, java.util.concurrent.TimeUnit.SECONDS));
         return new Result(process.exitValue(), new String(Files.readAllBytes(log), StandardCharsets.UTF_8));
     }
+    @Test void relationIdRequiresAutoIncrementIntegerPrimaryKey() {
+        for (String table : Arrays.asList("role_resource", "role_member")) {
+            assertDoesNotThrow(() -> AuthorizationBootstrapCommand.validateRelationId(
+                    table, "int", "NO", "auto_increment", Collections.singletonList("id")));
+            // A unique index on id alone does not satisfy the primary-key contract.
+            assertThrows(RuntimeException.class, () -> AuthorizationBootstrapCommand.validateRelationId(
+                    table, "int", "NO", "auto_increment", Collections.<String>emptyList()));
+            assertThrows(RuntimeException.class, () -> AuthorizationBootstrapCommand.validateRelationId(
+                    table, "int", "NO", "auto_increment", Arrays.asList("id", "role_id")));
+            assertThrows(RuntimeException.class, () -> AuthorizationBootstrapCommand.validateRelationId(
+                    table, "int", "NO", "", Collections.singletonList("id")));
+            assertThrows(RuntimeException.class, () -> AuthorizationBootstrapCommand.validateRelationId(
+                    table, "bigint", "NO", "auto_increment", Collections.singletonList("id")));
+            assertThrows(RuntimeException.class, () -> AuthorizationBootstrapCommand.validateRelationId(
+                    table, "int", "YES", "auto_increment", Collections.singletonList("id")));
+            assertThrows(RuntimeException.class, () -> AuthorizationBootstrapCommand.validateRelationId(
+                    table, null, null, null, Collections.<String>emptyList()));
+        }
+    }
+
     @Test void v3DefaultWorkspaceAndBeeProfileDryRun() throws Exception {
         Result result = run(workspace(), "--dry-run");
         assertEquals(0, result.code, result.output);

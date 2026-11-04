@@ -30,18 +30,22 @@ CREATE TABLE `resource` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='资源点';
 
 CREATE TABLE `role_resource` (
-                                 `role_id` varchar(32) COLLATE utf8mb4_bin NOT NULL COMMENT '角色id',
-                                 `resource_key` varchar(64) COLLATE utf8mb4_bin NOT NULL COMMENT '资源点key',
-                                 `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-                                 `created_by` varchar(32) COLLATE utf8mb4_bin DEFAULT NULL COMMENT '创建人',
-                                 UNIQUE KEY `role_resource_unique` (`role_id`,`resource_key`)
+    `id` int NOT NULL AUTO_INCREMENT COMMENT '自增id标志',
+    `role_id` varchar(32) COLLATE utf8mb4_bin NOT NULL COMMENT '角色id',
+    `resource_key` varchar(64) COLLATE utf8mb4_bin NOT NULL COMMENT '资源点key',
+    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `created_by` varchar(32) COLLATE utf8mb4_bin DEFAULT NULL COMMENT '创建人',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `role_resource_unique` (`role_id`,`resource_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='角色资源点';
 
 CREATE TABLE `role_member` (
-                               `role_id` varchar(32) COLLATE utf8mb4_bin NOT NULL COMMENT '角色id',
-                               `member_id` varchar(32) COLLATE utf8mb4_bin NOT NULL COMMENT '成员id',
-                               `member_name` varchar(32) COLLATE utf8mb4_bin NOT NULL COMMENT '成员名称',
-                               `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-                               `created_by` varchar(32) COLLATE utf8mb4_bin DEFAULT NULL COMMENT '创建人',
-                               UNIQUE KEY `role_member_unique` (`role_id`,`member_id`)
+    `id` int NOT NULL AUTO_INCREMENT COMMENT '自增id标志',
+    `role_id` varchar(32) COLLATE utf8mb4_bin NOT NULL COMMENT '角色id',
+    `member_id` varchar(32) COLLATE utf8mb4_bin NOT NULL COMMENT '成员id',
+    `member_name` varchar(32) COLLATE utf8mb4_bin NOT NULL COMMENT '成员名称',
+    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `created_by` varchar(32) COLLATE utf8mb4_bin DEFAULT NULL COMMENT '创建人',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `role_member_unique` (`role_id`,`member_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT='角色成员';

@@ -3,6 +3,7 @@ package com.cmbchina.backend.auth.infrastructure.repository.converter;
 import com.cmbchina.backend.auth.domain.entity.RoleMember;
 import com.cmbchina.backend.auth.infrastructure.po.RoleMemberPO;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
 import java.util.List;
 
@@ -11,6 +12,9 @@ public interface RoleMemberConverter {
     RoleMember toEntity(RoleMemberPO source);
 
     List<RoleMember> toEntities(List<RoleMemberPO> source);
+
+    @Mapping(target = "id", ignore = true)
+    RoleMemberPO toPO(RoleMember source);
 
     List<RoleMemberPO> toPOs(List<RoleMember> source);
 }

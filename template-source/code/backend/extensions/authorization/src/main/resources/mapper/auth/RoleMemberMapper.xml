@@ -3,6 +3,7 @@
 <mapper namespace="com.cmbchina.backend.auth.infrastructure.mapper.RoleMemberMapper">
 
     <resultMap id="RoleMemberMap" type="com.cmbchina.backend.auth.infrastructure.po.RoleMemberPO">
+        <id column="id" property="id"/>
         <result column="role_id" property="roleId"/>
         <result column="member_id" property="memberId"/>
         <result column="member_name" property="memberName"/>
@@ -11,7 +12,7 @@
     </resultMap>
 
     <select id="findByRoleId" resultMap="RoleMemberMap">
-        SELECT rm.`role_id`, rm.`member_id`, rm.`member_name`, rm.`created_at`, rm.`created_by`
+        SELECT rm.`id`, rm.`role_id`, rm.`member_id`, rm.`member_name`, rm.`created_at`, rm.`created_by`
         FROM `role_member` rm
         JOIN `role` r ON r.`role_id` = rm.`role_id` AND r.`is_deleted` = 0
         WHERE rm.`role_id` = #{roleId} ORDER BY rm.`member_id`

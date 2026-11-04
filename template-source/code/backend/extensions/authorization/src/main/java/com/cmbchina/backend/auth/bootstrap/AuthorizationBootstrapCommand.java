@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -266,8 +267,8 @@ public final class AuthorizationBootstrapCommand {
                 "created_at", "created_by", "updated_at", "updated_by", "is_deleted", "deleted_at", "deleted_by"));
         result.put("resource", setOf("id", "key", "name", "description", "origin", "type",
                 "target_resource_ref", "created_at"));
-        result.put("role_resource", setOf("role_id", "resource_key", "created_at", "created_by"));
-        result.put("role_member", setOf("role_id", "member_id", "member_name", "created_at", "created_by"));
+        result.put("role_resource", setOf("id", "role_id", "resource_key", "created_at", "created_by"));
+        result.put("role_member", setOf("id", "role_id", "member_id", "member_name", "created_at", "created_by"));
         return result;
     }
 
@@ -275,9 +276,19 @@ public final class AuthorizationBootstrapCommand {
         Map<String, Set<List<String>>> result = new HashMap<String, Set<List<String>>>();
         result.put("role", indexSet(Arrays.asList("id"), Arrays.asList("role_id")));
         result.put("resource", indexSet(Arrays.asList("id"), Arrays.asList("key")));
-        result.put("role_resource", indexSet(Arrays.asList("role_id", "resource_key")));
-        result.put("role_member", indexSet(Arrays.asList("role_id", "member_id")));
+        result.put("role_resource", indexSet(Arrays.asList("id"), Arrays.asList("role_id", "resource_key")));
+        result.put("role_member", indexSet(Arrays.asList("id"), Arrays.asList("role_id", "member_id")));
         return result;
+    }
+
+    static void validateRelationId(String table, String dataType, String nullable, String extra,
+                                   List<String> primaryColumns) {
+        if (!"int".equalsIgnoreCase(dataType) || !"NO".equalsIgnoreCase(nullable)
+                || extra == null || !Arrays.asList(extra.toLowerCase(Locale.ROOT).split("\\s+")).contains("auto_increment")
+                || !Collections.singletonList("id").equals(primaryColumns)) {
+            throw new BootstrapException("权限表 " + table + " 的 id 必须为 INT NOT NULL AUTO_INCREMENT PRIMARY KEY；"
+                    + "请人工迁移 Schema 后重试，Bootstrap 不自动修改既有表");
+        }
     }
 
     private static Set<String> setOf(String... values) {
@@ -392,13 +403,21 @@ public final class AuthorizationBootstrapCommand {
         private void validateSchema() throws SQLException {
             for (String table : PERMISSION_TABLES) {
                 Set<String> columns = new HashSet<String>();
+                String idDataType = null;
+                String idNullable = null;
+                String idExtra = null;
                 try (PreparedStatement statement = connection.prepareStatement(
-                        "SELECT column_name FROM information_schema.columns "
+                        "SELECT column_name, data_type, is_nullable, extra FROM information_schema.columns "
                                 + "WHERE table_schema = DATABASE() AND table_name = ?")) {
                     statement.setString(1, table);
                     try (ResultSet result = statement.executeQuery()) {
                         while (result.next()) {
                             columns.add(result.getString(1));
+                            if ("id".equals(result.getString(1))) {
+                                idDataType = result.getString(2);
+                                idNullable = result.getString(3);
+                                idExtra = result.getString(4);
+                            }
                         }
                     }
                 }
@@ -425,6 +444,11 @@ public final class AuthorizationBootstrapCommand {
                             parts.put(result.getInt(3), result.getString(2));
                         }
                     }
+                }
+                if ("role_resource".equals(table) || "role_member".equals(table)) {
+                    TreeMap<Integer, String> primary = indexes.get("PRIMARY");
+                    validateRelationId(table, idDataType, idNullable, idExtra,
+                            primary == null ? Collections.<String>emptyList() : new ArrayList<String>(primary.values()));
                 }
                 Set<List<String>> shapes = new HashSet<List<String>>();
                 for (TreeMap<Integer, String> parts : indexes.values()) {

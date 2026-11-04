@@ -16,3 +16,25 @@
 ## 维护边界
 
 资源键、角色、成员关系和权限校验属于本 Capability。业务接口需要权限保护时使用 `RequireAnyResource`，不要自行实现平行的 Cookie、角色或资源校验机制。
+
+## 关联表主键与存量迁移
+
+自 Template Revision `2026.11.03.1` 起，`role_resource` 与 `role_member` 使用数据库自增 `INT` 主键 `id`。
+业务关系仍由 `(role_id, resource_key)` 和 `(role_id, member_id)` 唯一约束标识；接口不暴露关系记录 id，批量插入省略 id，由数据库生成。
+Bootstrap 会检查两表的 id 字段、单列主键和自增属性；发现旧结构时拒绝继续，不会自动 ALTER TABLE。
+
+新库直接使用 `sql/authorization/schema.sql`。存量库由调用方先核对实际表结构、备份数据，并按目标 TDSQL 环境评估 DDL 锁表与执行窗口。
+仅当两表均没有 id 列和显式主键，且原有业务唯一索引完整时，才适用以下一次性迁移；已迁移的表不要重复执行：
+
+```sql
+ALTER TABLE `role_resource`
+    ADD COLUMN `id` INT NOT NULL AUTO_INCREMENT COMMENT '自增id标志' FIRST,
+    ADD PRIMARY KEY (`id`);
+ALTER TABLE `role_member`
+    ADD COLUMN `id` INT NOT NULL AUTO_INCREMENT COMMENT '自增id标志' FIRST,
+    ADD PRIMARY KEY (`id`);
+```
+
+两条 DDL 不构成原子事务；若部分成功，核对后只处理未完成的表。迁移后用 `SHOW CREATE TABLE` 确认 id 定义与原业务唯一索引，
+再部署对应代码并执行真实 Bootstrap、角色成员及资源绑定/解绑验收。新增 id 不会修复业务重复关系，也不提供业务排序语义。
+V4 不会升级已安装的 Authorization，存量生成工程须由调用方同步相关源码/XML 和数据库迁移。
