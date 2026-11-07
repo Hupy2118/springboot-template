@@ -31,7 +31,9 @@ class BootstrapContractTest {
         for (String name : Arrays.asList("application.yml", "application-dev.yml")) {
             Path dest = backend.resolve("src/main/resources/" + name);
             Files.createDirectories(dest.getParent());
-            Files.copy(source.resolve("base/src/main/resources/" + name), dest);
+            // Use the Bootstrap loader's ds1 contract, independently of the Bee runtime's named datasource.
+            String yaml = new String(Files.readAllBytes(source.resolve("base/src/main/resources/" + name)), StandardCharsets.UTF_8);
+            write(dest, yaml.replace("    xcode-agent:", "    ds1:"));
         }
         Path ddl = backend.resolve("sql/authorization/schema.sql"); Files.createDirectories(ddl.getParent());
         Files.copy(source.resolve("extensions/authorization/sql/authorization/schema.sql"), ddl);
@@ -85,6 +87,16 @@ class BootstrapContractTest {
         assertEquals(0, result.code, result.output);
         assertTrue(result.output.contains("resources=2"));
         assertFalse(result.output.contains("password"));
+    }
+    @Test void compositeAdministratorsDryRunCountsUniqueIdentitiesWithoutConnecting() throws Exception {
+        Path backend = workspace();
+        write(backend.getParent().resolve(".devagentstudio/application.json"),
+                "{\"authorization\":{\"enabled\":true,\"initialAdministratorSubjects\":[\"00123456/张三\",\"00123456/张三\",\"ops@example.com\"]}}");
+        Result result = run(backend, "--dry-run");
+        assertEquals(0, result.code, result.output);
+        assertTrue(result.output.contains("initialAdministrators=2"));
+        assertFalse(result.output.contains("00123456"));
+        assertFalse(result.output.contains("张三"));
     }
     @Test void defaultDdlRejectsMissingOrInvalidNewAssetWithoutFallingBackToLegacyPaths() throws Exception {
         Path backend = workspace();

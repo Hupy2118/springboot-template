@@ -236,6 +236,8 @@ contributes:
 
 **Authorization Bootstrap 与规划契约**：Authorization Extension 唯一拥有 `scripts/bootstrap-authorization.sh`、`.ps1`、`sql/authorization/schema.sql` 和 Bootstrap Java。Assembly、Core Loader、Release 输入清单统一扫描 `src/docs/migrations/scripts/sql`；不恢复 V2 Strategy/Anchor。Base/Login 不交付这些权限专属资产。Generate 与 V4 首次安装通过通用 Artifact 路径交付，脚本不会在 Engine Service 中执行。
 
+初始管理员仍从 `.devagentstudio/application.json` 的 `authorization.initialAdministratorSubjects: string[]` 读取。新增项由调用方写入边界严格校验为“8位员工号/姓名”（例如 `00123456/张三`），Bootstrap 将其分别写入 `member_id` 与 `member_name`，保留工号前导零。姓名按 Unicode 码点计数 1..32，禁止首尾空白、斜线、控制字符和标签分隔符；管理员最多 100 项，同工号同姓名去重、身份冲突拒绝。Bootstrap 只读取已保存配置，不承担新旧值的写入判定：非合法复合格式的历史字符串仍按原值/原值初始化，但两列均不得超过 32 码点，空值和 `current-user` 拒绝。已存在的 `role_id + member_id` 关系继续跳过，绝不更新姓名或删除成员；修改配置不会自动同步已初始化权限表，应通过成员管理或受控数据修复处理。初始管理员不要求等于当前登录用户。
+
 在生成工程外部执行 `/bin/bash backend/scripts/bootstrap-authorization.sh --dry-run`，Windows 使用 `powershell.exe -NoProfile -File backend/scripts/bootstrap-authorization.ps1 --dry-run`；去掉 `--dry-run` 才会连接数据库。脚本定位 backend，调用固定版本 Maven exec 插件和显式 MainClass，逐项环境参数传递保留空格、单双引号和反斜杠，并传播进程失败码。不加载 `.env`；不隐式使用宿主 DB_*。Java 仍可直接接受 `--technical-plan=`、`--application=`、`--ddl=`、`--application-yml=`、`--profile=`、`--db-url=`、`--db-user=`。密码只从目标工程 YAML 或其中显式声明的安全环境占位符读取，不通过命令参数传入。
 
 默认规划文件是工作区 `.devagentstudio/plans/technical-plan.json` 与 `.devagentstudio/application.json`。只接受 confirmed 的 `authorization-manifest.v3`，权限开关来自 application.authorization.enabled，不要求 manifest.enabled。`system_admin` 明确映射数据库 `SYSTEM_ADMIN`；唯一系统资源是 `system_authorization_management`。业务默认角色及授权只校验、不落库；系统角色仅新增管理资源授权，不自动拥有业务资源。Bootstrap 只增不改，不会清除数据库中已有的手工授权。

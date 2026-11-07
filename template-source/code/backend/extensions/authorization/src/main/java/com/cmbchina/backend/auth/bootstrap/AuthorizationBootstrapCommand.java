@@ -58,7 +58,7 @@ public final class AuthorizationBootstrapCommand {
             if (arguments.dryRun) {
                 System.out.printf(
                         "Dry-run 成功：fingerprint=%s，resources=%d，initialAdministrators=%d，业务 role_resource 将不会初始化%n",
-                        input.fingerprint, input.resources.size(), input.administratorSubjects.size());
+                        input.fingerprint, input.resources.size(), input.administrators.size());
                 return;
             }
 
@@ -164,20 +164,80 @@ public final class AuthorizationBootstrapCommand {
         if (subjectNodes == null || !subjectNodes.isArray() || subjectNodes.size() == 0) {
             throw new BootstrapException("application.authorization.initialAdministratorSubjects 不能为空");
         }
-        List<String> subjects = new ArrayList<String>();
-        Set<String> subjectKeys = new HashSet<String>();
-        for (int index = 0; index < subjectNodes.size(); index++) {
-            String subject = requiredText(subjectNodes.get(index),
-                    "initialAdministratorSubjects[" + index + "]", 32);
-            if (!subjectKeys.add(subject)) {
-                throw new BootstrapException("初始管理员 subject 重复：" + subject);
-            }
-            subjects.add(subject);
-        }
+        List<AdminMember> administrators = parseAdministrators(subjectNodes);
 
         String fingerprint = requiredText(manifest.get("fingerprint"), "manifest.fingerprint", 128);
         if (!fingerprint.matches("sha256:[0-9a-f]{64}")) throw new BootstrapException("manifest.fingerprint 格式非法");
-        return new BootstrapInput(resources, subjects, fingerprint);
+        return new BootstrapInput(resources, administrators, fingerprint);
+    }
+
+    /** Reads saved configuration only. Strict validation of new values belongs to the caller's write boundary. */
+    static List<AdminMember> parseAdministrators(JsonNode values) {
+        if (values == null || !values.isArray() || values.size() == 0 || values.size() > 100) {
+            throw new BootstrapException("初始管理员必须为包含 1..100 项的字符串数组");
+        }
+        Map<String, AdminMember> members = new TreeMap<String, AdminMember>();
+        for (int index = 0; index < values.size(); index++) {
+            String raw = textValue(values.get(index));
+            if (raw == null || trimWhitespace(raw).isEmpty()
+                    || "current-user".equalsIgnoreCase(trimWhitespace(raw))) {
+                throw new BootstrapException("initialAdministratorSubjects[" + index + "] 必须是非空且非占位符的字符串");
+            }
+            String normalized = trimWhitespace(raw);
+            int slash = normalized.indexOf('/');
+            boolean composite = slash == 8 && normalized.substring(0, slash).matches("[0-9]{8}")
+                    && normalized.indexOf('/', slash + 1) < 0;
+            String name = composite ? normalized.substring(slash + 1) : "";
+            composite = composite && validAdministratorName(name);
+            // Invalid composite-looking saved values retain their legacy identity, within SQL limits.
+            AdminMember member = composite
+                    ? new AdminMember(normalized.substring(0, 8), name, false)
+                    : new AdminMember(raw, raw, true);
+            if (member.memberId.codePointCount(0, member.memberId.length()) > 32
+                    || member.memberName.codePointCount(0, member.memberName.length()) > 32) {
+                throw new BootstrapException("initialAdministratorSubjects[" + index + "] 超过数据库长度限制");
+            }
+            AdminMember previous = members.get(member.memberId);
+            if (previous != null && (!previous.memberName.equals(member.memberName)
+                    || previous.legacy != member.legacy)) {
+                throw new BootstrapException("initialAdministratorSubjects[" + index + "] 管理员身份冲突");
+            }
+            members.put(member.memberId, member);
+        }
+        return new ArrayList<AdminMember>(members.values());
+    }
+
+    private static boolean validAdministratorName(String name) {
+        int length = name.codePointCount(0, name.length());
+        if (length == 0 || length > 32 || !name.equals(trimWhitespace(name))) return false;
+        return name.codePoints().noneMatch(cp -> Character.isISOControl(cp)
+                || cp == '/' || cp == ',' || cp == '，' || cp == 0x2028 || cp == 0x2029);
+    }
+
+    private static String trimWhitespace(String value) {
+        int start = 0;
+        int end = value.length();
+        while (start < end && isWhitespace(value.codePointAt(start)))
+            start += Character.charCount(value.codePointAt(start));
+        while (end > start && isWhitespace(value.codePointBefore(end)))
+            end -= Character.charCount(value.codePointBefore(end));
+        return value.substring(start, end);
+    }
+
+    private static boolean isWhitespace(int codePoint) {
+        return Character.isWhitespace(codePoint) || Character.isSpaceChar(codePoint) || codePoint == 0x0085;
+    }
+
+    static final class AdminMember {
+        final String memberId;
+        final String memberName;
+        final boolean legacy;
+
+        private AdminMember(String memberId, String memberName, boolean legacy) {
+            this.memberId = memberId;
+            this.memberName = memberName;
+            this.legacy = legacy;
+        }
     }
 
     /** Validate business grants, but leave their persistence to a separately modelled workflow. */
@@ -545,12 +605,12 @@ public final class AuthorizationBootstrapCommand {
 
         private int ensureInitialAdministrators() throws SQLException {
             int created = 0;
-            for (String subject : input.administratorSubjects) {
+            for (AdminMember admin : input.administrators) {
                 boolean exists;
                 try (PreparedStatement query = connection.prepareStatement(
                         "SELECT 1 FROM role_member WHERE role_id = ? AND member_id = ?")) {
                     query.setString(1, SYSTEM_ADMIN_ROLE_ID);
-                    query.setString(2, subject);
+                    query.setString(2, admin.memberId);
                     try (ResultSet result = query.executeQuery()) {
                         exists = result.next();
                     }
@@ -562,8 +622,8 @@ public final class AuthorizationBootstrapCommand {
                         "INSERT INTO role_member (role_id, member_id, member_name, created_by) "
                                 + "VALUES (?, ?, ?, 'SYSTEM')")) {
                     insert.setString(1, SYSTEM_ADMIN_ROLE_ID);
-                    insert.setString(2, subject);
-                    insert.setString(3, subject);
+                    insert.setString(2, admin.memberId);
+                    insert.setString(3, admin.memberName);
                     insert.executeUpdate();
                     created++;
                 }
@@ -652,13 +712,13 @@ public final class AuthorizationBootstrapCommand {
 
     private static final class BootstrapInput {
         private final List<ResourceSeed> resources;
-        private final List<String> administratorSubjects;
+        private final List<AdminMember> administrators;
         private final String fingerprint;
 
-        private BootstrapInput(List<ResourceSeed> resources, List<String> administratorSubjects,
+        private BootstrapInput(List<ResourceSeed> resources, List<AdminMember> administrators,
                                String fingerprint) {
             this.resources = resources;
-            this.administratorSubjects = administratorSubjects;
+            this.administrators = administrators;
             this.fingerprint = fingerprint;
         }
     }
