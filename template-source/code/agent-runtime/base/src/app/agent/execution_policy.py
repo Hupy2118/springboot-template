@@ -26,6 +26,13 @@ class ExecutionPolicy:
     resource_sha256: object
     interaction_kinds: tuple[str, ...]
     model_requests: int
+    contract_json: str
+    public_endpoint: bool
+
+    @property
+    def contract(self) -> dict:
+        """每次返回独立合同副本，不能修改启动时冻结的执行能力。"""
+        return json.loads(self.contract_json)
 
 
 def load_execution_policies(registered_ids: tuple[str, ...]) -> object:
@@ -39,22 +46,23 @@ def load_execution_policies(registered_ids: tuple[str, ...]) -> object:
     result = {}
     budgets = {"requestBytes": 262144, "messages": 128, "userTextBytes": 16384, "textBytes": 131072,
                "threadRuns": 1, "identityRuns": 2, "processRuns": 4, "runSeconds": 120, "cleanupSeconds": 10}
-    capability = {"mode": "conversation", "inputSchema": {"type": "object", "properties": {},
-        "required": [], "additionalProperties": False}, "textOutput": True, "publicStateSchema": None,
-        "outcomes": [], "interactionKinds": []}
+    from app.agent.contracts import validate_contract
     for agent_id, entry in raw.items():
         interaction = entry.get("interactionContract") if isinstance(entry, dict) else None
         kinds = interaction.get("interactionKinds") if isinstance(interaction, dict) else None
         internal = entry.get("executionCapabilities") if isinstance(entry, dict) else None
         if (not isinstance(entry, dict) or entry.get("agentId") != agent_id
-                or entry.get("rule") != "conversation.policy.v1" or entry.get("budgets") != budgets
+                or entry.get("rule") != "execution.policy.v2" or entry.get("budgets") != budgets
                 or not isinstance(kinds, list) or len(kinds) != len(set(kinds))
                 or set(kinds) - {"clarification", "confirmation", "approval_required"}
-                or {**interaction, "interactionKinds": []} != capability
                 or not isinstance(internal, dict) or set(internal) != {"toolIds", "resourceFiles", "modelRequests"}
                 or entry.get("apiContractId") != f"agent.{agent_id}"
                 or entry.get("endpointId") != f"agent.{agent_id}.run"):
             raise RuntimeError("Runtime 执行策略不满足当前会话能力声明。")
+        contract = validate_contract(interaction)
+        exposure = entry.get("invocation", {}).get("exposure")
+        if exposure not in {"internal", "public"}:
+            raise RuntimeError("Agent 入口暴露范围未声明。")
         tools, files = internal["toolIds"], internal["resourceFiles"]
         if (not isinstance(tools, list) or any(not isinstance(tool, str) for tool in tools) or len(set(tools)) != len(tools)
                 or not isinstance(files, dict) or set(files) != {"skills", "knowledge"}
@@ -72,5 +80,6 @@ def load_execution_policies(registered_ids: tuple[str, ...]) -> object:
             raise RuntimeError("Runtime 资源摘要或模型循环预算不一致。")
         result[agent_id] = ExecutionPolicy(agent_id, entry["apiContractId"], entry["endpointId"],
             entry["capabilitySha256"], entry["implementationSha256"], MappingProxyType(budgets.copy()),
-            tuple(tools), resources, MappingProxyType(dict(digests)), tuple(kinds), internal["modelRequests"])
+            tuple(tools), resources, MappingProxyType(dict(digests)), tuple(kinds), internal["modelRequests"],
+            json.dumps(contract, sort_keys=True), exposure == "public")
     return MappingProxyType(result)

@@ -6,6 +6,7 @@ from fastapi import Header, HTTPException, Request, Response
 
 from app.agent.context import RuntimeContextError
 from app.application.context import ApplicationServiceContext
+from app.agent.invocation import AgentInvoker
 from app.security.service import resolve_public_principal
 
 
@@ -42,4 +43,7 @@ async def trusted_business_context(
     return ApplicationServiceContext(
         principal=resolution.context,
         database=request.app.state.business_database,
+        agents=AgentInvoker(
+            settings=settings, registry=request.app.state.executions,
+            policies=request.app.state.execution_policies, principal=resolution.context),
     )

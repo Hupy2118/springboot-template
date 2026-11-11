@@ -6,7 +6,7 @@ from typing import Any, AsyncIterator
 
 from fastapi import Cookie, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 
 from app.api.router import business_router
 from app.agent.context import RuntimeContext, RuntimeContextError
@@ -91,6 +91,16 @@ def create_app(
     application.include_router(health_router)
     application.include_router(business_router)
 
+    @application.exception_handler(RuntimeRequestError)
+    async def business_agent_error(_request: Request, error: RuntimeRequestError) -> JSONResponse:
+        """普通接口显式交付失败或待交互状态，不把待审批包装为检测成功。"""
+        pending = getattr(error, "pending", None)
+        from app.server.errors import business_error_status
+        status = business_error_status(error)
+        return JSONResponse(status_code=status, content={"status": "awaiting_user" if pending else "failed",
+            "error": {"code": error.code, "message": str(error), "recoverable": error.recoverable},
+            **(pending or {})})
+
     def stream_response(
         *,
         agent_id: str,
@@ -147,6 +157,9 @@ def create_app(
         traceparent: str = Header(default=""),
     ) -> StreamingResponse:
         """建立公开 Principal 并返回业务 Agent AG-UI SSE。"""
+        policy = application.state.execution_policies.get(agent_id)
+        if policy is None or (not policy.public_endpoint and runtime_settings.runtime_profile != "debug"):
+            raise HTTPException(status_code=404, detail="当前 Agent 没有公开运行入口。")
         received_at = time.monotonic()
         # 路由不使用 Body(dict)，确保字节上限在 JSON 解码之前生效。
         payload = await read_run_payload(request, received_at)

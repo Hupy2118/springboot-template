@@ -6,6 +6,10 @@ from dataclasses import dataclass
 
 from app.agent.context import RuntimeContext
 from app.infrastructure.database import BusinessDatabase
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.agent.invocation import AgentInvoker
 
 
 @dataclass(frozen=True)
@@ -14,3 +18,4 @@ class ApplicationServiceContext:
 
     principal: RuntimeContext
     database: BusinessDatabase
+    agents: AgentInvoker | None = None

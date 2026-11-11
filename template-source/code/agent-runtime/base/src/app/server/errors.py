@@ -18,3 +18,21 @@ def public_error(error: Exception, settings: RuntimeSettings) -> RuntimeRequestE
         text = "Runtime 执行异常：" + type(error).__name__ + "，请查看当前启动日志。"
     code = f"model_http_{status}" if isinstance(status, int) else "runtime_execution_failed"
     return RuntimeRequestError(code, text[:1600], recoverable=False)
+
+
+def business_error_status(error: RuntimeRequestError) -> int:
+    """按失败责任返回 HTTP 状态，不能把超时、容量或内部故障伪装为参数错误。"""
+    if getattr(error, "pending", None) is not None:
+        return 409
+    code = error.code
+    statuses = {"thread_busy": 409, "interaction_conflict": 409, "interaction_response_required": 409,
+        "stale_interaction_response": 409, "duplicate_message": 409,
+        "execution_limit": 429, "run_timeout": 504, "runtime_unhealthy": 503,
+        "agent_not_found": 404, "invalid_agent_result": 502, "agent_result_missing": 502,
+        "output_limit": 502, "supplier_budget_exhausted": 502, "undeclared_interaction": 502,
+        "invalid_pending_interaction": 502, "multiple_pending_interactions": 502,
+        "agent_mapping_source_missing": 422, "invalid_agent_input": 422, "message_required": 422,
+        "invalid_interaction_value": 422, "untrusted_history": 422, "history_limit": 422}
+    if code.startswith("model_http_"):
+        return 502
+    return statuses.get(code, 500)

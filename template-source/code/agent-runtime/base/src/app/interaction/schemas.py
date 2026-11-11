@@ -50,6 +50,7 @@ class RuntimeRunRequest:
     interaction_response: InteractionResponse | None
     page_context: PageContext | None = None
     inspect_interaction: bool = False
+    input: dict[str, Any] | None = None
 
 
 def parse_run_request(payload: dict[str, Any]) -> RuntimeRunRequest:
@@ -59,7 +60,7 @@ def parse_run_request(payload: dict[str, Any]) -> RuntimeRunRequest:
     if set(payload) - allowed or payload.get("state", {}) != {} or payload.get("tools", []) != [] or payload.get("context", []) != []:
         raise RuntimeRequestError("undeclared_input", "当前会话不接受客户端 state、工具、额外 context 或扩权字段。")
     raw_props = payload.get("forwardedProps", {})
-    if not isinstance(raw_props, dict) or set(raw_props) - {"pageId", "actionId", "contextItems", "inspectInteraction", "interactionResponse"}:
+    if not isinstance(raw_props, dict) or set(raw_props) - {"pageId", "actionId", "contextItems", "inspectInteraction", "interactionResponse", "input"}:
         raise RuntimeRequestError("undeclared_input", "当前会话包含未声明的 forwardedProps。")
     raw_messages = payload.get("messages", [])
     if not isinstance(raw_messages, list) or any(not isinstance(item, dict) or set(item) != {"id", "role", "content"}
@@ -82,6 +83,9 @@ def parse_run_request(payload: dict[str, Any]) -> RuntimeRunRequest:
     except ValueError as exc:
         raise RuntimeRequestError("invalid_page_context", "页面上下文无效。") from exc
     raw_response = forwarded_props.get("interactionResponse")
+    business_input = forwarded_props.get("input")
+    if business_input is not None and not isinstance(business_input, dict):
+        raise RuntimeRequestError("invalid_agent_input", "Agent 业务输入必须是对象。")
     try:
         interaction_response = (
             InteractionResponse.model_validate(raw_response)
@@ -116,5 +120,6 @@ def parse_run_request(payload: dict[str, Any]) -> RuntimeRunRequest:
         interaction_response=interaction_response,
         page_context=page_context,
         inspect_interaction=inspect,
+        input=business_input,
     )
 

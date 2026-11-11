@@ -30,6 +30,7 @@ class InteractionOutcome:
 
     status: Literal["completed", "awaiting_user"]
     pending_interaction: PendingInteraction | None = None
+    result: Any = None
 
 
 InteractionEvent = TextDelta | InteractionOutcome
@@ -180,12 +181,33 @@ def _agent_input(
     return {"messages": messages}
 
 
+def _structured_result(state: dict, schema: dict) -> Any:
+    """优先采用明确结构化输出，否则解析最终 JSON；任一已选结果都须通过合同。"""
+    from pydantic import BaseModel
+    from app.agent.contracts import validate_value
+    if "structured_response" in state:
+        result = state["structured_response"]
+        if isinstance(result, BaseModel):
+            result = result.model_dump(mode="json")
+    else:
+        messages = state.get("messages", [])
+        final = next((message for message in reversed(messages) if getattr(message, "type", "") == "ai"
+                      and not getattr(message, "tool_calls", None)), None)
+        try:
+            result = json.loads(_message_text(getattr(final, "content", "")))
+        except (ValueError, TypeError) as exc:
+            raise RuntimeRequestError("invalid_agent_result", "Agent 未交付符合合同的结构化结果，不会自动重试。") from exc
+    validate_value(schema, result, result=True)
+    return result
+
+
 async def stream_agent_interaction(
     *,
     agent: Any,
     agent_id: str,
     request: RuntimeRunRequest,
     runtime_context: RuntimeContext,
+    execution_contract: dict,
 ) -> AsyncIterator[InteractionEvent]:
     """流式运行 Agent，并在结尾返回完成或待交互结果。"""
 
@@ -201,7 +223,9 @@ async def stream_agent_interaction(
             runtime_context.user_id.encode("utf-8")
         ).hexdigest(),
     }
-    before_snapshot = await _agent_state(agent, config)
+    from app.agent.contracts import validate_value
+    persistent = execution_contract["mode"] == "conversation" or bool(execution_contract["interactionKinds"])
+    before_snapshot = await _agent_state(agent, config) if persistent else None
     before = _pending_interaction(before_snapshot)
     if request.inspect_interaction:
         # 只读 checkpoint；不执行 astream，也不把旧的批准或写操作再次提交。
@@ -210,14 +234,35 @@ async def stream_agent_interaction(
     runtime_context = runtime_context.model_copy(update={"page_context": request.page_context})
     agent_input = _agent_input(request=request, pending=before,
         history=(getattr(before_snapshot, "values", None) or {}).get("messages", []))
-    async with aclosing(agent.astream(agent_input, config=config, context=runtime_context, stream_mode="messages")) as events:
+    if isinstance(agent_input, dict) and (request.input is not None or execution_contract["resultSchema"] is not None):
+        # 服务端合同作为独立业务说明加入输入，公开历史比较时沿页面上下文规则排除该内部投影。
+        instruction = "以下 input 是本轮业务数据；若 resultSchema 非空，通过 structured_response 或最终助手 JSON 交付符合该 Schema 的结果。"
+        agent_input["messages"].insert(0, {"id": "page-context:agent-contract:" + request.run_id, "role": "user",
+            "content": instruction + "\n" + json.dumps({"input": request.input, "resultSchema": execution_contract["resultSchema"]}, ensure_ascii=False)})
+    if isinstance(agent_input, dict):
+        # 能力输入与结果合同同样计入上下文预算，不能绕过原消息限制。
+        history = (getattr(before_snapshot, "values", None) or {}).get("messages", [])
+        size = sum(len(_message_text(getattr(item, "content", "")).encode("utf-8")) for item in history)
+        size += sum(len(item["content"].encode("utf-8")) for item in agent_input["messages"])
+        if len(history) + len(agent_input["messages"]) > 128 or size > 128 * 1024:
+            raise RuntimeRequestError("history_limit", "完整业务输入已达上限，请明确创建新会话。")
+    final_state = None
+    async with aclosing(agent.astream(agent_input, config=config, context=runtime_context, stream_mode=["messages", "values"])) as events:
         async for item in events:
-            message = item[0] if isinstance(item, tuple) and item else item
+            mode, value = item
+            if mode == "values":
+                final_state = value
+                continue
+            message = value[0] if isinstance(value, tuple) and value else value
             text = _message_text(getattr(message, "content", ""))
             if text:
                 yield TextDelta(text=text)
-    after = _pending_interaction(await _agent_state(agent, config))
+    after = _pending_interaction(await _agent_state(agent, config)) if persistent else None
+    result = None
+    if after is None and execution_contract["resultSchema"] is not None:
+        result = _structured_result(final_state or {}, execution_contract["resultSchema"])
     yield InteractionOutcome(
         status="awaiting_user" if after is not None else "completed",
         pending_interaction=after,
+        result=result,
     )
