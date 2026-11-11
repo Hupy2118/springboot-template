@@ -392,3 +392,17 @@ Runtime 必须由 Studio 在已确认 DAG 的平台投影阶段交付 execution_
 公开文本会话不再要求关闭 Tool、Skill 或 Knowledge。Studio 按正式七模块交付 executionCapabilities（业务 Tool 名称、精确资源清单、模型请求上限）和文档字节摘要。执行层允许已声明业务 Tool 及受控技能 read_file，禁止任意文件写入、子代理与未声明工具；SkillsMiddleware/MemoryMiddleware 使用独立只读资源根及精确来源，平台只读加载文件不等同于开放默认文件系统。交互仅允许 interactionKinds 中显式声明的类型，写入工具仍在实际执行前确认。无工具/技能时每 Run 最多一次模型发送，有业务工具或技能时最多八次；SDK 重试同样计数。每授权验收 case 只发起一次会话，不自动重放该会话。内部工具循环产生的公开助手正文按同一用户轮次合并校验历史。
 
 本次未做真实供应商或 Electron 验收，代码写入不代表功能验收通过。
+
+
+## 独立 Agent 能力（2026-11-03）
+
+Runtime 的平台策略使用 execution.policy.v2，interactionContract 显式包含 mode、inputSchema、resultSchema、textOutput、publicStateSchema、outcomes、interactionKinds。mode 支持 task/conversation；任务必须有结果 Schema。Schema 自包含，仅允许本地片段引用；结构化结果在返回前按 jsonschema 校验，失败不修补或重试。
+
+app.agent.invocation.stream_agent 是页面与业务服务共用的模型/工具执行入口。ApplicationServiceContext.agents 提供 invoke_agent（一次性 JSON）和 stream_agent（AG-UI）两种业务响应适配；业务接口传入平台确认的 Agent、JSON Pointer 参数/结果映射和完整响应 Schema，不经本机 HTTP。AG-UI 业务 Controller 使用 parse_run_request 后校验 request.input，并保留原 thread/run 及明确的交互续接身份。
+
+无交互任务不建立长期 checkpoint；会话或可交互任务继续按 Principal/Agent/thread 隔离。JSON 待交互返回 HTTP 409 和 pendingInteraction，不能自动批准或当成成功。取消、超时及实际任务收口复用 ExecutionRegistry。公开运行入口由平台签发策略 invocation.exposure 控制，internal 不发布业务运行接口；受控 Debug Profile 仍可调试内部 Agent。
+
+新增 jsonschema 依赖与锁文件同步发布；Template Source release revision 同步更新。登录/授权、模型凭据注入和唯一业务服务复用边界不变。
+
+
+Agent 输出合同按消费者约束：task/conversation 均允许纯文本（textOutput=true、resultSchema=null）；业务接口调用仍必须有结构化结果 Schema。Runtime 优先读取终态 structured_response（包括 Pydantic 对象），未提供时解析最终助手 JSON；已提供的无效结果直接失败，不回退、不修补。普通 JSON 接口区分 422 输入、409 冲突/交互、429 容量、504 超时、502 上游/结果、503 不健康与 500 内部错误。
