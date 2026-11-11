@@ -140,10 +140,14 @@ async def test_direct_checkpoint_inspection_matches_native_interrupt_before_and_
         graph.add_edge("confirm", END)
         agent = graph.compile(checkpointer=saver)
         initial = RuntimeRunRequest("thread", "run", [{"role": "user", "content": "开始"}], None)
-        events = [event async for event in stream_agent_interaction(agent=agent, agent_id="chat", request=initial, runtime_context=context)]
+        events = [event async for event in stream_agent_interaction(agent=agent, agent_id="chat", request=initial, runtime_context=context, execution_contract=TEST_EXECUTION_CONTRACT)]
         found = await inspect_interaction(saver, "chat", context, "thread")
         assert found == events[-1] and found.status == "awaiting_user"
         resumed = replace(initial, run_id="resume", messages=[], interaction_response=InteractionResponse(interactionId="confirm", value=False))
-        events = [event async for event in stream_agent_interaction(agent=agent, agent_id="chat", request=resumed, runtime_context=context)]
+        events = [event async for event in stream_agent_interaction(agent=agent, agent_id="chat", request=resumed, runtime_context=context, execution_contract=TEST_EXECUTION_CONTRACT)]
         found = await inspect_interaction(saver, "chat", context, "thread")
         assert found == events[-1] and found.status == "completed"
+
+
+# 当前文本会话的显式测试合同；交互测试保留确认/澄清能力。
+TEST_EXECUTION_CONTRACT = {"mode": "conversation", "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False}, "resultSchema": None, "textOutput": True, "interactionKinds": ["clarification", "confirmation", "approval_required"]}

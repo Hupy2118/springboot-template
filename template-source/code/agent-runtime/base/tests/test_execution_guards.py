@@ -54,11 +54,11 @@ async def test_resume_values_are_strict_before_graph_entry(kind, value, valid):
     context = RuntimeContext(namespace="probe:execution", user_id="trusted", authentication_mode="anonymous")
     if not valid:
         with pytest.raises(RuntimeRequestError) as caught:
-            _ = [item async for item in stream_agent_interaction(agent=agent, agent_id="chat", request=request, runtime_context=context)]
+            _ = [item async for item in stream_agent_interaction(agent=agent, agent_id="chat", request=request, runtime_context=context, execution_contract=TEST_EXECUTION_CONTRACT)]
         assert caught.value.code == "invalid_interaction_value"
         assert agent.calls == 0
     else:
-        events = [item async for item in stream_agent_interaction(agent=agent, agent_id="chat", request=request, runtime_context=context)]
+        events = [item async for item in stream_agent_interaction(agent=agent, agent_id="chat", request=request, runtime_context=context, execution_contract=TEST_EXECUTION_CONTRACT)]
         assert events[-1].status == "completed"
         assert agent.command.resume == value and type(agent.command.resume) is type(value)
 
@@ -207,13 +207,14 @@ def test_provider_timeout_is_capped_and_late_retry_is_rejected():
 async def test_busy_is_complete_agui_failure_before_checkpoint_or_model(monkeypatch):
     """冲突请求只交付 busy 终态，不触及 checkpoint、模型或原请求。"""
     import app.server.agui as agui
+    import app.agent.invocation as invocation
     from app.settings import load_settings
     registry = ExecutionRegistry()
     incumbent, rejected = execution(registry), execution(registry, inspect=True)
     incumbent.start()
     model, saver = Mock(), AsyncMock()
-    monkeypatch.setattr(agui, "create_chat_model", model)
-    monkeypatch.setattr(agui, "get_checkpointer", saver)
+    monkeypatch.setattr(invocation, "create_chat_model", model)
+    monkeypatch.setattr(invocation, "get_checkpointer", saver)
     context = RuntimeContext(namespace="probe:execution", user_id="trusted", authentication_mode="anonymous")
     request = RuntimeRunRequest("thread", "run", [], None, inspect_interaction=True)
     frames = []
@@ -239,14 +240,15 @@ async def test_busy_is_complete_agui_failure_before_checkpoint_or_model(monkeypa
 async def test_output_limit_closes_graph_and_never_reports_success(monkeypatch):
     """公开文本超限先关闭图，再发送有界失败，不能静默截断后报告 completed。"""
     import app.server.agui as agui
+    import app.agent.invocation as invocation
     from app.interaction.service import InteractionOutcome, TextDelta
     from app.settings import load_settings
     registry, closed = ExecutionRegistry(), asyncio.Event()
     run = execution(registry)
-    monkeypatch.setattr(agui, "get_checkpointer", AsyncMock(return_value=object()))
-    monkeypatch.setattr(agui, "inspect_interaction", AsyncMock(return_value=InteractionOutcome("completed")))
-    monkeypatch.setattr(agui, "create_chat_model", Mock(return_value=object()))
-    monkeypatch.setattr(agui, "create_agent", Mock(return_value=object()))
+    monkeypatch.setattr(invocation, "get_checkpointer", AsyncMock(return_value=object()))
+    monkeypatch.setattr(invocation, "inspect_interaction", AsyncMock(return_value=InteractionOutcome("completed")))
+    monkeypatch.setattr(invocation, "create_chat_model", Mock(return_value=object()))
+    monkeypatch.setattr(invocation, "create_agent", Mock(return_value=object()))
 
     async def oversized(**kwargs):
         """模拟模型实际输出超限，finally 是真实关闭图的观测点。"""
@@ -255,7 +257,7 @@ async def test_output_limit_closes_graph_and_never_reports_success(monkeypatch):
         finally:
             closed.set()
 
-    monkeypatch.setattr(agui, "stream_agent_interaction", oversized)
+    monkeypatch.setattr(invocation, "stream_agent_interaction", oversized)
     frames = []
 
     async def send(message):
@@ -271,3 +273,7 @@ async def test_output_limit_closes_graph_and_never_reports_success(monkeypatch):
     text = b"".join(frames).decode()
     assert closed.is_set() and "output_limit" in text and '"status":"completed"' not in text
     assert "RUN_FINISHED" in text and registry.active == {}
+
+
+# 当前文本会话的显式测试合同；交互测试保留确认/澄清能力。
+TEST_EXECUTION_CONTRACT = {"mode": "conversation", "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False}, "resultSchema": None, "textOutput": True, "interactionKinds": ["clarification", "confirmation", "approval_required"]}

@@ -36,10 +36,10 @@ def current_text_policy(monkeypatch):
     import app.agent.execution_policy as policies
     import app.models.factory as models
     capability = {"mode": "conversation", "inputSchema": {"type": "object", "properties": {},
-        "required": [], "additionalProperties": False}, "textOutput": True, "publicStateSchema": None,
+        "required": [], "additionalProperties": False}, "resultSchema": None, "textOutput": True, "publicStateSchema": None,
         "outcomes": [], "interactionKinds": []}
     entry = {"agentId": "chat", "apiContractId": "agent.chat", "endpointId": "agent.chat.run",
-        "rule": "conversation.policy.v1", "interactionContract": capability,
+        "rule": "execution.policy.v2", "invocation": {"exposure": "public"}, "interactionContract": capability,
         "capabilitySha256": "sha256:" + "a" * 64, "implementationSha256": "sha256:" + "b" * 64,
         "budgets": {"requestBytes": 262144, "messages": 128, "userTextBytes": 16384, "textBytes": 131072,
             "threadRuns": 1, "identityRuns": 2, "processRuns": 4, "runSeconds": 120, "cleanupSeconds": 10}}
@@ -55,3 +55,5 @@ def current_text_policy(monkeypatch):
         return FakeListChatModel(responses=["离线测试文本"])
 
     monkeypatch.setattr(models, "create_chat_model", offline_model)
+    import app.agent.invocation as invocation
+    monkeypatch.setattr(invocation, "create_chat_model", offline_model)

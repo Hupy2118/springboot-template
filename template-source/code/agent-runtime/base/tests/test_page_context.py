@@ -55,7 +55,7 @@ class PageContextTests(unittest.TestCase):
     async def collect(self, agent, request, context):
         """消费真实交互服务的异步生成器。"""
         return [event async for event in stream_agent_interaction(agent=agent, agent_id="chat", request=request,
-                                                                 runtime_context=context)]
+                                                                 runtime_context=context, execution_contract=TEST_EXECUTION_CONTRACT)]
 
 
 class FakeAgent:
@@ -73,4 +73,8 @@ class FakeAgent:
         """记录模型/工具实际消费的 context，避免把字段存在当作消费证据。"""
         self.calls += 1
         self.context = context
-        yield SimpleNamespace(content="完成")
+        yield ("messages", (SimpleNamespace(content="完成"), {}))
+
+
+# 当前文本会话的显式测试合同；交互测试保留确认/澄清能力。
+TEST_EXECUTION_CONTRACT = {"mode": "conversation", "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False}, "resultSchema": None, "textOutput": True, "interactionKinds": ["clarification", "confirmation", "approval_required"]}

@@ -91,7 +91,7 @@ async def test_native_confirmation_is_bound_to_principal_and_does_not_write_befo
 
     async def run(graph, request, context):
         """完整消费一次生产交互，不直接操纵 checkpoint 或伪造恢复命令。"""
-        return [event async for event in stream_agent_interaction(agent=graph, agent_id="leave", request=request, runtime_context=context)]
+        return [event async for event in stream_agent_interaction(agent=graph, agent_id="leave", request=request, runtime_context=context, execution_contract=TEST_EXECUTION_CONTRACT)]
 
     async with AsyncSqliteSaver.from_conn_string(str(tmp_path / "debug.sqlite")) as saver:
         builder = StateGraph(MessagesState, context_schema=RuntimeContext)
@@ -116,3 +116,7 @@ async def test_native_confirmation_is_bound_to_principal_and_does_not_write_befo
         with pytest.raises(RuntimeRequestError, match="没有可恢复"):
             await run(graph, resumed, context)
         assert len(writes) == 1
+
+
+# 当前文本会话的显式测试合同；交互测试保留确认/澄清能力。
+TEST_EXECUTION_CONTRACT = {"mode": "conversation", "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False}, "resultSchema": None, "textOutput": True, "interactionKinds": ["clarification", "confirmation", "approval_required"]}
