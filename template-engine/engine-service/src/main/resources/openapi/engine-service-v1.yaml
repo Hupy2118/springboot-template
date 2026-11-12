@@ -6,7 +6,7 @@ paths:
   /v1/app-updates/check:
     post:
       operationId: checkAppUpdate
-      description: Checks desktop app SemVer precedence. Stable clients are never offered prerelease versions. The CDN base URL is returned unchanged; the client constructs the installer path.
+      description: Offers the configured target release whenever its SemVer precedence differs from the current desktop version, including downgrades and prerelease targets.
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AppUpdateRequest' } } } }
       responses:
         '200': { description: App update eligibility, content: { application/json: { schema: { $ref: '#/components/schemas/AppUpdateResponse' } } } }
@@ -51,12 +51,14 @@ components:
       additionalProperties: false
       properties:
         updateAvailable: { type: boolean }
-        latestAppVersion: { $ref: '#/components/schemas/SemanticVersion' }
+        latestAppVersion:
+          description: Configured target release version.
+          allOf: [{ $ref: '#/components/schemas/SemanticVersion' }]
         appDownloadUrl:
           type: string
           format: uri
           nullable: true
-          description: Unchanged configured HTTP(S) CDN base URL when updateAvailable is true; null otherwise. The desktop updater reads latest.yml or latest-mac.yml from this base URL.
+          description: HTTP(S) CDN URL with the target version appended to the configured base path when updateAvailable is true. Existing query parameters are preserved. The desktop updater reads latest.yml or latest-mac.yml from this directory. The value is null when both versions have equal SemVer precedence.
     GenerateRequest:
       type: object
       required: [requestedConfig]
