@@ -28,7 +28,8 @@ class AppUpdateHttpTest {
         try (InputStream input = getClass().getResourceAsStream("/fixtures/app-update-check.json")) {
             assertNotNull(input);
             for (JsonNode fixture : JSON.readTree(input)) {
-                MockMvc mvc = mvc(fixture.path("latestAppVersion").asText(), "https://cdn.example.com/releases/");
+                MockMvc mvc = mvc(fixture.path("latestAppVersion").asText(),
+                        fixture.path("cdnRoot").asText("https://cdn.example.com/releases/"));
                 MvcResult result = mvc.perform(post(ENDPOINT).contentType(MediaType.APPLICATION_JSON)
                                 .content(JSON.writeValueAsBytes(fixture.get("request"))))
                         .andExpect(status().isOk()).andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
