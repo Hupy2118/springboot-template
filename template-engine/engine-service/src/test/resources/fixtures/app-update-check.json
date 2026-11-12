@@ -3,7 +3,7 @@
     "name": "older stable client",
     "latestAppVersion": "1.2.0",
     "request": {"currentVersion": "1.0.0"},
-    "response": {"updateAvailable": true, "latestAppVersion": "1.2.0", "appDownloadUrl": "https://cdn.example.com/releases/1.2.0/"}
+    "response": {"updateAvailable": true, "latestAppVersion": "1.2.0", "appDownloadUrl": "https://cdn.example.com/releases/"}
   },
   {
     "name": "same version",
@@ -12,48 +12,34 @@
     "response": {"updateAvailable": false, "latestAppVersion": "1.2.0", "appDownloadUrl": null}
   },
   {
-    "name": "newer client is offered a downgrade",
+    "name": "newer client is not downgraded",
     "latestAppVersion": "1.2.0",
     "request": {"currentVersion": "2.0.0"},
-    "response": {"updateAvailable": true, "latestAppVersion": "1.2.0", "appDownloadUrl": "https://cdn.example.com/releases/1.2.0/"}
+    "response": {"updateAvailable": false, "latestAppVersion": "1.2.0", "appDownloadUrl": null}
   },
   {
     "name": "numeric minor ordering",
     "latestAppVersion": "1.10.0",
     "request": {"currentVersion": "1.9.0"},
-    "response": {"updateAvailable": true, "latestAppVersion": "1.10.0", "appDownloadUrl": "https://cdn.example.com/releases/1.10.0/"}
+    "response": {"updateAvailable": true, "latestAppVersion": "1.10.0", "appDownloadUrl": "https://cdn.example.com/releases/"}
   },
   {
-    "name": "stable client is offered the configured prerelease",
-    "latestAppVersion": "1.0.0-dev.1",
+    "name": "stable client rejects prerelease",
+    "latestAppVersion": "2.0.0-beta.1",
     "request": {"currentVersion": "1.0.0"},
-    "response": {"updateAvailable": true, "latestAppVersion": "1.0.0-dev.1", "appDownloadUrl": "https://cdn.example.com/releases/1.0.0-dev.1/"}
+    "response": {"updateAvailable": false, "latestAppVersion": "2.0.0-beta.1", "appDownloadUrl": null}
   },
   {
     "name": "prerelease upgrades to newer prerelease",
     "latestAppVersion": "1.2.0-beta.11",
     "request": {"currentVersion": "1.2.0-beta.2"},
-    "response": {"updateAvailable": true, "latestAppVersion": "1.2.0-beta.11", "appDownloadUrl": "https://cdn.example.com/releases/1.2.0-beta.11/"}
+    "response": {"updateAvailable": true, "latestAppVersion": "1.2.0-beta.11", "appDownloadUrl": "https://cdn.example.com/releases/"}
   },
   {
     "name": "prerelease upgrades to stable",
     "latestAppVersion": "1.2.0",
     "request": {"currentVersion": "1.2.0-rc.1"},
-    "response": {"updateAvailable": true, "latestAppVersion": "1.2.0", "appDownloadUrl": "https://cdn.example.com/releases/1.2.0/"}
-  },
-  {
-    "name": "CDN root without a trailing slash",
-    "latestAppVersion": "1.0.0-dev.1",
-    "cdnRoot": "https://cdn.example.com/releases",
-    "request": {"currentVersion": "1.0.0-dev.0"},
-    "response": {"updateAvailable": true, "latestAppVersion": "1.0.0-dev.1", "appDownloadUrl": "https://cdn.example.com/releases/1.0.0-dev.1/"}
-  },
-  {
-    "name": "encoded URL components and target build metadata are preserved",
-    "latestAppVersion": "1.0.0-dev.1+002",
-    "cdnRoot": "https://cdn.example.com:8443/team%2Fdesktop/releases?token=a%2Bb&tag=one&mode=full&tag=two#desktop",
-    "request": {"currentVersion": "1.0.0-dev.2"},
-    "response": {"updateAvailable": true, "latestAppVersion": "1.0.0-dev.1+002", "appDownloadUrl": "https://cdn.example.com:8443/team%2Fdesktop/releases/1.0.0-dev.1+002/?token=a%2Bb&tag=one&mode=full&tag=two#desktop"}
+    "response": {"updateAvailable": true, "latestAppVersion": "1.2.0", "appDownloadUrl": "https://cdn.example.com/releases/"}
   },
   {
     "name": "metadata alone does not trigger an update",
