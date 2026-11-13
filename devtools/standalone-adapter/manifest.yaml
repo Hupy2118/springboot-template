@@ -12,7 +12,7 @@
       "type": "replace",
       "target": "frontend/extensions/login/src/pages/Logout/index.tsx",
       "source": "overlays/frontend/extensions/login/src/pages/Logout/index.tsx",
-      "expectedSourceSha256": "4f6cb79998552c06cf71da4e7762e8ddf77573307a509db3ffbac75dad1d2920",
+      "expectedSourceSha256": "36a5ef5bb271867d4991201761344c47d5d73591c91a98b714ad0d0b4a9e2213",
       "reason": "Clear local identity after server logout and return to the local application"
     },
     {

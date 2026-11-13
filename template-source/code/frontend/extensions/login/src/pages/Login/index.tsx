@@ -5,6 +5,7 @@ import { CURRENT_URL, USER_INFO_KEY } from '@/constants/login';
 import { PAGE_ROUTE } from '@/constants/routes';
 import { useIdentity } from '@/platform/identity/useIdentity';
 import { loginApi } from '@/apis/login';
+import { AppStateView } from '@/components/AppStateView';
 
 export default function LoginPage() {
   const previousUrl = window.localStorage.getItem(CURRENT_URL);
@@ -35,5 +36,5 @@ export default function LoginPage() {
         replace(redirect);
       });
   }, [code, previousUrl, replace, setIdentity]);
-  return <div>正在登录中</div>;
+  return <AppStateView status='loading' title='正在登录中' fullScreen />;
 }

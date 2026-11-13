@@ -2,7 +2,6 @@ import React, { useMemo, useCallback } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'; // 引入路由
 import type { ProSettings } from '@ant-design/pro-components';
 import { ProLayout, ProConfigProvider } from '@ant-design/pro-components';
-import { Spin } from 'antd';
 import { PAGE_ROUTE } from '@/constants/routes';
 import { LayoutTypeEnum } from '@typings/workbench';
 import { openNewPage, renderIcon } from '@utils/workbench';
@@ -63,6 +62,10 @@ export default () => {
     }
   }, []);
 
+  if (state !== 'ready') {
+    return <AccessStateView state={state} fullScreen />;
+  }
+
   return (
     <ProConfigProvider>
       <ProLayout
@@ -105,16 +108,7 @@ export default () => {
             <span>{item.name}</span>
           </div>
         )}
-        menuRender={(_, defaultDom) => {
-          if (state === 'ready') return defaultDom;
-          return state === 'loading' ? (
-            <div className='authorization-state'>
-              <Spin tip='正在加载权限…' />
-            </div>
-          ) : (
-            <AccessStateView state={state} />
-          );
-        }}
+        menuRender={(_, defaultDom) => defaultDom}
         {...settings}
       >
         <Outlet />

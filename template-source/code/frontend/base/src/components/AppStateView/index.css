@@ -1,0 +1,13 @@
+.app-state-screen {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  text-align: center;
+}
+
+.app-state-screen--fullscreen {
+  position: fixed;
+  inset: 0;
+  box-sizing: border-box;
+  overflow: auto;
+}
