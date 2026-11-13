@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cmbchina.managedb.infrastructure.persistence.mapper.DatasourceRegistrationMapper">
+    <resultMap id="BaseResultMap" type="com.cmbchina.managedb.infrastructure.persistence.po.DatasourceRegistrationPo">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="datasource_key" property="datasourceKey" jdbcType="VARCHAR"/>
+        <result column="app_key" property="appKey" jdbcType="VARCHAR"/>
+        <result column="app_name" property="appName" jdbcType="VARCHAR"/>
+        <result column="datasource_id" property="datasourceId" jdbcType="TINYINT"/>
+        <result column="status" property="status" jdbcType="VARCHAR"/>
+        <result column="active_operation_id" property="activeOperationId" jdbcType="BIGINT"/>
+        <result column="created_by" property="createdBy" jdbcType="VARCHAR"/>
+        <result column="creator" property="creator" jdbcType="VARCHAR"/>
+        <result column="is_deleted" property="deleted" jdbcType="TINYINT"/>
+    </resultMap>
+
+    <resultMap id="CountResultMap" type="com.cmbchina.managedb.infrastructure.persistence.po.DatasourceCountPo">
+        <result column="datasource_id" property="datasourceId" jdbcType="TINYINT"/>
+        <result column="total" property="total" jdbcType="BIGINT"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id
+        , datasource_key, app_key, app_name, datasource_id, status, active_operation_id, created_by, creator, is_deleted
+    </sql>
+
+    <insert id="insert" parameterType="com.cmbchina.managedb.infrastructure.persistence.po.DatasourceRegistrationPo">
+        INSERT INTO md_datasource_resource
+        (id, datasource_key, app_key, app_name, datasource_id, status, active_operation_id, created_by, creator, is_deleted)
+        VALUES (#{id}, #{datasourceKey}, #{appKey}, #{appName}, #{datasourceId}, #{status}, #{activeOperationId}, #{createdBy}, #{creator}, #{deleted})
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM md_datasource_resource
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByDatasourceKey" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM md_datasource_resource
+        WHERE datasource_key = #{datasourceKey}
+    </select>
+
+    <select id="countByDatasourceKey" resultType="long">
+        SELECT COUNT(*)
+        FROM md_datasource_resource
+        WHERE datasource_key = #{datasourceKey}
+    </select>
+
+    <select id="lock" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM md_datasource_resource
+        WHERE datasource_key = #{datasourceKey}
+        FOR UPDATE
+    </select>
+
+    <update id="claim">
+        UPDATE md_datasource_resource
+        SET active_operation_id = #{operationId}
+        WHERE datasource_key = #{datasourceKey}
+        AND status = 'REGISTERED'
+        AND is_deleted = 0
+        AND active_operation_id IS NULL
+    </update>
+
+    <update id="release">
+        UPDATE md_datasource_resource
+        SET active_operation_id = NULL
+        WHERE datasource_key = #{datasourceKey}
+        AND active_operation_id = #{operationId}
+    </update>
+
+    <update id="completeRelease">
+        UPDATE md_datasource_resource
+        SET status = 'RELEASED',
+        active_operation_id = NULL
+        WHERE datasource_key = #{datasourceKey}
+        AND active_operation_id = #{operationId}
+        AND status = 'REGISTERED'
+        AND is_deleted = 0
+    </update>
+
+    <select id="countTables" resultMap="CountResultMap">
+        SELECT datasource_id, COUNT(*) AS total
+        FROM md_datasource_table
+        WHERE status = 'CREATED'
+        AND datasource_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        GROUP BY datasource_id
+    </select>
+
+    <select id="countResources" resultMap="CountResultMap">
+        SELECT datasource_id, COUNT(*) AS total
+        FROM md_datasource_resource
+        WHERE status = 'REGISTERED'
+        AND is_deleted = 0
+        AND datasource_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        GROUP BY datasource_id
+    </select>
+</mapper>
