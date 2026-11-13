@@ -20,6 +20,6 @@ if [ "$MODE" = false ]; then
   REVISION=$(cat "$SOURCE/code/template-revision.txt")
   SHA=$(git -C "$REPO" rev-parse HEAD)
   echo "mode=native source=$SOURCE revision=$REVISION upstream=$SHA manifest=not-used"
-  exec java -jar "$JAR" "--spring.config.additional-location=file:$REPO/template-engine/engine-service/config/application-local.yml"
+  exec java -jar "$JAR" --spring.profiles.active=dev
 fi
 exec python3 -B "$ADAPTER/scripts/adapter.py" run

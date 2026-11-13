@@ -1,5 +1,6 @@
 package com.cmbchina.managedb.infrastructure.persistence;
 
+import com.cmb.bee.commons.exceptions.BizException;
 import com.cmbchina.managedb.domain.AuthorizationSeedPayload;
 import com.cmbchina.managedb.domain.DataOperation;
 import com.cmbchina.managedb.domain.ResourceErrorCode;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.SqlSessionTemplate;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.AbstractDataSource;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
@@ -61,6 +63,7 @@ class DataOperationMysqlTest {
         SqlSessionFactoryBean factory = new SqlSessionFactoryBean();
         factory.setDataSource(dataSource);
         factory.setConfiguration(configuration);
+        factory.setMapperLocations(new PathMatchingResourcePatternResolver().getResources("classpath*:mybatis/**/*.xml"));
         SqlSessionTemplate session = new SqlSessionTemplate(factory.getObject());
         DatasourceRegistrationMapper resources = session.getMapper(DatasourceRegistrationMapper.class);
         TableBindingMapper tables = session.getMapper(TableBindingMapper.class);

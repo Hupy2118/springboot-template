@@ -23,7 +23,7 @@ unset TEMPLATE_ENGINE_STANDALONE_ENABLED TEMPLATE_ENGINE_SOURCE_ROOT
 ./devtools/standalone-adapter/run-engine.sh
 ```
 
-关闭时不执行 Python、不读取 Adapter 清单、不访问或创建临时构建目录。仍可完全绕过 Adapter，以仓库原有 `java -jar` + `application-local.yml` 命令启动；原生命令不解析新开关。此变量不是 HTTP 请求字段。
+关闭时不执行 Python、不读取 Adapter 清单、不访问或创建临时构建目录。仍可完全绕过 Adapter，以仓库原有 `java -jar` + `--spring.profiles.active=dev` 命令启动；原生命令不解析新开关。此变量不是 HTTP 请求字段。
 
 服务就绪用 `POST /v1/generate` 验证，没有约定的 `/health`。
 

@@ -376,7 +376,7 @@ def main():
                 os.environ['TEMPLATE_ENGINE_SOURCE_ROOT'], report['release']['standaloneRevision'],
                 report['upstreamGitSha'], report['manifestSha256']), flush=True)
             os.execvp('java', ['java', '-jar', str(REPO / 'template-engine/engine-service/target/engine-service-1.0.0-SNAPSHOT.jar'),
-                              '--spring.config.additional-location=file:' + str(REPO / 'template-engine/engine-service/config/application-local.yml')])
+                              '--spring.profiles.active=dev'])
 
 
 if __name__ == '__main__':

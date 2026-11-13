@@ -1,5 +1,7 @@
 package com.cmbchina.managedb.adapter.web;
 
+import com.cmb.bee.commons.exceptions.BizException;
+import com.cmb.bee.web.support.MockBeeResponseAdvice;
 import com.cmbchina.managedb.adapter.web.application.DatasourceRegistrationController;
 import com.cmbchina.managedb.adapter.web.security.ActorFilter;
 import com.cmbchina.managedb.adapter.web.security.ServiceKeyFilter;
@@ -56,7 +58,7 @@ class DatasourceRegistrationControllerTest {
      */
     private MockMvc mockMvc(String key) {
         return MockMvcBuilders.standaloneSetup(new DatasourceRegistrationController(registration))
-                .setControllerAdvice(new BaseExceptionHandler())
+                .setControllerAdvice(new BaseExceptionHandler(), new MockBeeResponseAdvice())
                 .addFilters(new ServiceKeyFilter(key, new ObjectMapper()), new ActorFilter()).build();
     }
 
@@ -101,11 +103,11 @@ class DatasourceRegistrationControllerTest {
         mvc.perform(request("{\"appName\":\"注册测试\"}").header("Authorization", "Bearer test-only-key"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.datasourceKey").value("b0ddb23acc91"))
-                .andExpect(jsonPath("$.appKey").doesNotExist())
-                .andExpect(jsonPath("$.datasourceId").value(1))
-                .andExpect(jsonPath("$.isDeleted").value(false))
-                .andExpect(jsonPath("$.status").value("REGISTERED"));
+                .andExpect(jsonPath("$.body.datasourceKey").value("b0ddb23acc91"))
+                .andExpect(jsonPath("$.body.appKey").doesNotExist())
+                .andExpect(jsonPath("$.body.datasourceId").value(1))
+                .andExpect(jsonPath("$.body.isDeleted").value(false))
+                .andExpect(jsonPath("$.body.status").value("REGISTERED"));
     }
 
     /**
@@ -122,7 +124,7 @@ class DatasourceRegistrationControllerTest {
                 "{\"appName\":\"注册测试\",\"appKey\":\"" + String.join("", java.util.Collections.nCopies(65, "k")) + "\"}"}) {
             mvc.perform(request(body).header("Authorization", "Bearer test-only-key"))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"));
+                    .andExpect(jsonPath("$.returnCode").value("INVALID_ARGUMENT"));
         }
         verifyNoInteractions(registration);
     }
@@ -149,7 +151,7 @@ class DatasourceRegistrationControllerTest {
     @Test
     void rejectsMissingOrWrongCredentialsBeforeParsing() throws Exception {
         mvc.perform(request("{")).andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+                .andExpect(jsonPath("$.returnCode").value("UNAUTHENTICATED"));
         mvc.perform(request("{}").header("Authorization", "Bearer wrong"))
                 .andExpect(status().isUnauthorized());
         verifyNoInteractions(registration);
@@ -166,7 +168,7 @@ class DatasourceRegistrationControllerTest {
         when(registration.register(null, "注册测试", Actor.system())).thenThrow(new BizException(ResourceErrorCode.RESOURCE_SERVICE_NOT_CONFIGURED));
         mvc.perform(request("{\"appName\":\"注册测试\"}").header("Authorization", "Bearer test-only-key"))
                 .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.code").value("RESOURCE_SERVICE_NOT_CONFIGURED"));
+                .andExpect(jsonPath("$.returnCode").value("RESOURCE_SERVICE_NOT_CONFIGURED"));
         verify(registration).register(null, "注册测试", Actor.system());
     }
 

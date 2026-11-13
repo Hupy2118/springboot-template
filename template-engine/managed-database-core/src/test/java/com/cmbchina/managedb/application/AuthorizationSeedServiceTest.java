@@ -1,5 +1,6 @@
 package com.cmbchina.managedb.application;
 
+import com.cmb.bee.commons.exceptions.BizException;
 import com.cmbchina.managedb.domain.*;
 import com.cmbchina.managedb.domain.repository.DataOperationRepository;
 import org.junit.jupiter.api.Test;

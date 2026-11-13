@@ -5,7 +5,7 @@ mvn -f template-engine/pom.xml -pl engine-service -am package
 export TEMPLATE_ENGINE_SOURCE_ROOT="$(cd template-source && pwd)"
 
 java -jar template-engine/engine-service/target/engine-service-*.jar \
-  --spring.config.additional-location="file:$(pwd)/template-engine/engine-service/config/application-local.yml"
+  --spring.profiles.active=dev
 ```
 服务将监听 http://127.0.0.1:18080。启动后可验证模板下载：
 ```

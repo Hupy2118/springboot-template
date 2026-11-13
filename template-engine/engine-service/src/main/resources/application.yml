@@ -1,0 +1,36 @@
+server:
+  address: 127.0.0.1
+  port: ${TEMPLATE_ENGINE_PORT:18080}
+
+devagentstudio:
+  template-engine:
+    # Absolute path to template-source, which contains code/.
+    source-root: ${TEMPLATE_ENGINE_SOURCE_ROOT}
+  app-update:
+    latest-app-version: "${TEMPLATE_ENGINE_APP_UPDATE_VERSION:}"
+    app-download-url: "${TEMPLATE_ENGINE_APP_UPDATE_URL:}"
+
+managed-database:
+  enabled: ${MANAGED_DATABASE_ENABLED:false}
+  service-key: "${MANAGED_DATABASE_SERVICE_KEY:}"
+  id:
+    worker-id: ${MANAGED_DB_WORKER_ID:1}
+    datacenter-id: ${MANAGED_DB_DATACENTER_ID:1}
+  registration:
+    transaction-timeout-seconds: ${MANAGED_DB_TRANSACTION_TIMEOUT_SECONDS:10}
+  mount:
+    timeout-millis: ${MANAGED_DB_MOUNT_TIMEOUT_MILLIS:5000}
+    ssl-mode: ${MANAGED_DB_SSL_MODE:VERIFY_IDENTITY}
+  sql:
+    max-sql-bytes: ${MANAGED_DB_SQL_MAX_BYTES:65536}
+    max-check-tables: ${MANAGED_DB_CHECK_MAX_TABLES:200}
+    max-check-bytes: ${MANAGED_DB_CHECK_MAX_BYTES:4194304}
+    workers: ${MANAGED_DB_SQL_WORKERS:2}
+    execution-timeout-seconds: ${MANAGED_DB_SQL_TIMEOUT_SECONDS:30}
+    metadata-timeout-seconds: ${MANAGED_DB_METADATA_TIMEOUT_SECONDS:5}
+    network-timeout-millis: ${MANAGED_DB_SQL_NETWORK_TIMEOUT_MILLIS:35000}
+  query:
+    timeout-seconds: ${MANAGED_DB_QUERY_TIMEOUT_SECONDS:5}
+
+mybatis-plus:
+  mapper-locations: classpath*:mybatis/**/*.xml

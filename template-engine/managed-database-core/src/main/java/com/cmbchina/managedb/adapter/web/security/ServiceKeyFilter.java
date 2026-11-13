@@ -36,7 +36,7 @@ public class ServiceKeyFilter extends OncePerRequestFilter {
     }
 
     /**
-     * 保护业务路径及其尾斜杠形式，health 不需要服务密钥。
+     * 保护 Managed Database 路径，包括健康检查。
      */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {

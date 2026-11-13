@@ -1,5 +1,6 @@
 package com.cmbchina.managedb.infrastructure.sql;
 
+import com.cmb.bee.commons.exceptions.BizException;
 import com.cmbchina.managedb.domain.ResourceErrorCode;
 import com.cmbchina.managedb.domain.TableTaskDispatcher;
 import org.junit.jupiter.api.Test;

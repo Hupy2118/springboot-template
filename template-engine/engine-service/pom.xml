@@ -18,18 +18,15 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
-            <version>${spring-boot.version}</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
-            <version>${spring-boot.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.24</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>
@@ -40,6 +37,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring-boot.version}</version>
+                <configuration><mainClass>com.devagentstudio.template.engine.EngineServiceApplication</mainClass></configuration>
                 <executions><execution><goals><goal>repackage</goal></goals></execution></executions>
             </plugin>
             <plugin>
@@ -50,4 +48,26 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>local-mock</id>
+            <dependencies>
+                <dependency>
+                    <groupId>com.cmbchina</groupId>
+                    <artifactId>managed-database-core</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>managed-enterprise</id>
+            <dependencies>
+                <dependency>
+                    <groupId>com.cmbchina</groupId>
+                    <artifactId>managed-database-core</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 </project>

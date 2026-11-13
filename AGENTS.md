@@ -63,6 +63,6 @@ python3 scripts/ci/check-protected-surfaces.py
 ./scripts/ci/verify-code-template-release-revision.sh <base-ref>
 ```
 
-涉及 HTTP、ZIP 或启动配置时，使用 `template-engine/engine-service/config/application-local.yml` 进行真实 JAR 启动验收。该配置要求显式传入绝对 `TEMPLATE_ENGINE_SOURCE_ROOT`，并固定监听 `127.0.0.1`；详情见 `README.md` 和 `docs/DEVELOPMENT_GUIDE.md`。
+涉及 HTTP、ZIP 或启动配置时，启用 `dev` Profile，使用 JAR 内置的 `application.yml` 与 `application-dev.yml` 进行真实 JAR 启动验收。该配置要求显式传入绝对 `TEMPLATE_ENGINE_SOURCE_ROOT`，并固定监听 `127.0.0.1`；详情见 `README.md` 和 `docs/DEVELOPMENT_GUIDE.md`。
 
 涉及 Standalone Adapter 时，至少执行 `./devtools/standalone-adapter/build.sh test`、`prepare`、`audit`，再按改动范围执行 HTTP smoke、生成工程构建和真实 JAR 检查。`verify-all` 返回 3 表示真实数据库或 Executor 验收不完整，不能报告为全通过。纯维护文档修改执行链接/命令路径核对及 `git diff --check` 即可；修改 Base/Extension 内随工程交付的文档仍须按 Runtime Source 执行 Revision Gate。

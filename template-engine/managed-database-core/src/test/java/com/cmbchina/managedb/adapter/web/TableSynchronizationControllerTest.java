@@ -1,8 +1,12 @@
 package com.cmbchina.managedb.adapter.web;
+
+import com.cmb.bee.commons.exceptions.BizException;
+import com.cmb.bee.web.support.MockBeeResponseAdvice;
 import com.cmbchina.managedb.domain.Actor;
 
 import com.cmbchina.managedb.adapter.web.application.TableSynchronizationController;
 import com.cmbchina.managedb.adapter.web.security.ServiceKeyFilter;
+import com.cmbchina.managedb.application.BatchTableOperationService;
 import com.cmbchina.managedb.application.TableOperationService;
 import com.cmbchina.managedb.application.TableReadinessService;
 import com.cmbchina.managedb.application.view.TableOperationReceipt;
@@ -46,8 +50,9 @@ class TableSynchronizationControllerTest {
         operations = mock(TableOperationService.class);
         readiness = mock(TableReadinessService.class);
         ObjectMapper mapper = new ObjectMapper().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-        mvc = MockMvcBuilders.standaloneSetup(new TableSynchronizationController(operations, readiness))
-                .setControllerAdvice(new BaseExceptionHandler())
+        mvc = MockMvcBuilders.standaloneSetup(new TableSynchronizationController(operations, readiness,
+                        mock(BatchTableOperationService.class)))
+                .setControllerAdvice(new BaseExceptionHandler(), new MockBeeResponseAdvice())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(mapper))
                 .addFilters(new ServiceKeyFilter("test-only-key", mapper)).build();
     }
@@ -62,8 +67,8 @@ class TableSynchronizationControllerTest {
         when(operations.submit("b0ddb23acc91", "CREATE", "CREATE TABLE orders(id bigint)", false, Actor.system()))
                 .thenReturn(new TableOperationReceipt(101L));
         mvc.perform(request("/table-operations", "{\"mode\":\"CREATE\",\"sql\":\"CREATE TABLE orders(id bigint)\"}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.operationId").value("101"))
-                .andExpect(jsonPath("$.status").value("RUNNING"));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.body.operationId").value("101"))
+                .andExpect(jsonPath("$.body.status").value("RUNNING"));
     }
 
     /**
@@ -74,7 +79,7 @@ class TableSynchronizationControllerTest {
         when(readiness.check("b0ddb23acc91", Collections.emptyList())).thenReturn(new TableReadinessView(
                 false, 1L, "OPERATION_IN_PROGRESS", "101", "RUNNING", Collections.emptyList(), Collections.emptyList()));
         mvc.perform(request("/tables/check", "{\"sqls\":[]}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.ready").value(false));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.body.ready").value(false));
     }
 
     /**
@@ -90,7 +95,7 @@ class TableSynchronizationControllerTest {
         verifyNoInteractions(operations, readiness);
         when(operations.submit("b0ddb23acc91", "CREATE", "sql", false, Actor.system())).thenThrow(new BizException(ResourceErrorCode.RESOURCE_BUSY));
         mvc.perform(request("/table-operations", "{\"mode\":\"CREATE\",\"sql\":\"sql\"}"))
-                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("RESOURCE_BUSY"));
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.returnCode").value("RESOURCE_BUSY"));
     }
 
     /**
@@ -102,7 +107,7 @@ class TableSynchronizationControllerTest {
                 .thenThrow(new BizException(ResourceErrorCode.EXECUTION_CAPACITY_EXHAUSTED));
         mvc.perform(request("/table-operations", "{\"mode\":\"CREATE\",\"sql\":\"sql\"}"))
                 .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.code").value("EXECUTION_CAPACITY_EXHAUSTED"));
+                .andExpect(jsonPath("$.returnCode").value("EXECUTION_CAPACITY_EXHAUSTED"));
     }
 
     /**
@@ -114,7 +119,7 @@ class TableSynchronizationControllerTest {
                 .thenThrow(new BizException(ResourceErrorCode.PRIMARY_KEY_REQUIRED));
         mvc.perform(request("/table-operations", "{\"mode\":\"CREATE\",\"sql\":\"sql\"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("PRIMARY_KEY_REQUIRED"));
+                .andExpect(jsonPath("$.returnCode").value("PRIMARY_KEY_REQUIRED"));
     }
 
     /**

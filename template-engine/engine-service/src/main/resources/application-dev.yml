@@ -1,0 +1,43 @@
+devagentstudio:
+  app-update:
+    latest-app-version: "${TEMPLATE_ENGINE_APP_UPDATE_VERSION:1.0.1}"
+    app-download-url: "${TEMPLATE_ENGINE_APP_UPDATE_URL:http://127.0.0.1:18081/}"
+
+---
+# Activate both dev and managed-db with the local-mock JAR.
+spring:
+  config:
+    activate:
+      on-profile: managed-db
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: "jdbc:mysql://${managed-database.control-datasource.host}:${managed-database.control-datasource.port}/${managed-database.control-datasource.schema}?sslMode=${managed-database.mount.ssl-mode}&serverTimezone=UTC"
+    username: "${managed-database.control-datasource.username}"
+    password: "${managed-database.control-datasource.password}"
+
+managed-database:
+  enabled: ${MANAGED_DATABASE_ENABLED:true}
+  service-key: ${MANAGED_DATABASE_SERVICE_KEY:4b20de6b438fdd3902dec04b6eb113c517412bdf50ee635109294411d8f82999}
+  control-datasource:
+    host: "${MANAGED_DB_HOST:127.0.0.1}"
+    port: ${MANAGED_DB_PORT:3306}
+    schema: "${MANAGED_DB_ADMIN_SCHEMA:inner}"
+    username: root
+    password: 0978zrr@
+  mount:
+    ssl-mode: ${MANAGED_DB_SSL_MODE:REQUIRED}
+  runtime:
+    list:
+      - datasource-id: 1
+        username: "${MANAGED_DB_RUNTIME_USER}"
+        password: "${MANAGED_DB_RUNTIME_PASSWORD}"
+        ssl-mode: ${MANAGED_DB_RUNTIME_SSL_MODE:${managed-database.mount.ssl-mode}}
+
+devagent-studio:
+  list:
+    - datasource-id: 1
+      host: "${MANAGED_DB_MOUNT_HOST:${managed-database.control-datasource.host}}"
+      port: ${MANAGED_DB_MOUNT_PORT:${managed-database.control-datasource.port}}
+      db-name: "${MANAGED_DB_MOUNT_SCHEMA:inner}"
+      username: root
+      password: 0978zrr@

@@ -1,5 +1,7 @@
 package com.cmbchina.managedb.adapter.web;
 
+import com.cmb.bee.commons.exceptions.BizException;
+import com.cmb.bee.web.support.MockBeeResponseAdvice;
 import com.cmbchina.managedb.adapter.web.application.DatasourceRuntimeConnectionController;
 import com.cmbchina.managedb.adapter.web.security.ServiceKeyFilter;
 import com.cmbchina.managedb.application.DatasourceRuntimeConnectionService;
@@ -38,7 +40,7 @@ class DatasourceRuntimeConnectionControllerTest {
         service = mock(DatasourceRuntimeConnectionService.class);
         ObjectMapper mapper = new ObjectMapper();
         mvc = MockMvcBuilders.standaloneSetup(new DatasourceRuntimeConnectionController(service))
-                .setControllerAdvice(new BaseExceptionHandler()).setMessageConverters(new MappingJackson2HttpMessageConverter(mapper))
+                .setControllerAdvice(new BaseExceptionHandler(), new MockBeeResponseAdvice()).setMessageConverters(new MappingJackson2HttpMessageConverter(mapper))
                 .addFilters(new ServiceKeyFilter("test-key", mapper)).build();
     }
 
@@ -51,8 +53,8 @@ class DatasourceRuntimeConnectionControllerTest {
                 new RuntimeConnectionView(APP, 2L, new RuntimeDatabaseConnection("localhost", 3306, "inner2", "demo", "test-password", "DISABLED")));
         mvc.perform(get(PATH).servletPath(PATH).header("Authorization", "Bearer test-key"))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
-                .andExpect(jsonPath("$.datasourceKey").value(APP)).andExpect(jsonPath("$.datasourceId").value(2))
-                .andExpect(jsonPath("$.username").value("demo")).andExpect(jsonPath("$.sslMode").value("DISABLED"));
+                .andExpect(jsonPath("$.body.datasourceKey").value(APP)).andExpect(jsonPath("$.body.datasourceId").value(2))
+                .andExpect(jsonPath("$.body.username").value("demo")).andExpect(jsonPath("$.body.sslMode").value("DISABLED"));
     }
 
     /**
@@ -71,6 +73,6 @@ class DatasourceRuntimeConnectionControllerTest {
     void missingConfigurationIsServiceUnavailable() throws Exception {
         when(service.resolve(APP)).thenThrow(new BizException(ResourceErrorCode.RUNTIME_CONNECTION_NOT_CONFIGURED));
         mvc.perform(get(PATH).servletPath(PATH).header("Authorization", "Bearer test-key"))
-                .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("RUNTIME_CONNECTION_NOT_CONFIGURED"));
+                .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.returnCode").value("RUNTIME_CONNECTION_NOT_CONFIGURED"));
     }
 }

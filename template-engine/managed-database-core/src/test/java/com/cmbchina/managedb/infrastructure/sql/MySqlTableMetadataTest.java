@@ -1,5 +1,6 @@
 package com.cmbchina.managedb.infrastructure.sql;
 
+import com.cmb.bee.commons.exceptions.BizException;
 import com.cmbchina.managedb.domain.ResourceErrorCode;
 import com.cmbchina.managedb.domain.TableMetadata;
 import com.cmbchina.managedb.infrastructure.datasource.ConfiguredDatabaseSchemas;

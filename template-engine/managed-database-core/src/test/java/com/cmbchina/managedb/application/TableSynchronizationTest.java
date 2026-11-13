@@ -1,4 +1,6 @@
 package com.cmbchina.managedb.application;
+
+import com.cmb.bee.commons.exceptions.BizException;
 import com.cmbchina.managedb.domain.Actor;
 
 import com.cmbchina.managedb.application.view.TableOperationReceipt;

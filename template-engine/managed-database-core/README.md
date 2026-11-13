@@ -1,13 +1,13 @@
 # Managed Database Service
 
-DevAgent Studio 的内置数据库资源服务，为本地生成项目提供统一的模拟数据库资源。本模块是 `template-engine` 下的 library 子模块，由 `engine-service` 的
-`EngineServiceApplication` 统一启动，不单独打包为可执行 JAR。采用 DDD 包分层，技术基线为 Java 8、Spring Boot 2.7.10、MyBatis-Plus 3.5.2。
+DevAgent Studio 的内置数据库资源服务，为本地生成项目提供统一的真实数据库资源。本模块是 `template-engine` 下的 library 子模块，由 `engine-service` 的
+`EngineServiceApplication` 统一启动，不单独打包为可执行 JAR。采用 DDD 包分层，技术基线为 Java 8、Spring Boot 2.7.2、MyBatis-Plus 3.5.2。
 
 ## 交接文件
 
 | 文件                                                                                      | 内容                       |
 |-----------------------------------------------------------------------------------------|--------------------------|
-| [managed-database-schema.sql](src/main/resources/db/manual/managed-database-schema.sql) | 当前三张管理表的完整建表脚本           |
+| [managed-database-schema.sql](src/main/resources/db/manual/managed-database-schema.sql) | 当前四张管理表的完整建表脚本           |
 | README.md                                                                               | 项目结构、部署配置与启动说明           |
 | [managed-database-design.md](docs/managed-database-design.md)                           | 资源模型、Studio 交互、接口清单和执行规则 |
 
@@ -31,11 +31,11 @@ src/main/java/com/cmbchina/managedb/
 └── common/                通用异常与响应
 ```
 
-本模块不提供独立启动入口，由 `engine-service` 的 `EngineServiceApplication` 通过 `@ComponentScan` 扫描 `com.cmbchina.managedb` 包统一启动。
+本模块不提供独立启动入口，由 `engine-service` 的 `EngineServiceApplication` 在组合 JAR 中根据 `managed-database.enabled=true` 装配。
 
 ## 部署配置
 
-本模块不单独维护运行配置，相关配置项由 `engine-service` 统一提供（见 `engine-service/config/application-local.yml` 及部署环境变量）。以下配置项由
+本模块不单独维护运行配置，相关配置项由 `engine-service` 统一提供（见 [组合本地配置](../engine-service/src/main/resources/application-dev.yml) 及部署环境变量）。以下配置项由
 engine-service 启动时加载，供本模块的 `bootstrap` 装配使用：
 
 | 配置项                                           | 用途                                                       |
@@ -48,10 +48,10 @@ engine-service 启动时加载，供本模块的 `bootstrap` 装配使用：
 
 监听地址与端口由 engine-service 统一配置（`server.address` / `server.port`），本模块不单独监听。
 
-管理库和业务挂载库分别准备。初始化时，在管理库手工执行 [建表脚本](src/main/resources/db/manual/managed-database-schema.sql)，创建三张管理表。应用不自动创建
+管理库和业务挂载库分别准备。初始化时，在管理库手工执行 [建表脚本](src/main/resources/db/manual/managed-database-schema.sql)，创建四张管理表。应用不自动创建
 Schema 或初始化管理表。
 
-datasourceId 是固定挂载编号，三张管理表统一使用 TINYINT UNSIGNED，部署使用 1～255；Java 保留 long/Long。编号上线后不能改指向其他数据库，配置列表下标也不等于挂载编号。主键和操作
+datasourceId 是固定挂载编号，四张管理表统一使用 TINYINT UNSIGNED，部署使用 1～255；Java 保留 long/Long。编号上线后不能改指向其他数据库，配置列表下标也不等于挂载编号。主键和操作
 ID 继续使用 BIGINT。
 
 调试账号独立于建表账号，不允许 root 或回退使用管理账号。数据库地址需能从用户本地项目访问，部署侧授予调试所需的业务表读写权限。真实密码、服务密钥和运行时连接响应不得写入交接材料或日志。
@@ -61,7 +61,7 @@ ID 继续使用 BIGINT。
 本模块不单独启动，由 `engine-service` 统一打包和运行。在 `template-engine` 目录下构建全部模块：
 
 ```sh
-mvn -B -ntp clean verify
+mvn -B -ntp -Plocal-mock -pl engine-service -am clean verify
 ```
 
 构建产物为 library JAR，由 `engine-service` 通过 Maven 依赖引入并由 `EngineServiceApplication` 统一启动。启动前通过 engine-service 提供完整部署配置和数据库授权。

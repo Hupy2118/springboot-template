@@ -40,11 +40,9 @@ public final class ConfiguredRuntimeConnections implements RuntimeConnectionPort
     public RuntimeDatabaseConnection resolve(long datasourceId) {
         DatabaseMountProperties.Mount mount = mounts.get(datasourceId);
         RuntimeConnectionProperties.Entry entry = entries.get(datasourceId);
-        //这儿需要设计一下，怎么区分高权账号和普通账号  mount是平台高权账号  entry是给模拟演示配置的普通账号
-        // if (mount == null || entry == null || blank(entry.getUsername()) || blank(entry.getPassword())
-        //         || entry.getUsername().equals(mount.getUsername()) || "root".equalsIgnoreCase(entry.getUsername())
-        //         || !allowedSslMode(entry.getSslMode())) {
-        if (mount == null || entry == null || blank(entry.getUsername()) || blank(entry.getPassword()) || !allowedSslMode(entry.getSslMode())) {
+        if (mount == null || entry == null || blank(entry.getUsername()) || blank(entry.getPassword())
+                || entry.getUsername().equalsIgnoreCase(mount.getUsername()) || "root".equalsIgnoreCase(entry.getUsername())
+                || !allowedSslMode(entry.getSslMode())) {
             throw new BizException(ResourceErrorCode.RUNTIME_CONNECTION_NOT_CONFIGURED);
         }
         return new RuntimeDatabaseConnection(mount.getHost(), mount.getPort(), mount.getDbName(), entry.getUsername(), entry.getPassword(),

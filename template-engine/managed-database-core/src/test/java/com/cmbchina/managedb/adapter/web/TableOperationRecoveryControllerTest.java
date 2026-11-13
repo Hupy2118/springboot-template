@@ -1,4 +1,7 @@
 package com.cmbchina.managedb.adapter.web;
+
+import com.cmb.bee.commons.exceptions.BizException;
+import com.cmb.bee.web.support.MockBeeResponseAdvice;
 import com.cmbchina.managedb.domain.Actor;
 
 import com.cmbchina.managedb.adapter.web.application.TableOperationRecoveryController;
@@ -53,6 +56,7 @@ class TableOperationRecoveryControllerTest {
         operations = mock(TableOperationService.class);
         mapper = new ObjectMapper().findAndRegisterModules();
         mvc = MockMvcBuilders.standaloneSetup(new TableOperationRecoveryController(recovery, operations))
+                .setControllerAdvice(new MockBeeResponseAdvice())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(mapper))
                 .addFilters(new ServiceKeyFilter("test-only-key", mapper)).build();
     }

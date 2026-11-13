@@ -1,5 +1,7 @@
 package com.devagentstudio.template.engine.service;
 
+import com.devagentstudio.template.engine.EngineServiceApplication;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -37,7 +39,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(SpringExtension.class)
-@SpringBootTest(classes = EngineServiceApplication.class)
+@SpringBootTest(classes = EngineServiceApplication.class, properties =
+        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration")
 class EngineServiceIT {
     private static final ObjectMapper JSON = new ObjectMapper();
     @Autowired private WebApplicationContext context;

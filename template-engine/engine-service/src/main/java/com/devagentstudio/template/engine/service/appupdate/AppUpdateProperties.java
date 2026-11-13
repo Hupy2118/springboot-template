@@ -28,7 +28,9 @@ public class AppUpdateProperties implements InitializingBean {
      */
     @Override
     public void afterPropertiesSet() {
-        if (latestAppVersion == null && appDownloadUrl == null) {
+        if (missing(latestAppVersion) && missing(appDownloadUrl)) {
+            latestAppVersion = null;
+            appDownloadUrl = null;
             return;
         }
         if (!isConfigured()) {
@@ -47,5 +49,9 @@ public class AppUpdateProperties implements InitializingBean {
         } catch (URISyntaxException exception) {
             throw new IllegalArgumentException("devagentstudio.app-update.appDownloadUrl must be an absolute HTTP(S) URL with a host", exception);
         }
+    }
+
+    private static boolean missing(String value) {
+        return value == null || value.isEmpty();
     }
 }

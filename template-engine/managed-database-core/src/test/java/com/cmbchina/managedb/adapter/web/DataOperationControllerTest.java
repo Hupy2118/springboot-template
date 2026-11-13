@@ -1,11 +1,12 @@
 package com.cmbchina.managedb.adapter.web;
 
+import com.cmb.bee.commons.exceptions.BizException;
+import com.cmb.bee.web.support.MockBeeResponseAdvice;
 import com.cmbchina.managedb.adapter.web.application.DataOperationController;
 import com.cmbchina.managedb.adapter.web.security.ServiceKeyFilter;
 import com.cmbchina.managedb.application.AuthorizationSeedService;
 import com.cmbchina.managedb.application.view.DataOperationView;
 import com.cmbchina.managedb.common.exception.BaseExceptionHandler;
-import com.cmbchina.managedb.common.response.JsonResponseAdvice;
 import com.cmbchina.managedb.domain.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -35,15 +36,17 @@ class DataOperationControllerTest {
     void setUp() {
         ObjectMapper mapper = new ObjectMapper();
         mvc = MockMvcBuilders.standaloneSetup(new DataOperationController(service, mapper))
-                .setControllerAdvice(new BaseExceptionHandler(), new JsonResponseAdvice())
+                .setControllerAdvice(new BaseExceptionHandler(), new MockBeeResponseAdvice())
                 .addFilters(new ServiceKeyFilter("fixture-key", mapper)).build();
     }
 
-    /** 202 只返回安全回执，两个 GET 仅返回摘要。 */
+    /** 200 只返回安全回执，两个 GET 仅返回摘要。 */
     @Test
     void returnsReceiptAndSafeLookup() throws Exception {
         when(service.submit(eq(IDEMPOTENCY_KEY), any())).thenReturn(new DataOperationView.Receipt("12", DataOperation.Status.RUNNING));
-        mvc.perform(submit(json(KEY))).andExpect(status().isAccepted())
+        mvc.perform(submit(json(KEY))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.returnCode").value("SUC0000"))
+                .andExpect(jsonPath("$.errorMsg").value(""))
                 .andExpect(jsonPath("$.body.operationId").value("12"))
                 .andExpect(jsonPath("$.body.status").value("RUNNING"))
                 .andExpect(jsonPath("$.body.verified").doesNotExist());
@@ -54,6 +57,7 @@ class DataOperationControllerTest {
         for (String path : new String[]{"/12", "/by-key/" + IDEMPOTENCY_KEY}) {
             mvc.perform(authorize(get(BASE + path), BASE + path)).andExpect(status().isOk())
                     .andExpect(jsonPath("$.returnCode").value("SUC0000"))
+                    .andExpect(jsonPath("$.errorMsg").value(""))
                     .andExpect(jsonPath("$.body.verified").value(true))
                     .andExpect(jsonPath("$.body.createdCount").value(5))
                     .andExpect(jsonPath("$.body.rows").doesNotExist())

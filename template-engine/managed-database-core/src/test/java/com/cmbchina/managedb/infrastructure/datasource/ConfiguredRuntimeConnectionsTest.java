@@ -1,5 +1,6 @@
 package com.cmbchina.managedb.infrastructure.datasource;
 
+import com.cmb.bee.commons.exceptions.BizException;
 import com.cmbchina.managedb.domain.ResourceErrorCode;
 import com.cmbchina.managedb.domain.RuntimeDatabaseConnection;
 import org.junit.jupiter.api.Test;

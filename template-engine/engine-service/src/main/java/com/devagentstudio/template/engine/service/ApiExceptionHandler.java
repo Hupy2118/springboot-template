@@ -11,7 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
-@RestControllerAdvice
+@RestControllerAdvice(basePackages = "com.devagentstudio.template.engine.service")
 public class ApiExceptionHandler {
     @ExceptionHandler(ServiceException.class)
     ResponseEntity<Map<String, Object>> service(ServiceException exception) { return response(exception.code(), exception.getMessage(), exception.status()); }

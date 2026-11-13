@@ -1,5 +1,7 @@
 package com.devagentstudio.template.engine.service;
 
+import com.devagentstudio.template.engine.EngineServiceApplication;
+
 import com.devagentstudio.template.engine.core.common.StateDigest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -51,7 +53,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** Test-only executor for proving the frozen operation preconditions and transaction contract. */
 @ExtendWith(SpringExtension.class)
-@SpringBootTest(classes = EngineServiceApplication.class)
+@SpringBootTest(classes = EngineServiceApplication.class, properties =
+        "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration")
 class V3PackageExecutorContractIT {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Set<String> MANAGED_REGISTRIES = new HashSet<String>(Arrays.asList(

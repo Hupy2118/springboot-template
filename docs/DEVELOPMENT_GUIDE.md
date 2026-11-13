@@ -318,10 +318,10 @@ mvn -f template-engine/pom.xml -pl engine-service -am package
 export TEMPLATE_ENGINE_SOURCE_ROOT="$(cd template-source && pwd)"
 
 java -jar template-engine/engine-service/target/engine-service-1.0.0-SNAPSHOT.jar \
-  --spring.config.additional-location="file:$(pwd)/template-engine/engine-service/config/application-local.yml"
+  --spring.profiles.active=dev
 ```
 
-本地服务监听 `127.0.0.1:18080`（由 `application-local.yml` 控制），仅面向本机。`TEMPLATE_ENGINE_SOURCE_ROOT` 必须为绝对路径；服务无应用层认证，不应直接暴露公网。应用生成后的 Workspace Apply、构建、回滚、State 持久化属于 XCodeAgent / 调用方职责。
+本地服务监听 `127.0.0.1:18080`（由 `application.yml` 控制），仅面向本机。`TEMPLATE_ENGINE_SOURCE_ROOT` 必须为绝对路径；服务无应用层认证，不应直接暴露公网。应用生成后的 Workspace Apply、构建、回滚、State 持久化属于 XCodeAgent / 调用方职责。
 
 Source Root 指向 `template-source` 层，不是 `template-source/code`；可用 `TEMPLATE_ENGINE_PORT` 覆盖端口。服务没有约定的 `/health`，使用真实 `POST /v1/generate` 验证就绪。请求建议使用 `Accept: application/zip, application/json`：只接受 ZIP 时，当前错误 JSON 存在内容协商限制。完整请求样例见 [Standalone tests/requests](../devtools/standalone-adapter/tests/requests/)，同样适用于正式模式，不包含模式字段。
 
@@ -339,10 +339,10 @@ export TEMPLATE_ENGINE_STANDALONE_ENABLED=true
 
 | 模式 | Source Root | Revision 来源 |
 | --- | --- | --- |
-| native（开关缺省或 false） | `<repo>/template-source` | `code/template-revision.txt`，当前 `2026.10.30.1` |
-| standalone（开关 true） | `<repo>/.standalone-build/template-source` | `devtools/standalone-adapter/release.yaml`，当前 `2026.10.30.1001` |
+| native（开关缺省或 false） | `<repo>/template-source` | `code/template-revision.txt`，当前 `2026.11.13.1` |
+| standalone（开关 true） | `<repo>/.standalone-build/template-source` | `devtools/standalone-adapter/release.yaml`，当前 `2026.11.13.1002` |
 
-`run-engine.sh` 仅接受 true/false，发现已设置的 Source Root 与模式不一致会拒绝启动。Standalone 会 prepare/audit 后执行同一个 Engine JAR 与 `application-local.yml`；关闭时不执行 Python 或访问 Adapter 清单/临时目录。直接 `java -jar` 不解析此开关，HTTP 也不接受 standalone 字段。切换模式或修订前先停止已有进程，再重启加载 Source 和新 JAR；已下载工程不会自动更新。
+`run-engine.sh` 仅接受 true/false，发现已设置的 Source Root 与模式不一致会拒绝启动。Standalone 会 prepare/audit 后执行同一个 Engine JAR，并启用 `dev` Profile；关闭时不执行 Python 或访问 Adapter 清单/临时目录。直接 `java -jar` 不解析此开关，HTTP 也不接受 standalone 字段。切换模式或修订前先停止已有进程，再重启加载 Source 和新 JAR；已下载工程不会自动更新。
 
 **维护适配内容**：`manifest.yaml` 与 `release.yaml` 使用 JSON 语法。覆盖/删除/补丁逐目标校验上游 SHA，新增目标必须不存在；精确片段补丁还校验结果 SHA。构造只复制 Loader 的 Runtime ownership roots，拒绝 symlink、二进制、越界和大小写碰撞；staging 审核通过后替换有效树。变更上游 Runtime 输入、清单、Overlay 或构造逻辑后，更新 sourceRevision（与正式源一致）并审核提升 standaloneRevision；fingerprint 台账阻止同 Revision 对应不同内容。活动服务持有 Release 锁时不得 prepare 或热替换，不能删除锁或台账绕过检查。
 
@@ -370,16 +370,16 @@ export TEMPLATE_ENGINE_STANDALONE_ENABLED=true
 
 ### 5.4 XCodeAgent 应用版本检测
 
-此接口为无状态发布信息查询，与模板版本、Capability 和 TemplateState 无关。配置位于 `template-engine/engine-service/config/application-local.yml`：
+此接口为无状态发布信息查询，与模板版本、Capability 和 TemplateState 无关。配置位于 `template-engine/engine-service/src/main/resources/application-dev.yml`：
 
 ```yaml
 devagentstudio:
   app-update:
-    latestAppVersion: "1.0.1"
-    appDownloadUrl: "http://127.0.0.1:18081/"
+    latest-app-version: "${TEMPLATE_ENGINE_APP_UPDATE_VERSION:1.0.1}"
+    app-download-url: "${TEMPLATE_ENGINE_APP_UPDATE_URL:http://127.0.0.1:18081/}"
 ```
 
-`latestAppVersion` 是客户端应切换到的目标版本。`appDownloadUrl` 配置为固定的 CDN 根地址。本地联调时，在该地址下提供 `1.0.1/` 及其清单和安装包。两项配置同时省略时，模板服务可正常启动，版本检测返回 `503 APP_UPDATE_UNAVAILABLE`。只提供一项、版本不符合 SemVer 2.0.0，或下载地址不是包含 host 的绝对 HTTP/HTTPS URL 时，服务启动失败。配置修改后需重启服务。
+`latest-app-version` 是客户端应切换到的目标版本。`app-download-url` 配置为固定的 CDN 根地址。本地联调时，在该地址下提供 `1.0.1/` 及其清单和安装包。两项配置同时省略时，模板服务可正常启动，版本检测返回 `503 APP_UPDATE_UNAVAILABLE`。只提供一项、版本不符合 SemVer 2.0.0，或下载地址不是包含 host 的绝对 HTTP/HTTPS URL 时，服务启动失败。配置修改后需重启服务。
 
 请求 `POST /v1/app-updates/check`，Content-Type 为 `application/json`，请求对象只允许一个必填字符串字段：
 
@@ -423,7 +423,7 @@ devagentstudio:
 
 `mvn -f template-engine/pom.xml verify` 包含 Source Boundary、Assembly Parity、Schema 及 Package Executor 等现有测试。前端发布前也可在 `frontend/` 下运行 `pnpm materialize:full`、`pnpm verify:assembly` 和 `pnpm verify:release`。所有修改最后执行 `git diff --check`。
 
-Service 改动至少运行 `mvn -f template-engine/pom.xml -pl engine-service -am package`；涉及 HTTP、ZIP 或启动配置时，还须用权威 `application-local.yml` 与绝对 Source Root 做真实 JAR 启动验收。纯维护文档变更核对链接、命令路径和差异即可；Base/Extension 内交付给用户的文档属于 Runtime 输入，仍需 Revision Gate。
+Service 改动至少运行 `mvn -f template-engine/pom.xml -pl engine-service -am package`；涉及 HTTP、ZIP 或启动配置时，还须用 `dev` Profile 与绝对 Source Root 做真实 JAR 启动验收。纯维护文档变更核对链接、命令路径和差异即可；Base/Extension 内交付给用户的文档属于 Runtime 输入，仍需 Revision Gate。
 
 ### 6.2 Release 操作规则
 

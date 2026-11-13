@@ -60,7 +60,7 @@ public class BaseExceptionHandler {
             default:
                 status = HttpStatus.INTERNAL_SERVER_ERROR;
         }
-        log.error("业务异常：{}", e.getMessage(), e);
+        log.warn("业务异常，错误码={}", code);
         BeeResponseEntity<String> response = BeeResponseEntity.failed(e.getErrorCode(), e.getParams());
         return ResponseEntity.status(status).body(response);
     }
@@ -70,32 +70,36 @@ public class BaseExceptionHandler {
      */
     @ExceptionHandler({MethodArgumentNotValidException.class, ConstraintViolationException.class, HttpMessageNotReadableException.class,
             MethodArgumentTypeMismatchException.class, MissingServletRequestParameterException.class})
-    public BeeResponseEntity<String> validationExceptionHandle(Exception e) {
-        return BeeResponseEntity.failed("INVALID_ARGUMENT", "请求参数无效");
+    public ResponseEntity<BeeResponseEntity<String>> validationExceptionHandle(Exception e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(BeeResponseEntity.failed("INVALID_ARGUMENT", "请求参数无效"));
     }
 
     /**
      * 保持方法不支持的标准状态，避免被统一未知异常误判成服务器故障。
      */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public BeeResponseEntity<String> methodNotAllowed(HttpRequestMethodNotSupportedException e) {
-        return BeeResponseEntity.failed("INVALID_ARGUMENT", "请求方法不支持");
+    public ResponseEntity<BeeResponseEntity<String>> methodNotAllowed(HttpRequestMethodNotSupportedException e) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .body(BeeResponseEntity.failed("INVALID_ARGUMENT", "请求方法不支持"));
     }
 
     /**
      * 保持媒体类型不支持的标准状态。
      */
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
-    public BeeResponseEntity<String> unsupportedMediaType(HttpMediaTypeNotSupportedException e) {
-        return BeeResponseEntity.failed("INVALID_ARGUMENT", "请求媒体类型不支持");
+    public ResponseEntity<BeeResponseEntity<String>> unsupportedMediaType(HttpMediaTypeNotSupportedException e) {
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(BeeResponseEntity.failed("INVALID_ARGUMENT", "请求媒体类型不支持"));
     }
 
     /**
      * 未分类错误不推断注册未提交，不记录可能含凭据的堆栈。
      */
     @ExceptionHandler(Exception.class)
-    public BeeResponseEntity<String> internalError(Exception e) {
+    public ResponseEntity<BeeResponseEntity<String>> internalError(Exception e) {
         log.error("内部异常，类型={}", e.getClass().getSimpleName());
-        return BeeResponseEntity.failed("INTERNAL_ERROR", "操作结果未确认，请勿自动重试");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(BeeResponseEntity.failed("INTERNAL_ERROR", "操作结果未确认，请勿自动重试"));
     }
 }

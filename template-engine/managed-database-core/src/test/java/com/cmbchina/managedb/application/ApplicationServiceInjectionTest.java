@@ -1,5 +1,7 @@
 package com.cmbchina.managedb.application;
 
+import com.cmbchina.managedb.domain.AuthorizationSeedPort;
+import com.cmbchina.managedb.domain.repository.DataOperationRepository;
 import com.cmbchina.managedb.domain.DatabaseSchemaPort;
 import com.cmbchina.managedb.domain.DatasourceKeyGenerator;
 import com.cmbchina.managedb.domain.RuntimeConnectionPort;
