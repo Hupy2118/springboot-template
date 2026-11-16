@@ -32,6 +32,11 @@ public interface TableOperationMapper {
      */
     long countByDatasourceKey(@Param("datasourceKey") String datasourceKey);
 
+    long maxIdByDatasourceKey(@Param("datasourceKey") String datasourceKey);
+
+    List<TableOperationPo> selectAfterId(@Param("datasourceKey") String datasourceKey, @Param("marker") long marker,
+                                         @Param("limit") int limit);
+
     /**
      * 限定数量的历史只读查询。
      */

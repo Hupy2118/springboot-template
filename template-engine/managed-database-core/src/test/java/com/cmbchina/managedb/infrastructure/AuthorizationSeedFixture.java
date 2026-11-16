@@ -12,6 +12,7 @@ import java.util.Collections;
 public final class AuthorizationSeedFixture {
     public static final String KEY = "12ab34cd56ef";
     public static final String IDEMPOTENCY_KEY = String.join("", Collections.nCopies(64, "a"));
+    public static final String RETRY_KEY = String.join("", Collections.nCopies(64, "b"));
     public static final String SUBJECT = "fixture-subject";
 
     /** 工具类不创建实例。 */

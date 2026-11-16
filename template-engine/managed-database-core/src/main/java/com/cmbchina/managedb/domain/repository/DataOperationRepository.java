@@ -12,8 +12,12 @@ public interface DataOperationRepository {
     /** 核对当前资源占用及四表归属，返回固定挂载。 */
     long preflight(AuthorizationSeedPayload payload);
 
-    /** 在资源锁内先查幂等记录，再决定是否创建和认领资源。 */
-    Admission begin(long datasourceId, String idempotencyKey, AuthorizationSeedPayload payload);
+    default Admission begin(long datasourceId, String idempotencyKey, AuthorizationSeedPayload payload) {
+        return begin(datasourceId, idempotencyKey, payload, null);
+    }
+
+    /** 在资源锁内先查幂等记录，再检查可选的失败引用并认领资源。 */
+    Admission begin(long datasourceId, String idempotencyKey, AuthorizationSeedPayload payload, Long retryOfOperationId);
 
     /** 在工作线程执行 DML 之前重新核对占用和目录。 */
     void requireExecution(DataOperation operation, AuthorizationSeedPayload payload);

@@ -2,6 +2,7 @@ package com.cmbchina.managedb.infrastructure.persistence;
 
 import com.baomidou.mybatisplus.core.incrementer.IdentifierGenerator;
 import com.cmb.bee.commons.exceptions.BizException;
+import com.cmbchina.managedb.domain.ReadOperationSnapshot;
 import com.cmbchina.managedb.domain.Actor;
 import com.cmbchina.managedb.domain.CheckContext;
 import com.cmbchina.managedb.domain.DatasourceResource;
@@ -24,6 +25,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -36,6 +38,8 @@ import java.util.stream.Collectors;
  * 三表事务在同一实现内执行；不调用注册仓储的多个独立事务拼接原子操作。
  */
 public final class MybatisTableOperationRepository implements TableOperationRepository {
+    private static final int READ_OPERATION_LIMIT = 100;
+
     private final DatasourceRegistrationMapper resources;
     private final TableBindingMapper tables;
     private final TableOperationMapper operations;
@@ -154,6 +158,24 @@ public final class MybatisTableOperationRepository implements TableOperationRepo
     public CheckContext checkContext(String datasourceKey) {
         return tx("repository.checkContext", read,
                 () -> new CheckContext(application(resources.selectByDatasourceKey(datasourceKey)), operations.countByDatasourceKey(datasourceKey)));
+    }
+
+    @Override
+    public ReadOperationSnapshot readOperationSnapshot(String datasourceKey, Long marker) {
+        return tx("repository.readOperationSnapshot", read, () -> {
+            DatasourceResource resource = application(resources.selectByDatasourceKey(datasourceKey));
+            resource.requireActive();
+            long count = operations.countByDatasourceKey(datasourceKey);
+            long maxId = operations.maxIdByDatasourceKey(datasourceKey);
+            Long activeId = resource.getActiveOperationId();
+            TableOperationPo active = activeId == null ? null : operations.selectByDatasourceKeyAndId(datasourceKey, activeId);
+            TableOperation activeOperation = active == null || !Integer.valueOf(0).equals(active.getDeleted())
+                    ? null : codec.restoreForReadProtection(active);
+            List<TableOperation> delta = marker == null ? Collections.emptyList()
+                    : operations.selectAfterId(datasourceKey, marker, READ_OPERATION_LIMIT).stream()
+                            .map(codec::restoreForReadProtection).collect(Collectors.toList());
+            return new ReadOperationSnapshot(resource, count, maxId, activeOperation, delta);
+        });
     }
 
     /**

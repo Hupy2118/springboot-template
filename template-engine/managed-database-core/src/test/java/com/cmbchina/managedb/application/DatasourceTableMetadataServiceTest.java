@@ -5,12 +5,13 @@ import com.cmbchina.managedb.domain.Actor;
 
 import com.cmbchina.managedb.application.view.DatasourceTablesView;
 import com.cmbchina.managedb.application.view.TableColumnsView;
-import com.cmbchina.managedb.domain.CheckContext;
+import com.cmbchina.managedb.domain.ReadOperationSnapshot;
 import com.cmbchina.managedb.domain.DatabaseSchemaPort;
 import com.cmbchina.managedb.domain.DatasourceResource;
 import com.cmbchina.managedb.domain.ResourceErrorCode;
 import com.cmbchina.managedb.domain.ResourceStatus;
 import com.cmbchina.managedb.domain.TableBinding;
+import com.cmbchina.managedb.domain.TableOperation;
 import com.cmbchina.managedb.domain.TableMetadata;
 import com.cmbchina.managedb.domain.repository.TableOperationRepository;
 import com.cmbchina.managedb.domain.valueobject.DatasourceKey;
@@ -52,9 +53,10 @@ class DatasourceTableMetadataServiceTest {
         repository = mock(TableOperationRepository.class);
         schemas = mock(DatabaseSchemaPort.class);
         resource = DatasourceResource.register(new DatasourceKey(APP), 2L, null, "注册测试", Actor.system());
-        when(repository.checkContext(APP)).thenReturn(new CheckContext(resource, 0L));
+        when(repository.readOperationSnapshot(APP, null)).thenReturn(snapshot(resource, 0, null));
+        when(repository.readOperationSnapshot(APP, 0L)).thenReturn(snapshot(resource, 0, null));
         when(schemas.tableKey(eq(2L), anyString())).thenAnswer(a -> a.getArgument(1));
-        service = new DatasourceTableMetadataService(repository, schemas);
+        service = new DatasourceTableMetadataService(repository, schemas, new TableReadConflictGuard(repository, schemas));
     }
 
     /**
@@ -70,6 +72,10 @@ class DatasourceTableMetadataServiceTest {
      */
     private TableBinding owned(String name, TableBinding.Status status, boolean deleted) {
         return new TableBinding(APP, 2L, name, status, deleted);
+    }
+
+    private ReadOperationSnapshot snapshot(DatasourceResource current, long count, TableOperation active, TableOperation... delta) {
+        return new ReadOperationSnapshot(current, count, count == 0 ? 0 : 101, active, Arrays.asList(delta));
     }
 
     /**
@@ -153,6 +159,26 @@ class DatasourceTableMetadataServiceTest {
                 assertThrows(BizException.class, () -> service.tables(APP)).getErrorCode());
     }
 
+    @Test
+    void businessColumnsRemainReadableDuringAuthorizationBatch() {
+        resource.claim(101L);
+        TableOperation batch = TableOperation.startBatch(101L, APP, 2L, Arrays.asList("role", "resource", "role_resource", "role_member"),
+                Collections.nCopies(4, "CREATE TABLE"), Collections.nCopies(4, false), null, null);
+        batch.markRunning(0);
+        batch.complete(0, TableOperation.StepStatus.SUCCEEDED, null, Collections.emptyMap());
+        when(repository.readOperationSnapshot(APP, null)).thenReturn(snapshot(resource, 1, batch));
+        when(repository.readOperationSnapshot(APP, 101L)).thenReturn(snapshot(resource, 1, batch));
+        when(repository.bindings(APP)).thenReturn(Arrays.asList(
+                owned("role", TableBinding.Status.CREATED, false), owned("personnel", TableBinding.Status.CREATED, false)));
+        when(repository.binding(2L, "personnel")).thenReturn(Optional.of(owned("personnel", TableBinding.Status.CREATED, false)));
+        when(schemas.readTableMetadata(2L, "personnel")).thenReturn(Optional.of(actual("personnel")));
+        assertEquals("personnel", service.columns(APP, "personnel").getTableName());
+        assertEquals("personnel", service.tables(APP).getTables().get(0).getTableName());
+        assertEquals(1, service.tables(APP).getTables().size());
+        assertEquals(ResourceErrorCode.RESOURCE_BUSY, assertThrows(BizException.class, () -> service.columns(APP, "role")).getErrorCode());
+        verify(schemas, never()).readTableMetadata(2L, "role");
+    }
+
     /**
      * 应用有在途或未知占用时不读取可能处于重建中的表。
      */
@@ -169,11 +195,36 @@ class DatasourceTableMetadataServiceTest {
      */
     @Test
     void rejectsChangesDuringMetadataRead() {
-        when(repository.checkContext(APP)).thenReturn(new CheckContext(resource, 0L), new CheckContext(resource, 1L));
+        when(repository.readOperationSnapshot(APP, 0L)).thenReturn(snapshot(resource, 1, null));
         when(repository.bindings(APP)).thenReturn(Collections.singletonList(owned("orders", TableBinding.Status.CREATED, false)));
         when(schemas.readTableMetadata(2L, "orders")).thenReturn(Optional.of(actual("orders")));
         assertEquals(ResourceErrorCode.RESOURCE_BUSY,
                 assertThrows(BizException.class, () -> service.tables(APP)).getErrorCode());
+    }
+
+    @Test
+    void completedDdlDiscardsOnlyTheAffectedDirectoryEntryAndRejectsItsColumns() {
+        TableOperation finished = TableOperation.start(101L, APP, 2L, "orders", "CREATE TABLE", TableOperation.Mode.CREATE, true, Actor.system());
+        finished.markRunning(0);
+        finished.complete(0, TableOperation.StepStatus.SUCCEEDED, null, Collections.emptyMap());
+        finished.finish(TableOperation.Status.SUCCEEDED, null);
+        when(repository.bindings(APP)).thenReturn(Arrays.asList(
+                owned("orders", TableBinding.Status.CREATED, false), owned("department", TableBinding.Status.CREATED, false)));
+        when(repository.binding(2L, "orders")).thenReturn(Optional.of(owned("orders", TableBinding.Status.CREATED, false)));
+        when(repository.binding(2L, "department")).thenReturn(Optional.of(owned("department", TableBinding.Status.CREATED, false)));
+        when(schemas.readTableMetadata(2L, "department")).thenReturn(Optional.of(actual("department")));
+        when(schemas.readTableMetadata(2L, "orders")).thenAnswer(call -> {
+            when(repository.readOperationSnapshot(APP, 0L)).thenReturn(snapshot(resource, 1, null, finished));
+            return Optional.of(actual("orders"));
+        });
+
+        DatasourceTablesView directory = service.tables(APP);
+        assertEquals(1, directory.getTables().size());
+        assertEquals("department", directory.getTables().get(0).getTableName());
+        when(repository.readOperationSnapshot(APP, 0L)).thenReturn(snapshot(resource, 0, null));
+        assertEquals(ResourceErrorCode.RESOURCE_BUSY,
+                assertThrows(BizException.class, () -> service.columns(APP, "orders")).getErrorCode());
+        assertEquals("department", service.columns(APP, "department").getTableName());
     }
 
     /**
@@ -182,7 +233,7 @@ class DatasourceTableMetadataServiceTest {
     @Test
     void rejectsReleasedApplication() {
         DatasourceResource released = DatasourceResource.restore(new DatasourceKey(APP), 2L, null, null, null, null, ResourceStatus.RELEASED, false, null);
-        when(repository.checkContext(APP)).thenReturn(new CheckContext(released, 0L));
+        when(repository.readOperationSnapshot(APP, null)).thenReturn(snapshot(released, 0, null));
         assertEquals(ResourceErrorCode.RESOURCE_NOT_FOUND,
                 assertThrows(BizException.class, () -> service.tables(APP)).getErrorCode());
         verifyNoInteractions(schemas);

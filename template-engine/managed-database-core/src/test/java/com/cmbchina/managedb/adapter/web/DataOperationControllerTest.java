@@ -13,14 +13,21 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.util.StreamUtils;
+
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 import static com.cmbchina.managedb.AuthorizationSeedFixture.*;
+import static org.hamcrest.Matchers.aMapWithSize;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -43,12 +50,13 @@ class DataOperationControllerTest {
     /** 200 只返回安全回执，两个 GET 仅返回摘要。 */
     @Test
     void returnsReceiptAndSafeLookup() throws Exception {
-        when(service.submit(eq(IDEMPOTENCY_KEY), any())).thenReturn(new DataOperationView.Receipt("12", DataOperation.Status.RUNNING));
+        when(service.submit(eq(IDEMPOTENCY_KEY), any(), isNull())).thenReturn(new DataOperationView.Receipt("12", DataOperation.Status.RUNNING));
         mvc.perform(submit(json(KEY))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.returnCode").value("SUC0000"))
                 .andExpect(jsonPath("$.errorMsg").value(""))
                 .andExpect(jsonPath("$.body.operationId").value("12"))
                 .andExpect(jsonPath("$.body.status").value("RUNNING"))
+                .andExpect(jsonPath("$.body.purpose").value("AUTHORIZATION_SEED_V1"))
                 .andExpect(jsonPath("$.body.verified").doesNotExist());
         DataOperationView result = new DataOperationView(new DataOperation(12, KEY, 1, IDEMPOTENCY_KEY,
                 DataOperation.Result.committed(5, 0)));
@@ -63,6 +71,45 @@ class DataOperationControllerTest {
                     .andExpect(jsonPath("$.body.rows").doesNotExist())
                     .andExpect(content().string(not(containsString(SUBJECT))));
         }
+    }
+
+    /** 冻结示例经过真实解析和 Bee 包装，且调度信息不进入指纹。 */
+    @Test
+    void acceptsFrozenRetryExample() throws Exception {
+        String retry;
+        try (InputStream input = new ClassPathResource("authorization-seed-retry.json").getInputStream()) {
+            retry = StreamUtils.copyToString(input, StandardCharsets.UTF_8);
+        }
+        String first = retry.replace(RETRY_KEY, IDEMPOTENCY_KEY).replace("  \"retryOfOperationId\": \"12345\",\n", "");
+        String fingerprint = parse(KEY, first).getFingerprint();
+        assertEquals("ff40ae972a4c686456fa3c09af6eb79950188a9c126897dfe887edc1ea0afa29", fingerprint);
+        assertEquals(fingerprint, parse(KEY, retry).getFingerprint());
+        when(service.submit(eq(RETRY_KEY), argThat(payload -> fingerprint.equals(payload.getFingerprint())), eq(12345L)))
+                .thenReturn(new DataOperationView.Receipt("12346", DataOperation.Status.RUNNING));
+        mvc.perform(submit(retry)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.returnCode").value("SUC0000"))
+                .andExpect(jsonPath("$.errorMsg").value(""))
+                .andExpect(jsonPath("$.body").value(aMapWithSize(3)))
+                .andExpect(jsonPath("$.body.operationId").isString())
+                .andExpect(jsonPath("$.body.operationId").value("12346"))
+                .andExpect(jsonPath("$.body.status").value("RUNNING"))
+                .andExpect(jsonPath("$.body.purpose").value("AUTHORIZATION_SEED_V1"));
+    }
+
+    @Test
+    void rejectsInvalidRetryReferenceWithoutCallingService() throws Exception {
+        String original = json(KEY);
+        for (String field : new String[]{"\"retryOfOperationId\":12345", "\"retryOfOperationId\":null",
+                "\"retryOfOperationId\":\"-1\"", "\"retryOfOperationId\":\"0\"", "\"retryOfOperationId\":\"\"",
+                "\"retryOfOperationId\":\"+12\"", "\"retryOfOperationId\":\" 12\"",
+                "\"retryOfOperationId\":\"9223372036854775808\"",
+                "\"retryOfOperationId\":\"1\",\"retryOfOperationId\":\"2\"",
+                "\"retryOfOperationId\":\"1\",\"force\":true", "\"force\":true"}) {
+            mvc.perform(submit("{" + field + "," + original.substring(1)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.returnCode").value("INVALID_ARGUMENT"));
+        }
+        verifyNoInteractions(service);
     }
 
     /** 未鉴权请求、未知或重复属性、伪造表名、类型转换和请求超限均在执行前拒绝。 */
@@ -110,7 +157,8 @@ class DataOperationControllerTest {
     /** 明确区分同键冲突与未查到原操作。 */
     @Test
     void returnsConflictAndMissingLookup() throws Exception {
-        when(service.submit(eq(IDEMPOTENCY_KEY), any())).thenThrow(new BizException(ResourceErrorCode.IDEMPOTENCY_CONFLICT));
+        when(service.submit(eq(IDEMPOTENCY_KEY), any(), isNull()))
+                .thenThrow(new BizException(ResourceErrorCode.IDEMPOTENCY_CONFLICT));
         when(service.byKey(KEY, IDEMPOTENCY_KEY)).thenThrow(new BizException(ResourceErrorCode.RESOURCE_NOT_FOUND));
         mvc.perform(submit(json(KEY))).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.returnCode").value("IDEMPOTENCY_CONFLICT"));

@@ -4,12 +4,13 @@ import com.cmb.bee.commons.exceptions.BizException;
 import com.cmbchina.managedb.domain.Actor;
 
 import com.cmbchina.managedb.application.view.TableDataView;
-import com.cmbchina.managedb.domain.CheckContext;
+import com.cmbchina.managedb.domain.ReadOperationSnapshot;
 import com.cmbchina.managedb.domain.DatabaseSchemaPort;
 import com.cmbchina.managedb.domain.DatasourceResource;
 import com.cmbchina.managedb.domain.ResourceErrorCode;
 import com.cmbchina.managedb.domain.ResourceStatus;
 import com.cmbchina.managedb.domain.TableBinding;
+import com.cmbchina.managedb.domain.TableOperation;
 import com.cmbchina.managedb.domain.TableDataPage;
 import com.cmbchina.managedb.domain.TableDataQuery;
 import com.cmbchina.managedb.domain.TableDataQueryPort;
@@ -64,10 +65,11 @@ class DatasourceTableDataServiceTest {
         schemas = mock(DatabaseSchemaPort.class);
         reader = mock(TableDataQueryPort.class);
         resource = DatasourceResource.register(new DatasourceKey(APP), 2L, null, "注册测试", Actor.system());
-        service = new DatasourceTableDataService(repository, schemas, reader);
+        service = new DatasourceTableDataService(repository, schemas, reader, new TableReadConflictGuard(repository, schemas));
         table = new TableMetadata(TABLE, "订单",
                 Collections.singletonList(new TableMetadata.Column("id", "bigint", false, true, true, null, "主键")));
-        when(repository.checkContext(APP)).thenReturn(new CheckContext(resource, 0L));
+        when(repository.readOperationSnapshot(APP, null)).thenReturn(snapshot(resource, 0, null));
+        when(repository.readOperationSnapshot(APP, 0L)).thenReturn(snapshot(resource, 0, null));
         when(schemas.tableKey(eq(2L), anyString())).thenAnswer(call -> call.getArgument(1));
         when(repository.binding(2L, TABLE)).thenReturn(Optional.of(new TableBinding(APP, 2L, TABLE, TableBinding.Status.CREATED, false)));
         when(schemas.readTableMetadata(2L, TABLE)).thenReturn(Optional.of(table));
@@ -80,6 +82,10 @@ class DatasourceTableDataServiceTest {
      */
     private TableDataQuery query() {
         return new TableDataQuery(1, 20, new TableDataQuery.Filter("AND", Collections.emptyList()));
+    }
+
+    private ReadOperationSnapshot snapshot(DatasourceResource current, long count, TableOperation active, TableOperation... delta) {
+        return new ReadOperationSnapshot(current, count, count == 0 ? 0 : 101, active, Arrays.asList(delta));
     }
 
     /**
@@ -164,8 +170,8 @@ class DatasourceTableDataServiceTest {
     void refusesBusyAndReleasedApplications() {
         resource.claim(101L);
         assertSame(ResourceErrorCode.RESOURCE_BUSY, assertThrows(BizException.class, () -> service.query(APP, TABLE, query())).getErrorCode());
-        when(repository.checkContext(APP)).thenReturn(
-                new CheckContext(DatasourceResource.restore(new DatasourceKey(APP), 2L, null, null, null, null, ResourceStatus.RELEASED, false, null), 0L));
+        when(repository.readOperationSnapshot(APP, null)).thenReturn(snapshot(
+                DatasourceResource.restore(new DatasourceKey(APP), 2L, null, null, null, null, ResourceStatus.RELEASED, false, null), 0, null));
         assertThrows(BizException.class, () -> service.query(APP, TABLE, query()));
         verifyNoInteractions(schemas, reader);
     }
@@ -175,9 +181,40 @@ class DatasourceTableDataServiceTest {
      */
     @Test
     void discardsPageIfOperationCountChanges() {
-        when(repository.checkContext(APP)).thenReturn(new CheckContext(resource, 0L), new CheckContext(resource, 1L));
+        when(repository.readOperationSnapshot(APP, 0L)).thenReturn(snapshot(resource, 1, null));
         assertSame(ResourceErrorCode.RESOURCE_BUSY, assertThrows(BizException.class, () -> service.query(APP, TABLE, query())).getErrorCode());
         verify(reader).read(eq(2L), eq(table), any());
+    }
+
+    @Test
+    void readsBusinessDataDuringBatchButRejectsItsTargets() {
+        resource.claim(101L);
+        TableOperation batch = TableOperation.startBatch(101L, APP, 2L, Arrays.asList("role", "resource", "role_resource", "role_member"),
+                Collections.nCopies(4, "CREATE TABLE"), Collections.nCopies(4, false), null, null);
+        when(repository.readOperationSnapshot(APP, null)).thenReturn(snapshot(resource, 1, batch));
+        when(repository.readOperationSnapshot(APP, 101L)).thenReturn(snapshot(resource, 1, batch));
+        assertEquals(TABLE, service.query(APP, TABLE, query()).getTableName());
+        assertSame(ResourceErrorCode.RESOURCE_BUSY, assertThrows(BizException.class, () -> service.query(APP, "role", query())).getErrorCode());
+        verify(schemas, never()).readTableMetadata(2L, "role");
+    }
+
+    @Test
+    void comparesCompletedDdlTargetsAfterReadingData() {
+        for (String target : Arrays.asList("role", TABLE)) {
+            TableOperation finished = TableOperation.cleanup(101L, APP, 2L, TableOperation.Mode.DROP, Collections.singletonList(target), Actor.system());
+            finished.markRunning(0);
+            finished.complete(0, TableOperation.StepStatus.SUCCEEDED, null, Collections.emptyMap());
+            finished.finish(TableOperation.Status.SUCCEEDED, null);
+            when(reader.read(eq(2L), eq(table), any())).thenAnswer(call -> {
+                when(repository.readOperationSnapshot(APP, 0L)).thenReturn(snapshot(resource, 1, null, finished));
+                return new TableDataPage(Collections.emptyList(), Collections.singletonMap("id", "TEXT"), false, false);
+            });
+            if (TABLE.equals(target)) {
+                assertSame(ResourceErrorCode.RESOURCE_BUSY, assertThrows(BizException.class, () -> service.query(APP, TABLE, query())).getErrorCode());
+            } else {
+                assertEquals(TABLE, service.query(APP, TABLE, query()).getTableName());
+            }
+        }
     }
 
     /**

@@ -25,6 +25,7 @@ import java.util.*;
 public final class AuthorizationSeedRequest {
     private final String idempotencyKey;
     private final AuthorizationSeedPayload payload;
+    private final String retryOfOperationId;
 
     /** 先限制原始字节和嵌套层级，再构造领域载荷。 */
     public static AuthorizationSeedRequest parse(String key, InputStream input, ObjectMapper mapper) {
@@ -37,7 +38,13 @@ public final class AuthorizationSeedRequest {
         } catch (IOException exception) {
             throw invalid();
         }
-        requireFields(root, "purpose", "idempotencyKey", "tables");
+        String retryOfOperationId = null;
+        if (root != null && root.has("retryOfOperationId")) {
+            requireFields(root, "purpose", "idempotencyKey", "tables", "retryOfOperationId");
+            retryOfOperationId = readOperationId(root.get("retryOfOperationId"));
+        } else {
+            requireFields(root, "purpose", "idempotencyKey", "tables");
+        }
         String idempotencyKey = AuthorizationSeedPayload.requireIdempotencyKey(text(root.get("idempotencyKey")));
         JsonNode tables = root.get("tables");
         if (!tables.isArray() || tables.size() != AuthorizationSeedPayload.Table.values().length) {
@@ -52,7 +59,23 @@ public final class AuthorizationSeedRequest {
             rows.add(readRows(entry.get("rows"), table));
         }
         return new AuthorizationSeedRequest(idempotencyKey,
-                new AuthorizationSeedPayload(key, text(root.get("purpose")), names, rows));
+                new AuthorizationSeedPayload(key, text(root.get("purpose")), names, rows), retryOfOperationId);
+    }
+
+    /** 仅接受可用 BIGINT 表示的正整数十进制字符串。 */
+    private static String readOperationId(JsonNode node) {
+        String value = text(node);
+        if (!value.matches("[0-9]+")) {
+            throw invalid();
+        }
+        try {
+            if (Long.parseLong(value) > 0) {
+                return value;
+            }
+        } catch (NumberFormatException exception) {
+            throw invalid();
+        }
+        throw invalid();
     }
 
     /** 即使请求以 chunked 传输，也最多读上限再加一个字节。 */

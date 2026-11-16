@@ -28,13 +28,15 @@ public class DataOperationController {
     private final ObjectMapper mapper;
 
     /**
-     * 202 表示受理或返回原受理记录；前置鉴权在读取请求体之前执行。
+     * HTTP 200 返回受理回执；前置鉴权在读取请求体之前执行。
      */
     @PostMapping(value = "/batch", consumes = MediaType.APPLICATION_JSON_VALUE)
     public DataOperationView.Receipt submit(@PathVariable String datasourceKey,
                                             HttpServletRequest request) throws IOException {
         AuthorizationSeedRequest input = AuthorizationSeedRequest.parse(datasourceKey, request.getInputStream(), mapper);
-        return service.submit(input.getIdempotencyKey(), input.getPayload());
+        String retryOfOperationId = input.getRetryOfOperationId();
+        return service.submit(input.getIdempotencyKey(), input.getPayload(),
+                retryOfOperationId == null ? null : Long.valueOf(retryOfOperationId));
     }
 
     /**

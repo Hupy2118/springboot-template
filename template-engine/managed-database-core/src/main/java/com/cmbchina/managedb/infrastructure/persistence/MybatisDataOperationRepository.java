@@ -57,13 +57,22 @@ public final class MybatisDataOperationRepository implements DataOperationReposi
 
     /** 幂等优先于资源状态检查，历史重试仍可查询原记录。 */
     @Override
-    public Admission begin(long datasourceId, String idempotencyKey, AuthorizationSeedPayload payload) {
+    public Admission begin(long datasourceId, String idempotencyKey, AuthorizationSeedPayload payload,
+                           Long retryOfOperationId) {
         String key = payload.getDatasourceKey();
         return tx("seed.begin", () -> {
             DatasourceRegistrationPo resource = resources.lock(key);
             Optional<DataOperation> existing = find(key, "idempotency_key=? FOR UPDATE", idempotencyKey);
             if (existing.isPresent()) {
                 return new Admission(existing.get().requireFingerprint(payload.getFingerprint()), false);
+            }
+            if (retryOfOperationId != null) {
+                DataOperation previous = find(key, "id=? FOR UPDATE", retryOfOperationId)
+                        .orElseThrow(() -> new BizException(ResourceErrorCode.RESOURCE_NOT_FOUND));
+                if (previous.getResult().getStatus() != DataOperation.Status.FAILED) {
+                    throw new BizException(ResourceErrorCode.RESOURCE_BUSY);
+                }
+                previous.requireFingerprint(payload.getFingerprint());
             }
             requireResource(resource, null);
             if (resource.getDatasourceId() != datasourceId) {

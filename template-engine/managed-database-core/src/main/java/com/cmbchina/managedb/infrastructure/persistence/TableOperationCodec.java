@@ -208,6 +208,31 @@ public final class TableOperationCodec {
         }
     }
 
+    TableOperation restoreForReadProtection(TableOperationPo row) {
+        try {
+            TableOperation.Mode mode = mode(row.getActionType());
+            JsonNode names = mapper.readTree(row.getExecutionJson()).path("tableNames");
+            if (!names.isArray() || (mode != TableOperation.Mode.RELEASE && names.isEmpty())
+                    || (mode != TableOperation.Mode.CREATE_BATCH && mode != TableOperation.Mode.RELEASE && names.size() != 1)) {
+                throw new IllegalArgumentException();
+            }
+            for (JsonNode name : names) {
+                if (!name.isTextual()) {
+                    throw new IllegalArgumentException();
+                }
+            }
+        } catch (Exception e) {
+            PersistenceDiagnostics.failure("codec.readProtectionTargets", row.getId(), e);
+            return null;
+        }
+        try {
+            return restore(row);
+        } catch (BizException e) {
+            // Restore already logged the unreadable record. Keep its slot in the delta.
+            return null;
+        }
+    }
+
     /**
      * 限制持久化结果大小，异常不回显内容。
      */

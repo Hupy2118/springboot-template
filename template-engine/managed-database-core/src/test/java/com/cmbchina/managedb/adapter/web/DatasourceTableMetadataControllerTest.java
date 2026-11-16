@@ -99,6 +99,10 @@ class DatasourceTableMetadataControllerTest {
         doThrow(new BizException(ResourceErrorCode.DATABASE_UNAVAILABLE)).when(service).tables(APP);
         mvc.perform(get(BASE).servletPath(BASE).header("Authorization", "Bearer test-only-key"))
                 .andExpect(status().isServiceUnavailable());
+        when(service.columns(APP, "role")).thenThrow(new BizException(ResourceErrorCode.RESOURCE_BUSY));
+        String busyPath = BASE + "/role/columns";
+        mvc.perform(get(busyPath).servletPath(busyPath).header("Authorization", "Bearer test-only-key"))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.returnCode").value("RESOURCE_BUSY"));
         when(service.columns(APP, "missing")).thenThrow(new BizException(ResourceErrorCode.RESOURCE_NOT_FOUND));
         String path = BASE + "/missing/columns";
         mvc.perform(get(path).servletPath(path).header("Authorization", "Bearer test-only-key"))

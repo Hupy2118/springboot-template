@@ -20,8 +20,13 @@ public class AuthorizationSeedService {
     private final AuthorizationSeedPort database;
     private final TableTaskDispatcher dispatcher;
 
-    /** 先查原记录，新操作预检通过且管理事务提交后才调度。 */
     public DataOperationView.Receipt submit(String rawIdempotencyKey, AuthorizationSeedPayload payload) {
+        return submit(rawIdempotencyKey, payload, null);
+    }
+
+    /** 先查原记录，新操作预检通过且管理事务提交后才调度。 */
+    public DataOperationView.Receipt submit(String rawIdempotencyKey, AuthorizationSeedPayload payload,
+                                            Long retryOfOperationId) {
         String idempotencyKey = AuthorizationSeedPayload.requireIdempotencyKey(rawIdempotencyKey);
         String key = payload.getDatasourceKey();
         Optional<DataOperation> previous = repository.byKey(key, idempotencyKey);
@@ -32,7 +37,8 @@ public class AuthorizationSeedService {
             long datasourceId = repository.preflight(payload);
             database.preflight(datasourceId, payload);
             try (TableTaskDispatcher.Reservation slot = dispatcher.reserve()) {
-                DataOperationRepository.Admission admission = repository.begin(datasourceId, idempotencyKey, payload);
+                DataOperationRepository.Admission admission = repository.begin(
+                        datasourceId, idempotencyKey, payload, retryOfOperationId);
                 DataOperation operation = admission.getOperation();
                 if (admission.isCreated()) {
                     return dispatch(slot, operation, payload);

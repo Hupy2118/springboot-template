@@ -1,5 +1,7 @@
 package com.cmbchina.managedb.adapter.web;
 
+import com.cmb.bee.commons.exceptions.BizException;
+import com.cmbchina.managedb.domain.ResourceErrorCode;
 import com.cmbchina.managedb.adapter.web.application.DatasourceTableDataController;
 import com.cmbchina.managedb.adapter.web.security.ServiceKeyFilter;
 import com.cmbchina.managedb.application.DatasourceTableDataService;
@@ -17,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -68,7 +71,7 @@ class DatasourceTableDataControllerTest {
                         .content("{\"threadId\":\"t\",\"runId\":\"r\",\"messages\":[],\"forwardedProps\":" + props + "}"))
                 .andExpect(request().asyncStarted()).andExpect(header().string("Cache-Control", "no-store")).andReturn();
         String body = mvc.perform(asyncDispatch(pending)).andExpect(status().isOk())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM)).andReturn().getResponse().getContentAsString();
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM)).andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         List<JsonNode> result = new ArrayList<>();
         for (String line : body.split("\\r?\\n")) {
             if (line.startsWith("data:")) {
@@ -106,6 +109,21 @@ class DatasourceTableDataControllerTest {
         assertEquals(0, payload.path("rows").size());
         assertFalse(payload.path("filteringSupported").asBoolean());
         assertTrue(result.stream().anyMatch(event -> "TABLE_DATA_RESULT".equals(event.path("name").asText())));
+    }
+
+    @Test
+    void busyTableEmitsOnlyTheExistingErrorPayload() throws Exception {
+        when(service.query(eq(APP), eq(TABLE), any())).thenThrow(new BizException(ResourceErrorCode.RESOURCE_BUSY));
+        List<JsonNode> result = events("{\"action\":\"QUERY\"}");
+        JsonNode failure = result.stream().filter(event -> "TABLE_DATA_ERROR".equals(event.path("name").asText()))
+                .findFirst().orElseThrow(AssertionError::new);
+        assertEquals("CUSTOM", failure.path("type").asText());
+        JsonNode payload = failure.path("value");
+        assertEquals("RESOURCE_BUSY", payload.path("code").asText());
+        assertEquals(ResourceErrorCode.RESOURCE_BUSY.getErrorMessage(), payload.path("message").asText());
+        assertEquals(payload, result.get(result.size() - 1).path("result"));
+        assertTrue(result.stream().anyMatch(event -> payload.equals(event.path("snapshot").path("tableData"))));
+        assertFalse(result.stream().anyMatch(event -> "TABLE_DATA_RESULT".equals(event.path("name").asText())));
     }
 
     /**

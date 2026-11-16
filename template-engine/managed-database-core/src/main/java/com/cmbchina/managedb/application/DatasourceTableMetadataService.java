@@ -3,7 +3,6 @@ package com.cmbchina.managedb.application;
 import com.cmb.bee.commons.exceptions.BizException;
 import com.cmbchina.managedb.application.view.DatasourceTablesView;
 import com.cmbchina.managedb.application.view.TableColumnsView;
-import com.cmbchina.managedb.domain.CheckContext;
 import com.cmbchina.managedb.domain.DatabaseSchemaPort;
 import com.cmbchina.managedb.domain.DatasourceResource;
 import com.cmbchina.managedb.domain.ResourceErrorCode;
@@ -15,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -27,26 +27,34 @@ import java.util.Optional;
 public class DatasourceTableMetadataService {
     private final TableOperationRepository repository;
     private final DatabaseSchemaPort schemas;
+    private final TableReadConflictGuard guard;
 
     /**
      * 只返回已确认建成且真实存在的应用表；数据库读取失败不能伪装为空清单。
      */
     public DatasourceTablesView tables(String rawDatasourceKey) {
         String datasourceKey = new DatasourceKey(rawDatasourceKey).getValue();
-        CheckContext before = available(datasourceKey);
-        DatasourceResource resource = before.getResource();
+        TableReadConflictGuard.Check before = guard.before(datasourceKey);
+        before.requireClear(Collections.emptySet());
+        DatasourceResource resource = before.resource();
         List<TableMetadata> result = new ArrayList<>();
         for (TableBinding binding : repository.bindings(datasourceKey)) {
             if (binding.isDeleted() || binding.getStatus() != TableBinding.Status.CREATED) {
                 continue;
             }
             binding.requireOwner(datasourceKey, resource.getDatasourceId());
-            Optional<TableMetadata> actual = schemas.readTableMetadata(resource.getDatasourceId(), binding.getTableName());
+            String name = schemas.tableKey(resource.getDatasourceId(), binding.getTableName());
+            if (before.getAffected().contains(name)) {
+                continue;
+            }
+            Optional<TableMetadata> actual = schemas.readTableMetadata(resource.getDatasourceId(), name);
             if (actual.isPresent()) {
                 result.add(actual.get());
             }
         }
-        requireStable(datasourceKey, before);
+        TableReadConflictGuard.Check after = guard.after(before);
+        after.requireClear(Collections.emptySet());
+        result.removeIf(table -> after.getAffected().contains(table.getTableName()));
         result.sort(Comparator.comparing(TableMetadata::getTableName));
         return new DatasourceTablesView(datasourceKey, result);
     }
@@ -56,38 +64,17 @@ public class DatasourceTableMetadataService {
      */
     public TableColumnsView columns(String rawDatasourceKey, String rawTableName) {
         String datasourceKey = new DatasourceKey(rawDatasourceKey).getValue();
-        CheckContext before = available(datasourceKey);
-        DatasourceResource resource = before.getResource();
+        TableReadConflictGuard.Check before = guard.before(datasourceKey);
+        before.requireClear(Collections.emptySet());
+        DatasourceResource resource = before.resource();
         String name = schemas.tableKey(resource.getDatasourceId(), rawTableName);
-        requireReadableBinding(resource, name);
-        TableMetadata actual =
-                schemas.readTableMetadata(resource.getDatasourceId(), name).orElseThrow(() -> new BizException(ResourceErrorCode.RESOURCE_NOT_FOUND));
-        requireStable(datasourceKey, before);
-        requireReadableBinding(resource, name);
-        return new TableColumnsView(datasourceKey, actual);
-    }
-
-    /**
-     * 资源必须有效且无 RUNNING/UNKNOWN 占用，不返回重建过程中的半成品。
-     */
-    private CheckContext available(String datasourceKey) {
-        CheckContext context = repository.checkContext(datasourceKey);
-        context.getResource().requireActive();
-        if (context.getResource().getActiveOperationId() != null) {
-            throw new BizException(ResourceErrorCode.RESOURCE_BUSY);
-        }
-        return context;
-    }
-
-    /**
-     * 读取结束时核对应用位置与操作数，检查期间有变更就要求重新查询。
-     */
-    private void requireStable(String datasourceKey, CheckContext before) {
-        CheckContext after = available(datasourceKey);
-        if (before.getOperationCount() != after.getOperationCount() || before.getResource().getDatasourceId() != after.getResource()
-                .getDatasourceId()) {
-            throw new BizException(ResourceErrorCode.RESOURCE_BUSY);
-        }
+        return guard.readTable(before, name, () -> {
+            requireReadableBinding(resource, name);
+            TableMetadata actual = schemas.readTableMetadata(resource.getDatasourceId(), name)
+                    .orElseThrow(() -> new BizException(ResourceErrorCode.RESOURCE_NOT_FOUND));
+            requireReadableBinding(resource, name);
+            return new TableColumnsView(datasourceKey, actual);
+        });
     }
 
     /**

@@ -1,0 +1,11 @@
+{
+  "purpose": "AUTHORIZATION_SEED_V1",
+  "idempotencyKey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "retryOfOperationId": "12345",
+  "tables": [
+    {"tableName":"12ab34cd56ef_role","rows":[{"role_id":"SYSTEM_ADMIN","role_name":"管理员","description":"系统角色","enable":1,"is_system":1,"is_deleted":0,"created_by":"SYSTEM"}]},
+    {"tableName":"12ab34cd56ef_resource","rows":[{"key":"system_authorization_management","name":"权限管理","description":"系统资源","origin":"system","type":"system","target_resource_ref":"system:authorization_management"}]},
+    {"tableName":"12ab34cd56ef_role_resource","rows":[{"role_id":"SYSTEM_ADMIN","resource_key":"system_authorization_management","created_by":"SYSTEM"}]},
+    {"tableName":"12ab34cd56ef_role_member","rows":[{"role_id":"SYSTEM_ADMIN","member_id":"00123456","member_name":"测试人员","created_by":"SYSTEM"}]}
+  ]
+}

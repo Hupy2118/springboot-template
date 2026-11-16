@@ -1,5 +1,6 @@
 package com.cmbchina.managedb.domain.repository;
 
+import com.cmbchina.managedb.domain.ReadOperationSnapshot;
 import com.cmbchina.managedb.domain.Actor;
 import com.cmbchina.managedb.domain.CheckContext;
 import com.cmbchina.managedb.domain.TableBinding;
@@ -26,6 +27,11 @@ public interface TableOperationRepository {
      * 读取应用及全部保留操作数。
      */
     CheckContext checkContext(String datasourceKey);
+
+    /**
+     * 读取同一事务快照。marker 非空时包含该 ID 之后的有界保留记录。
+     */
+    ReadOperationSnapshot readOperationSnapshot(String datasourceKey, Long marker);
 
     /**
      * 查位置归属，包含软删除。

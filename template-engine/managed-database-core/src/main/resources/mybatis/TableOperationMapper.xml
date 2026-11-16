@@ -47,6 +47,22 @@
         WHERE datasource_key = #{datasourceKey}
     </select>
 
+    <select id="maxIdByDatasourceKey" resultType="long">
+        SELECT COALESCE(MAX(id), 0)
+        FROM md_database_operation
+        WHERE datasource_key = #{datasourceKey}
+    </select>
+
+    <select id="selectAfterId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM md_database_operation
+        WHERE datasource_key = #{datasourceKey}
+        AND id &gt; #{marker}
+        ORDER BY id ASC
+        LIMIT #{limit}
+    </select>
+
     <select id="selectRecentByDatasourceKey" resultMap="BaseResultMap">
         SELECT
         <include refid="Base_Column_List"/>

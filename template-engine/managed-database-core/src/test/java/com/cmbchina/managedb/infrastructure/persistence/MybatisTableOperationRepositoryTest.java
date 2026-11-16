@@ -6,6 +6,7 @@ import com.cmbchina.managedb.domain.Actor;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.incrementer.IdentifierGenerator;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.cmbchina.managedb.domain.ReadOperationSnapshot;
 import com.cmbchina.managedb.domain.ResourceErrorCode;
 import com.cmbchina.managedb.domain.TableBinding;
 import com.cmbchina.managedb.domain.TableOperation;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.TransactionSystemException;
 
@@ -34,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -125,6 +128,65 @@ class MybatisTableOperationRepositoryTest {
         table.setDeleted(0);
         when(tables.lock(1L, "orders")).thenReturn(table);
         when(operations.lock(APP, 101L)).thenReturn(stored);
+    }
+
+    @Test
+    void readsActiveOperationAndSoftDeletedDeltaInSeparateReadOnlySnapshots() {
+        when(resources.selectByDatasourceKey(APP)).thenReturn(application);
+        application.setActiveOperationId(101L);
+        stored.setDeleted(0);
+        when(operations.countByDatasourceKey(APP)).thenReturn(1L, 2L);
+        when(operations.maxIdByDatasourceKey(APP)).thenReturn(101L, 102L);
+        when(operations.selectByDatasourceKeyAndId(APP, 101L)).thenReturn(stored);
+        ReadOperationSnapshot before = repository.readOperationSnapshot(APP, null);
+        assertEquals(1L, before.getOperationCount());
+        assertEquals(101L, before.getMaxId());
+        assertEquals(101L, before.getActiveOperation().getId());
+        assertTrue(before.getOperationsSinceMarker().isEmpty());
+
+        application.setActiveOperationId(null);
+        stored.setId(102L);
+        stored.setDeleted(1);
+        stored.setStatus("FAILED");
+        when(operations.selectAfterId(eq(APP), eq(101L), anyInt())).thenReturn(Collections.singletonList(stored));
+        ReadOperationSnapshot after = repository.readOperationSnapshot(APP, before.getMaxId());
+        assertEquals(2L, after.getOperationCount());
+        assertEquals(102L, after.getMaxId());
+        assertNull(after.getActiveOperation());
+        assertEquals(102L, after.getOperationsSinceMarker().get(0).getId());
+
+        ArgumentCaptor<TransactionDefinition> definition = ArgumentCaptor.forClass(TransactionDefinition.class);
+        org.mockito.InOrder order = inOrder(transactions, resources, operations, tables);
+        order.verify(transactions).getTransaction(definition.capture());
+        order.verify(resources).selectByDatasourceKey(APP);
+        order.verify(operations).countByDatasourceKey(APP);
+        order.verify(operations).maxIdByDatasourceKey(APP);
+        order.verify(operations).selectByDatasourceKeyAndId(APP, 101L);
+        order.verify(transactions).commit(any());
+        order.verify(transactions).getTransaction(definition.capture());
+        order.verify(resources).selectByDatasourceKey(APP);
+        order.verify(operations).countByDatasourceKey(APP);
+        order.verify(operations).maxIdByDatasourceKey(APP);
+        order.verify(operations).selectAfterId(APP, 101L, 100);
+        order.verify(transactions).commit(any());
+        for (TransactionDefinition tx : definition.getAllValues()) {
+            assertTrue(tx.isReadOnly());
+            assertEquals(TransactionDefinition.PROPAGATION_REQUIRES_NEW, tx.getPropagationBehavior());
+            assertEquals(TransactionDefinition.ISOLATION_REPEATABLE_READ, tx.getIsolationLevel());
+        }
+        org.mockito.Mockito.verifyNoMoreInteractions(transactions, resources, operations, tables);
+    }
+
+    @Test
+    void keepsMalformedSingleTargetRecordUnresolved() {
+        when(resources.selectByDatasourceKey(APP)).thenReturn(application);
+        application.setActiveOperationId(101L);
+        when(operations.countByDatasourceKey(APP)).thenReturn(1L);
+        when(operations.maxIdByDatasourceKey(APP)).thenReturn(101L);
+        stored.setDeleted(0);
+        stored.setExecutionJson(stored.getExecutionJson().replace("[\"orders\"]", "[\"orders\",\"role\"]"));
+        when(operations.selectByDatasourceKeyAndId(APP, 101L)).thenReturn(stored);
+        assertNull(repository.readOperationSnapshot(APP, null).getActiveOperation());
     }
 
     /**

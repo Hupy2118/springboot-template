@@ -22,6 +22,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.*;
 
@@ -31,9 +32,9 @@ import static org.junit.jupiter.api.Assertions.*;
 /** 隔离管理库已手工部署四张表时，验证真实资源锁、唯一受理和未知占用。 */
 @EnabledIfEnvironmentVariable(named = "MANAGED_DB_SEED_TEST_MANAGEMENT_JDBC_URL", matches = ".+")
 class DataOperationMysqlTest {
-    /** 并发两连接争抢同键，只返回一个新操作；DDL 使用同一占用更新条件。 */
+    /** 并发重试只创建一个新操作，保留旧失败审计和未知占用。 */
     @Test
-    void serializesSameKeyAndRetainsUnknownAcrossRepositoryInstances() throws Exception {
+    void serializesRetryAndRetainsFailedAuditAndUnknownClaim() throws Exception {
         String key = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         AuthorizationSeedPayload payload = parse(key, json(key));
         AbstractDataSource dataSource = new AbstractDataSource() {
@@ -79,14 +80,42 @@ class DataOperationMysqlTest {
                 jdbc.update("INSERT INTO md_datasource_table(id,datasource_key,datasource_id,table_name,status) VALUES (?,?,1,?,'CREATED')",
                         ids.nextId(null), key, table);
             }
+            DataOperation original = first.begin(1, IDEMPOTENCY_KEY, payload).getOperation();
+            assertEquals(ResourceErrorCode.RESOURCE_BUSY, assertThrows(BizException.class,
+                    () -> second.begin(1, RETRY_KEY, payload, original.getId())).getErrorCode());
+            first.finish(original, DataOperation.Result.failed(ResourceErrorCode.SEED_DATA_CONFLICT));
+            String auditQuery = "SELECT status,result_json,completed_at FROM md_data_operation WHERE id=?";
+            Map<String, Object> failedAudit = jdbc.queryForMap(auditQuery, original.getId());
+            assertEquals("FAILED", failedAudit.get("status"));
+            assertNotNull(failedAudit.get("result_json"));
+            assertNotNull(failedAudit.get("completed_at"));
+
+            assertEquals(ResourceErrorCode.RESOURCE_NOT_FOUND, assertThrows(BizException.class,
+                    () -> second.begin(1, RETRY_KEY, payload, Long.MAX_VALUE)).getErrorCode());
+            AuthorizationSeedPayload otherDatasource = parse(KEY, json(KEY));
+            assertEquals(ResourceErrorCode.RESOURCE_NOT_FOUND, assertThrows(BizException.class,
+                    () -> second.begin(1, RETRY_KEY, otherDatasource, original.getId())).getErrorCode());
+            AuthorizationSeedPayload changed = parse(key, json(key).replace(SUBJECT, "other-fixture"));
+            assertEquals(ResourceErrorCode.IDEMPOTENCY_CONFLICT, assertThrows(BizException.class,
+                    () -> second.begin(1, RETRY_KEY, changed, original.getId())).getErrorCode());
+            assertFalse(second.byKey(key, RETRY_KEY).isPresent());
+            assertEquals(original.getId(), second.begin(1, IDEMPOTENCY_KEY, payload, Long.MAX_VALUE).getOperation().getId());
+
+            String completedKey = RETRY_KEY.substring(1) + "c";
+            DataOperation completed = first.begin(1, completedKey, payload).getOperation();
+            first.finish(completed, DataOperation.Result.committed(5, 0));
+            assertEquals(ResourceErrorCode.RESOURCE_BUSY, assertThrows(BizException.class,
+                    () -> second.begin(1, RETRY_KEY, payload, completed.getId())).getErrorCode());
+            assertFalse(second.byKey(key, RETRY_KEY).isPresent());
+
             CountDownLatch start = new CountDownLatch(1);
             Future<DataOperationRepository.Admission> left = workers.submit(() -> {
                 start.await();
-                return first.begin(1, IDEMPOTENCY_KEY, payload);
+                return first.begin(1, RETRY_KEY, payload, original.getId());
             });
             Future<DataOperationRepository.Admission> right = workers.submit(() -> {
                 start.await();
-                return second.begin(1, IDEMPOTENCY_KEY, payload);
+                return second.begin(1, RETRY_KEY, payload, original.getId());
             });
             start.countDown();
             DataOperationRepository.Admission a = left.get(15, TimeUnit.SECONDS);
@@ -94,8 +123,17 @@ class DataOperationMysqlTest {
             assertNotEquals(a.isCreated(), b.isCreated());
             DataOperation operation = a.getOperation();
             assertEquals(operation.getId(), b.getOperation().getId());
+            assertNotEquals(original.getId(), operation.getId());
+            assertEquals(Long.valueOf(operation.getId()), jdbc.queryForObject(
+                    "SELECT active_operation_id FROM md_datasource_resource WHERE datasource_key=?", Long.class, key));
+            assertEquals(Integer.valueOf(1), jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM md_data_operation WHERE datasource_key=? AND idempotency_key=?", Integer.class, key, RETRY_KEY));
             assertEquals(ResourceErrorCode.IDEMPOTENCY_CONFLICT, assertThrows(BizException.class,
-                    () -> second.begin(1, IDEMPOTENCY_KEY, parse(key, json(key).replace(SUBJECT, "other-fixture")))).getErrorCode());
+                    () -> second.begin(1, RETRY_KEY, changed, Long.MAX_VALUE)).getErrorCode());
+            String nextKey = RETRY_KEY.substring(1) + "d";
+            assertEquals(ResourceErrorCode.RESOURCE_BUSY, assertThrows(BizException.class,
+                    () -> second.begin(1, nextKey, payload, original.getId())).getErrorCode());
+            assertFalse(second.byKey(key, nextKey).isPresent());
 
             TransactionTemplate ddl = new TransactionTemplate(manager);
             Integer ddlClaim = ddl.execute(status -> {
@@ -104,9 +142,16 @@ class DataOperationMysqlTest {
             });
             assertEquals(Integer.valueOf(0), ddlClaim);
             first.finish(operation, DataOperation.Result.unknown());
-            assertEquals(DataOperation.Status.UNKNOWN, second.byKey(key, IDEMPOTENCY_KEY).get().getResult().getStatus());
+            assertEquals(ResourceErrorCode.RESOURCE_BUSY, assertThrows(BizException.class,
+                    () -> second.begin(1, nextKey, payload, operation.getId())).getErrorCode());
+            assertFalse(second.byKey(key, nextKey).isPresent());
+            DataOperationRepository.Admission replay = second.begin(1, RETRY_KEY, payload, Long.MAX_VALUE);
+            assertFalse(replay.isCreated());
+            assertEquals(operation.getId(), replay.getOperation().getId());
+            assertEquals(DataOperation.Status.UNKNOWN, replay.getOperation().getResult().getStatus());
             assertEquals(Long.valueOf(operation.getId()), jdbc.queryForObject(
                     "SELECT active_operation_id FROM md_datasource_resource WHERE datasource_key=?", Long.class, key));
+            assertEquals(failedAudit, jdbc.queryForMap(auditQuery, original.getId()));
         } finally {
             workers.shutdownNow();
             jdbc.update("DELETE FROM md_data_operation WHERE datasource_key=?", key);

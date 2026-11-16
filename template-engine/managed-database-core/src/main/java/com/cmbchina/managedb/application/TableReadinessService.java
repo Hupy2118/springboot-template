@@ -2,12 +2,12 @@ package com.cmbchina.managedb.application;
 
 import com.cmb.bee.commons.exceptions.BizException;
 import com.cmbchina.managedb.application.view.TableReadinessView;
-import com.cmbchina.managedb.domain.CheckContext;
 import com.cmbchina.managedb.domain.DatabaseSchemaPort;
 import com.cmbchina.managedb.domain.DatasourceResource;
 import com.cmbchina.managedb.domain.ResourceErrorCode;
 import com.cmbchina.managedb.domain.StructureDifference;
 import com.cmbchina.managedb.domain.TableBinding;
+import com.cmbchina.managedb.domain.TableOperation;
 import com.cmbchina.managedb.domain.TableStructure;
 import com.cmbchina.managedb.domain.TableStructureComparator;
 import com.cmbchina.managedb.domain.TableSyncSettings;
@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 启动检查只读，当前全模型由 Studio 提供，历史成功不等于当前同步。
@@ -34,6 +35,7 @@ public class TableReadinessService {
     private final TableSqlSupport support;
     private final TableStructureComparator comparator;
     private final TableSyncSettings settings;
+    private final TableReadConflictGuard guard;
 
     /**
      * 前后使用新快照检测受理写入，不锁管理行等待元数据。
@@ -41,23 +43,24 @@ public class TableReadinessService {
     public TableReadinessView check(String rawDatasourceKey, List<String> sqls) {
         String datasourceKey = new DatasourceKey(rawDatasourceKey).getValue();
         settings.validateList(sqls);
-        CheckContext before = repository.checkContext(datasourceKey);
-        DatasourceResource resource = before.getResource();
-        resource.requireActive();
-        if (resource.getActiveOperationId() != null) {
+        TableReadConflictGuard.Check before = guard.before(datasourceKey);
+        DatasourceResource resource = before.resource();
+        if (before.isGlobal()) {
             return busy(before, "OPERATION_IN_PROGRESS");
         }
         List<TableStructure> expected = parseDistinct(sqls, resource);
+        Set<String> names = expected.stream().map(TableStructure::getTableName).collect(Collectors.toSet());
+        if (before.conflicts(names)) {
+            return busy(before, "OPERATION_IN_PROGRESS");
+        }
         List<TableReadinessView.Entry> entries = new ArrayList<>();
         boolean ready = collectEntries(datasourceKey, resource, expected, entries);
-        List<String> extra = extraCreatedTables(datasourceKey, expected);
-        CheckContext after = repository.checkContext(datasourceKey);
-        after.getResource().requireActive();
-        if (after.getResource().getActiveOperationId() != null
-                || before.getOperationCount() != after.getOperationCount()
-                || resource.getDatasourceId() != after.getResource().getDatasourceId()) {
+        List<String> extra = extraCreatedTables(resource, names);
+        TableReadConflictGuard.Check after = guard.after(before);
+        if (after.conflicts(names)) {
             return busy(after, "CHECK_CHANGED");
         }
+        extra.removeIf(after.getAffected()::contains);
         return new TableReadinessView(ready, resource.getDatasourceId(), null, null, null, entries, extra);
     }
 
@@ -121,15 +124,16 @@ public class TableReadinessService {
     /**
      * 找出已建成但不在本次模型内的额外受管表。
      */
-    private List<String> extraCreatedTables(String datasourceKey, List<TableStructure> expected) {
-        Set<String> names = new HashSet<>();
-        for (TableStructure structure : expected) {
-            names.add(structure.getTableName());
-        }
+    private List<String> extraCreatedTables(DatasourceResource resource, Set<String> expected) {
+        String datasourceKey = resource.getDatasourceKey().getValue();
         List<String> extra = new ArrayList<>();
         for (TableBinding table : repository.bindings(datasourceKey)) {
-            if (table.getStatus() == TableBinding.Status.CREATED && !names.contains(table.getTableName())) {
-                extra.add(table.getTableName());
+            if (!table.isDeleted() && table.getStatus() == TableBinding.Status.CREATED) {
+                table.requireOwner(datasourceKey, resource.getDatasourceId());
+                String name = schemas.tableKey(resource.getDatasourceId(), table.getTableName());
+                if (!expected.contains(name)) {
+                    extra.add(name);
+                }
             }
         }
         return extra;
@@ -138,12 +142,12 @@ public class TableReadinessService {
     /**
      * 占用或检查期间出现写入时不伪造逐表成功。
      */
-    private TableReadinessView busy(CheckContext context, String reason) {
-        Long id = context.getResource().getActiveOperationId();
+    private TableReadinessView busy(TableReadConflictGuard.Check check, String reason) {
+        Long id = check.resource().getActiveOperationId();
+        TableOperation active = check.getSnapshot().getActiveOperation();
         String status = id == null ? null
-                : repository.detail(context.getResource().getDatasourceKey().getValue(), id)
-                .map(op -> op.getStatus().name()).orElse("RUNNING");
-        return new TableReadinessView(false, context.getResource().getDatasourceId(), reason,
+                : active != null && active.getId() == id && active.getStatus() != null ? active.getStatus().name() : "RUNNING";
+        return new TableReadinessView(false, check.resource().getDatasourceId(), reason,
                 id == null ? null : Long.toString(id), status, Collections.emptyList(), Collections.emptyList());
     }
 }

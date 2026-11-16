@@ -5,6 +5,7 @@ import com.cmbchina.managedb.domain.Actor;
 
 import com.cmbchina.managedb.application.view.TableOperationReceipt;
 import com.cmbchina.managedb.application.view.TableReadinessView;
+import com.cmbchina.managedb.domain.ReadOperationSnapshot;
 import com.cmbchina.managedb.domain.CheckContext;
 import com.cmbchina.managedb.domain.DatabaseSchemaPort;
 import com.cmbchina.managedb.domain.DatasourceResource;
@@ -89,6 +90,12 @@ class TableSynchronizationTest {
         resource = DatasourceResource.register(new DatasourceKey(APP), 1L, null, "注册测试", Actor.system());
         when(repository.nextId()).thenReturn(101L);
         when(repository.checkContext(APP)).thenAnswer(a -> new CheckContext(resource, count));
+        when(repository.readOperationSnapshot(eq(APP), org.mockito.ArgumentMatchers.nullable(Long.class))).thenAnswer(a -> {
+            Long marker = a.getArgument(1);
+            long maxId = stored == null ? 0 : stored.getId();
+            return new ReadOperationSnapshot(resource, count, maxId, resource.getActiveOperationId() == null ? null : stored,
+                    marker != null && maxId > marker ? Collections.singletonList(stored) : Collections.emptyList());
+        });
         when(repository.binding(eq(1L), anyString())).thenAnswer(a -> Optional.ofNullable(bindings.get(a.getArgument(1))));
         when(repository.bindings(APP)).thenAnswer(a -> new ArrayList<>(bindings.values()));
         when(repository.detail(APP, 101L)).thenAnswer(a -> Optional.ofNullable(stored == null ? null : copy(stored)));
@@ -136,7 +143,7 @@ class TableSynchronizationTest {
         TableSqlSupport support = new TableSqlSupport(schemas, repository, settings);
         TableStructureComparator comparator = new TableStructureComparator();
         operations = new TableOperationService(repository, schemas, support, comparator, dispatcher);
-        readiness = new TableReadinessService(repository, schemas, support, comparator, settings);
+        readiness = new TableReadinessService(repository, schemas, support, comparator, settings, new TableReadConflictGuard(repository, schemas));
     }
 
     /**
@@ -485,10 +492,57 @@ class TableSynchronizationTest {
     @Test
     void concurrentAcceptanceInvalidatesCheck() {
         ownedTable();
-        when(repository.checkContext(APP)).thenReturn(new CheckContext(resource, 0L), new CheckContext(resource, 1L));
+        when(schemas.readTable(1L, "orders")).thenAnswer(call -> {
+            TableOperation completed = TableOperation.start(101L, APP, 1L, "orders", SQL, TableOperation.Mode.CREATE, true, Actor.system());
+            completed.markRunning(0);
+            completed.complete(0, TableOperation.StepStatus.SUCCEEDED, null, Collections.emptyMap());
+            completed.finish(TableOperation.Status.SUCCEEDED, null);
+            stored = completed;
+            count = 1;
+            return Optional.of(physical.get("orders"));
+        });
         TableReadinessView result = readiness.check(APP, Collections.singletonList(SQL));
         assertFalse(result.isReady());
         assertEquals("CHECK_CHANGED", result.getReason());
+    }
+
+    @Test
+    void readinessFiltersPartialBatchAndKeepsBusyContractForExpectedTargets() {
+        ownedTable();
+        stored = TableOperation.startBatch(101L, APP, 1L, Arrays.asList("role", "resource", "role_resource", "role_member"),
+                Collections.nCopies(4, "CREATE TABLE"), Collections.nCopies(4, false), null, null);
+        resource.claim(101L);
+        count = 1;
+        bindings.put("role", new TableBinding(APP, 1L, "role", TableBinding.Status.CREATED, false));
+        bindings.put("department", new TableBinding(APP, 1L, "department", TableBinding.Status.CREATED, false));
+
+        TableReadinessView result = readiness.check(APP, Collections.singletonList(SQL));
+        assertTrue(result.isReady());
+        assertEquals("SYNCED", result.getTables().get(0).getStatus());
+        assertEquals(Collections.singletonList("department"), result.getExtraTables());
+        TableReadinessView busy = readiness.check(APP, Collections.singletonList(SQL.replace("orders", "role")));
+        assertFalse(busy.isReady());
+        assertEquals("OPERATION_IN_PROGRESS", busy.getReason());
+        assertEquals("101", busy.getOperationId());
+        assertEquals("RUNNING", busy.getOperationStatus());
+        assertTrue(busy.getExtraTables().isEmpty());
+    }
+
+    @Test
+    void readinessDropsExtraTableChangedDuringCheck() {
+        ownedTable();
+        bindings.put("role", new TableBinding(APP, 1L, "role", TableBinding.Status.CREATED, false));
+        when(schemas.readTable(1L, "orders")).thenAnswer(call -> {
+            stored = TableOperation.cleanup(101L, APP, 1L, TableOperation.Mode.DROP, Collections.singletonList("role"), Actor.system());
+            stored.markRunning(0);
+            stored.complete(0, TableOperation.StepStatus.SUCCEEDED, null, Collections.emptyMap());
+            stored.finish(TableOperation.Status.SUCCEEDED, null);
+            count = 1;
+            return Optional.of(physical.get("orders"));
+        });
+        TableReadinessView result = readiness.check(APP, Collections.singletonList(SQL));
+        assertTrue(result.isReady());
+        assertTrue(result.getExtraTables().isEmpty());
     }
 
     /**
