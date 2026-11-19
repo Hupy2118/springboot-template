@@ -16,6 +16,8 @@ def touch(root, relative, content="text\n"):
     path = root / relative
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+    if path.name == "extension.yaml" and path.parent.name in ("login", "authorization"):
+        (path.parent / "AGENTS.fragment.md").write_text("## Fixture\n", encoding="utf-8")
     return path
 
 
@@ -61,6 +63,8 @@ class CodeTemplateReleaseInputsTest(unittest.TestCase):
             self.assertIn("template-source/code/backend/extensions/authorization/sql/authorization/schema.sql", inputs)
             self.assertIn("template-source/code/backend/extensions/login/migrations/001.sql", inputs)
             self.assertEqual(sorted(inputs), inputs)
+            self.assertIn("template-source/code/frontend/extensions/login/AGENTS.fragment.md", inputs)
+            self.assertIn("template-source/code/backend/extensions/authorization/AGENTS.fragment.md", inputs)
 
     def test_sql_rejects_symlinks_binary_and_non_utf8_inputs(self):
         for invalid in ("symlink", b"\x00", b"\xff"):
@@ -97,6 +101,11 @@ class CodeTemplateReleaseInputsTest(unittest.TestCase):
             with patch.object(gate, "SCRIPT_DIR", repository / "scripts/ci"), patch.object(sys, "argv", ["gate", "HEAD"]):
                 gate.main()
                 ddl.write_text("CREATE TABLE test(id bigint);\n", encoding="utf-8")
+                with self.assertRaisesRegex(SystemExit, "did not strictly increase"):
+                    gate.main()
+                ddl.write_text("CREATE TABLE test(id int);\n", encoding="utf-8")
+                fragment = root / "code/backend/extensions/authorization/AGENTS.fragment.md"
+                fragment.write_text("## Changed capability rules\n", encoding="utf-8")
                 with self.assertRaisesRegex(SystemExit, "did not strictly increase"):
                     gate.main()
                 revision.write_text("2026.10.23.2\n", encoding="utf-8")

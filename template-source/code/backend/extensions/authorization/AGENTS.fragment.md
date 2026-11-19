@@ -1,8 +1,9 @@
-# Authorization 后端能力
+<!-- DEVAGENTSTUDIO:CAPABILITY:authorization:BEGIN -->
+## Authorization 后端能力
 
-本文件仅在 Authorization Capability 启用时生成。Authorization 依赖 Login；当前用户身份由 Login 的请求上下文提供。
+本章节仅在 Authorization Capability 启用时组合。Authorization 依赖 Login；当前用户身份由 Login 的请求上下文提供。
 
-## 注入内容
+### 注入内容
 
 - 授权管理 Controller、Application Service、DTO/Assembler、领域实体与 Repository，以及 MyBatis Mapper、PO、XML 和实现类均位于 `com.cmbchina.backend.auth` 下。
 - `RequireAnyResource` 可标注在 Controller 类或方法上，声明当前用户至少需要拥有的一个资源键。
@@ -13,11 +14,11 @@
 - 当前权限 MVC 类是 `com.cmbchina.backend.common.config.WebMvcConfiguration`。权限测试需要 Bee 私有 Maven 依赖。Template Service 不执行数据库操作。
 - V4 首次启用以 ADD_FILE 交付资产并保留 ENSURE_CAPABILITY_CONFIG。已安装权限不会自动升级或修补缺失资产，必须另行执行经过所有权检查的安全修复。
 
-## 维护边界
+### 维护边界
 
 资源键、角色、成员关系和权限校验属于本 Capability。业务接口需要权限保护时使用 `RequireAnyResource`，不要自行实现平行的 Cookie、角色或资源校验机制。
 
-## 关联表主键与存量迁移
+### 关联表主键与存量迁移
 
 自 Template Revision `2026.11.03.1` 起，`role_resource` 与 `role_member` 使用数据库自增 `INT` 主键 `id`。
 业务关系仍由 `(role_id, resource_key)` 和 `(role_id, member_id)` 唯一约束标识；接口不暴露关系记录 id，批量插入省略 id，由数据库生成。
@@ -38,3 +39,6 @@ ALTER TABLE `role_member`
 两条 DDL 不构成原子事务；若部分成功，核对后只处理未完成的表。迁移后用 `SHOW CREATE TABLE` 确认 id 定义与原业务唯一索引，
 再部署对应代码并执行真实 Bootstrap、角色成员及资源绑定/解绑验收。新增 id 不会修复业务重复关系，也不提供业务排序语义。
 V4 不会升级已安装的 Authorization，存量生成工程须由调用方同步相关源码/XML 和数据库迁移。
+
+`auth/domain/constant/AuthConstants.java` 的 `DEVAGENTSTUDIO_AUTH_CONSTANTS_START/END` 是业务资源常量注册点；保留边界与系统管理常量，避免覆盖能力代码。
+<!-- DEVAGENTSTUDIO:CAPABILITY:authorization:END -->

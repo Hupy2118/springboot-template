@@ -42,7 +42,11 @@ class SqlAssetSyncTest {
         Files.write(root.resolve("workspace/" + SQL), changed);
         assertTrue(WorkspaceStatus.scan(root, state).modified.contains(SQL));
         assertEquals(root.resolve("extensions/authorization/" + SQL), WorkspaceStatus.source(root, state.owners.get(SQL), SQL));
+        byte[] baseAgents = Files.readAllBytes(root.resolve("base/AGENTS.md"));
+        Files.write(root.resolve("workspace/AGENTS.md"), "# User edit must not leak into Base\n".getBytes(StandardCharsets.UTF_8));
         new WorkspaceSync(root).sync("authorization");
+        assertArrayEquals(baseAgents, Files.readAllBytes(root.resolve("base/AGENTS.md")));
+        assertEquals("generator", state.owners.get("AGENTS.md"));
         assertArrayEquals(changed, Files.readAllBytes(root.resolve("extensions/authorization/" + SQL)));
         assertArrayEquals(base, Files.readAllBytes(root.resolve("base/pom.xml")));
         assertArrayEquals(login, Files.readAllBytes(root.resolve("extensions/login/extension.yaml")));

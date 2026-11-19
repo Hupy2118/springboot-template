@@ -114,6 +114,8 @@ class V3UpdatePlannerTest {
     @Test
     void releaseRefreshAddsOnlyNewArtifactsPreservesInstalledContentAndNeverDeletesRemovedArtifacts() throws Exception {
         Path r1Root = temporary.resolve("r1/code"); copyRuntime(codeRoot(), r1Root); writeRevision(r1Root, "2026.09.20.1");
+        Files.createDirectories(r1Root.resolve("backend/extensions/authorization/docs"));
+        Files.write(r1Root.resolve("backend/extensions/authorization/docs/authorization.md"), "Historical capability guide\n".getBytes(StandardCharsets.UTF_8));
         CodeTemplateRelease r1 = new CodeTemplateReleaseLoader(r1Root).load();
         Map<String, Object> requested = requested("authorization", Collections.<String, Object>emptyMap());
         ResolvedExtensions r1Resolved = new ExtensionResolver(r1).resolve(requested);

@@ -101,6 +101,9 @@ def runtime_files(code):
             require(extension.is_dir() and not extension.is_symlink(), 'invalid extension: ' + str(extension))
             prefix = side + '/extensions/' + extension.name + '/'
             output[prefix + 'extension.yaml'] = safe_file(extension, 'extension.yaml').read_bytes()
+            fragment = extension / 'AGENTS.fragment.md'
+            if fragment.exists() or fragment.is_symlink() or extension.name in ('login', 'authorization'):
+                output[prefix + 'AGENTS.fragment.md'] = safe_file(extension, 'AGENTS.fragment.md').read_bytes()
             children = ('src',) if side == 'frontend' else ('src', 'docs', 'migrations', 'scripts', 'sql')
             for child in children:
                 path = extension / child

@@ -1,8 +1,9 @@
-# Standalone Login 后端能力
+<!-- DEVAGENTSTUDIO:CAPABILITY:login:BEGIN -->
+## Standalone Login 后端能力
 
 本工程由本地 Standalone Adapter 生成，使用模拟身份和签名 Cookie。此处不接入企业 Bee/YHT，不校验真实企业授权码。
 
-## 与现有前端一致的登录接口
+### 与现有前端一致的登录接口
 
 `GET /api/sso/login?code=mock-code`
 
@@ -24,7 +25,7 @@ avatar 为可选字段；未配置时省略。响应通过 `Set-Cookie` 写入 `
 
 code 只需是非空、最多 2048 字符的模拟占位参数，不决定用户身份，不代表真实 SSO 验证；缺失/空白/超长返回 400，不发 Cookie。用户固定选取 `STANDALONE_MOCK_SSO_USER_ID`，未设置时选取 STANDALONE_MOCK_USERS 中第一位。
 
-## 默认运行与可选覆盖
+### 默认运行与可选覆盖
 
 本 Standalone 工程默认启用 Mock、默认使用 local Profile 并绑定 `127.0.0.1:8080`。准备好数据库配置后直接启动 JAR，即可调用上述 GET 模拟回调，无需设置任何 Mock 环境变量或 Profile。
 
@@ -41,7 +42,7 @@ export STANDALONE_MOCK_SSO_USER_ID=member-001
 
 旧配置 `{"member-001":"Local Admin"}` 继续支持。缺失或空白用户配置使用默认白名单，非空但非法的用户配置拒绝启动。GET 模拟 SSO 接口不需要提交登录密钥。若需旧 POST 登录，请显式配置 STANDALONE_MOCK_LOGIN_SECRET；默认随机登录密钥不对外提供。
 
-## 保留的测试接口
+### 保留的测试接口
 
 - `POST /api/standalone/login`：JSON userId/secret，仍校验共享登录密钥和用户白名单。
 - `GET /api/standalone/me`：通过 Cookie 读取 userId/userName/avatar；未认证为 401。
@@ -49,6 +50,7 @@ export STANDALONE_MOCK_SSO_USER_ID=member-001
 
 Cookie 由浏览器接收，前端无需读取 HttpOnly Cookie。现有 `/api` 开发代理可用于访问后端；不增加前端登录参数或修改统一响应解包。
 
-## 权限边界
+### 权限边界
 
 模拟认证不固定放行权限。userId/sapId 必须与 role_member.member_id 一致，后续 Authorization 仍查真实角色和资源数据。默认 member-001 与 fixture Bootstrap 管理员一致，但不会自动获得数据库权限。DATASOURCE_DS1_URL、DATASOURCE_DS1_PORT、DATASOURCE_DS1_SCHEMA、DATASOURCE_DS1_USERNAME、DATASOURCE_DS1_PASSWORD 和首次 Bootstrap 初始化仍由调用方准备；免 Mock 配置不代表数据库零配置。首次初始化及真实数据库授权由调用方手工验收。
+<!-- DEVAGENTSTUDIO:CAPABILITY:login:END -->

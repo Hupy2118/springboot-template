@@ -56,17 +56,21 @@ public final class CodeTemplateReleaseLoader {
             Map<String, byte[]> contracts = readTree(codeRoot.resolve("contracts"), "contracts");
             Map<String, byte[]> frontendBase = readTree(codeRoot.resolve("frontend/base"), "frontend/base");
             Map<String, byte[]> backendBase = readTree(codeRoot.resolve("backend/base"), "backend/base");
+            com.devagentstudio.template.engine.core.v3.AgentsDocument.compose(frontendBase.get("AGENTS.md"), Collections.<String, byte[]>emptyMap());
+            com.devagentstudio.template.engine.core.v3.AgentsDocument.compose(backendBase.get("AGENTS.md"), Collections.<String, byte[]>emptyMap());
             for (String path : frontendBase.keySet()) if (REGISTRIES.contains(path)) sourceError("Base may not own generated registry " + path);
 
             Map<String, PartialExtension> partials = new TreeMap<String, PartialExtension>();
-            loadExtensions(codeRoot.resolve("frontend/extensions"), true, partials);
-            loadExtensions(codeRoot.resolve("backend/extensions"), false, partials);
+            Map<String, byte[]> frontendAgents = new LinkedHashMap<String, byte[]>();
+            Map<String, byte[]> backendAgents = new LinkedHashMap<String, byte[]>();
+            loadExtensions(codeRoot.resolve("frontend/extensions"), true, partials, frontendAgents);
+            loadExtensions(codeRoot.resolve("backend/extensions"), false, partials, backendAgents);
             Map<String, ExtensionRelease> extensions = new TreeMap<String, ExtensionRelease>();
             for (PartialExtension partial : partials.values()) extensions.put(partial.id, partial.finish());
             validateGraph(extensions);
             validateGlobalContracts(extensions);
             validateBaseAndExtensionCollisions(frontendBase, backendBase, extensions);
-            return new CodeTemplateRelease(revision, contracts, frontendBase, backendBase, extensions);
+            return new CodeTemplateRelease(revision, contracts, frontendBase, backendBase, extensions, frontendAgents, backendAgents);
         } catch (V3Exception e) {
             throw e;
         } catch (Exception e) {
@@ -74,7 +78,7 @@ public final class CodeTemplateReleaseLoader {
         }
     }
 
-    private void loadExtensions(Path parent, boolean frontend, Map<String, PartialExtension> partials) throws IOException {
+    private void loadExtensions(Path parent, boolean frontend, Map<String, PartialExtension> partials, Map<String, byte[]> agents) throws IOException {
         requireDirectory(parent, frontend ? "frontend/extensions" : "backend/extensions");
         List<Path> children = new ArrayList<Path>();
         try (java.util.stream.Stream<Path> stream = Files.list(parent)) { stream.forEach(children::add); }
@@ -101,6 +105,14 @@ public final class CodeTemplateReleaseLoader {
 
             if (frontend) loadFrontend(directory, manifest, partial);
             else loadBackend(directory, manifest, partial);
+            Path fragment = directory.resolve("AGENTS.fragment.md");
+            if (Files.exists(fragment, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                byte[] content = readUtf8(fragment).getBytes(StandardCharsets.UTF_8);
+                com.devagentstudio.template.engine.core.v3.AgentsDocument.fragment(id, content);
+                agents.put(id, content);
+            } else if ("login".equals(id) || "authorization".equals(id)) {
+                sourceError("missing AGENTS.fragment.md: " + relative(directory));
+            }
             validateExtensionRoot(directory, frontend);
         }
     }
@@ -214,7 +226,7 @@ public final class CodeTemplateReleaseLoader {
                 String name = child.getFileName().toString();
                 if (Files.isSymbolicLink(child)) sourceError("symlink is not allowed: " + relative(child));
                 if (ignored(child, directory)) continue;
-                if ("extension.yaml".equals(name)) continue;
+                if ("extension.yaml".equals(name) || "AGENTS.fragment.md".equals(name)) continue;
                 if (frontend && "src".equals(name) || !frontend && Arrays.asList("src", "docs", "migrations", "scripts", "sql").contains(name)) {
                     if (!Files.isDirectory(child)) sourceError("expected extension source directory: " + relative(child));
                     continue;

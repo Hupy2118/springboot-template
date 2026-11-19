@@ -16,6 +16,8 @@ async function reset() { await rm(root, { recursive: true, force: true }); await
 
 try {
   // Base uses the same unified sync path: existing, new, deleted, and host files all belong to Base.
+  await write(owners.base, 'AGENTS.md', '# Base only');
+  await write(workspace, 'AGENTS.md', '# Assembled capability sections');
   await write(owners.base, 'src/layout/index.tsx', 'old base');
   await write(owners.base, 'src/providers/AppProviders.tsx', 'old host');
   await write(owners.base, 'src/utils/obsolete.ts', 'delete me');
@@ -35,6 +37,7 @@ try {
   ]);
   assert.equal(await readFile(path.join(owners.base, 'src/providers/AppProviders.tsx'), 'utf8'), 'new host');
   assert.equal(await readFile(path.join(owners.base, 'rsbuild.config.ts'), 'utf8'), 'new runtime config');
+  assert.equal(await readFile(path.join(owners.base, 'AGENTS.md'), 'utf8'), '# Base only');
   await assert.rejects(readFile(path.join(owners.base, 'src/extensions/providers.ts')));
   await assert.rejects(readFile(path.join(owners.base, '.devagentstudio-template-workspace.json')));
   assert.equal((await syncWorkspace('base', { workspaceRoot: workspace, ownerRoots: owners, skipStateCheck: true })).length, 0);

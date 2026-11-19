@@ -9,7 +9,7 @@ import { GENERATED_MARKER } from './assembly-contract.mjs';
 const execute = promisify(execFile);
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const releaseRoot = await mkdtemp(path.join(frontendRoot, '.assembly-release-'));
-const maintenanceOnly = ['base', 'extensions', 'assembly', 'workspace', 'TEMPLATE_DEVELOPMENT.md', 'base.md', 'extension.md', '.gitkeep'];
+const maintenanceOnly = ['base', 'extensions', 'assembly', 'workspace', 'TEMPLATE_DEVELOPMENT.md', 'base.md', 'extension.md', 'AGENTS.fragment.md', '.gitkeep'];
 
 async function exists(target) {
   try { await stat(target); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; }

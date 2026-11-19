@@ -450,7 +450,7 @@ Standalone 使用自己的 release.yaml 与 fingerprint 台账；正式 Revision
 以下属于**当前已知的检查点**，不要把它们写成“已解决”：
 
 - 页面模块上下文 Key 在不同打包路径下可能与 `moduleImportPath` 不一致；页面投影测试应包含实际加载检查。
-- 前端 Base 的 `AGENTS.md` 引用了不存在的前端 `docs/project-structure.md`；如需补齐，必须与生成工程中 Agent 指引同步修改。
+- 生成工程的前后端各以根部 `AGENTS.md` 为唯一 Agent 工程说明；不依赖 `docs/project-structure.md` 的链式阅读。
 - 后端权限 MVC 入口为 Authorization 自有 `com.cmbchina.backend.common.config.WebMvcConfiguration`；Login 认证由 Bee EnableAuthClient 接入，其实际顺序需要 Bee 环境验证。
 - `backend/docs/development-guide.md` 仍有旧 MVC 类名、拦截器顺序和“尚不会改变 Engine 产物”的历史说明；后端 README 链接到该文件时，架构与发布边界应以本指南和当前 Loader 为准，当前只消费 `template-source/code/` 模型。
 - Standalone 的构建/启动与模拟登录证据不覆盖企业 SSO、真实数据库授权或 Workspace Executor Apply；历史 reports 中早期结论应结合后续 Revision 的补充记录阅读。
@@ -461,4 +461,8 @@ Standalone 使用自己的 release.yaml 与 fingerprint 台账；正式 Revision
 
 根 `README.md` 保留项目入口及最小启动/请求示例；根 `AGENTS.md` 保留 Agent 的代码约束。`devtools/standalone-adapter/README.md` 作为本地工具使用说明保留，详细覆盖清单与历史验收证据放在其 reports，本指南维护集成边界并链接该入口，不把历史验收结论当作当前自动通过。
 
-保留 `template-source/code/backend/base/docs/project-structure.md`、Extension 下的 `docs/login.md`、`docs/authorization.md` 等**随生成工程投放的运行时能力指引**：它们与模板维护过程文档不是同一类资产，删除会改变用户工程输出。OpenAPI、JSON Schema、Manifest、测试也不应因文档收敛而删除。
+生成工程规范维护于两端 `base/AGENTS.md` 及 `extensions/<id>/AGENTS.fragment.md`。正式 Loader 将片段独立于代码资产保存，Materializer 与现有前后端 Assembly 复用有效依赖顺序组合文档，生成器拥有输出 AGENTS.md；sync 不回写该路径。片段使用唯一 `<!-- DEVAGENTSTUDIO:CAPABILITY:<id>:BEGIN -->` / `END` 边界，内容以二级标题开始，严格 UTF-8、LF、一个末尾换行；Base 不得含能力边界。Login/Authorization 必须提供片段；其他历史扩展无片段时保持原行为，有片段则遵循同一规则。
+
+已将两端 Base README、后端 project-structure 和 Login/Authorization 指引的有效内容迁入上述输入，停止交付这五份重复文档；授权存量表迁移指引保留在 Authorization 片段中。SQL、scripts、migrations、OpenAPI、Schema、Manifest 仍按原路径交付。片段是 Runtime Release Inputs，但不是独立产物或 installedArtifacts。新增能力片段不改变五个前端 Registry 或其他文件的所有权。
+
+V4 APPLY/RECONCILE 及其操作白名单保持不变：首次安装能力不会向旧 Workspace 的 AGENTS.md 增补章节，同集合 APPLY 仍返回 204。后续如需章节安装，须另行设计模板协议与 XCodeAgent Executor 的最小协同，具备锁、前像校验、事务回滚并同步操作契约与测试；本次未实现。

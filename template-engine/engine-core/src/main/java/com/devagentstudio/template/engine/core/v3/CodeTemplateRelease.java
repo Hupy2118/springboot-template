@@ -7,6 +7,8 @@ import java.util.Map;
 /** Immutable V3 Runtime Source snapshot. */
 public final class CodeTemplateRelease {
     private final String revision;
+    private final Map<String, byte[]> frontendAgents;
+    private final Map<String, byte[]> backendAgents;
     private final Map<String, byte[]> contracts;
     private final Map<String, byte[]> frontendBase;
     private final Map<String, byte[]> backendBase;
@@ -15,6 +17,14 @@ public final class CodeTemplateRelease {
     /** 保存模板根目录契约与双端源码的不可变快照。 */
     public CodeTemplateRelease(String revision, Map<String, byte[]> contracts, Map<String, byte[]> frontendBase, Map<String, byte[]> backendBase,
                                Map<String, ExtensionRelease> extensions) {
+        this(revision, contracts, frontendBase, backendBase, extensions,
+                Collections.<String, byte[]>emptyMap(), Collections.<String, byte[]>emptyMap());
+    }
+    public CodeTemplateRelease(String revision, Map<String, byte[]> contracts, Map<String, byte[]> frontendBase,
+            Map<String, byte[]> backendBase, Map<String, ExtensionRelease> extensions,
+            Map<String, byte[]> frontendAgents, Map<String, byte[]> backendAgents) {
+        this.frontendAgents = copyBytes(frontendAgents);
+        this.backendAgents = copyBytes(backendAgents);
         this.revision = revision;
         this.contracts = copyBytes(contracts);
         this.frontendBase = copyBytes(frontendBase);
@@ -28,6 +38,8 @@ public final class CodeTemplateRelease {
     }
     /** 返回随生成工程交付的路由契约文件。 */
     public Map<String, byte[]> contracts() { return copyBytes(contracts); }
+    public Map<String, byte[]> frontendAgents() { return copyBytes(frontendAgents); }
+    public Map<String, byte[]> backendAgents() { return copyBytes(backendAgents); }
     public String revision() { return revision; }
     public Map<String, byte[]> frontendBase() { return copyBytes(frontendBase); }
     public Map<String, byte[]> backendBase() { return copyBytes(backendBase); }

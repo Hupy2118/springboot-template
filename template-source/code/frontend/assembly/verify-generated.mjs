@@ -8,7 +8,9 @@ import { ownersForProfile, resolveExistingOwner } from './source-ownership.mjs';
 
 const execute = promisify(execFile);
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const generatedRoot = path.join(frontendRoot, 'workspace');
+// Allow checking a freshly assembled disposable workspace without resetting local edits.
+const workspaceArgument = process.argv.find((item) => item.startsWith('--workspace='));
+const generatedRoot = path.resolve(frontendRoot, workspaceArgument?.slice('--workspace='.length) || 'workspace');
 const temporaryRoot = await mkdtemp(path.join(frontendRoot, '.assembly-verify-'));
 const ignored = new Set(['.devagentstudio-template-generated.json', '.devagentstudio-template-workspace.json', '.gitkeep', 'node_modules', 'dist']);
 

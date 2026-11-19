@@ -2,6 +2,7 @@
 import { cp, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assembleAgents } from './agents-document.mjs';
 import { extensionsForProfile } from './profiles.mjs';
 import { ASSEMBLY_MANAGED_FILES } from './assembly-contract.mjs';
 import { assertWorkspaceClean, writeWorkspaceState } from './workspace-state.mjs';
@@ -221,6 +222,7 @@ async function assemble() {
   }
   const selected = selectExtensions(await manifests(), requested, disabled);
   await verifyContributionSources(selected);
+  const agents = await assembleAgents(frontendRoot, selected);
   const destination = outputDirectory();
   const primaryOutput = destination === path.join(frontendRoot, 'workspace');
   if (primaryOutput && argument('--force', '') !== 'true') await assertWorkspaceClean();
@@ -249,6 +251,7 @@ async function assemble() {
   const initializerContributions = contributionList(selected, 'initializers');
   const reporterContributions = contributionList(selected, 'errorReporters');
   const generated = new Map([
+    ['AGENTS.md', agents],
     ['src/extensions/providers.ts', generateProviderRegistry(providers)],
     ['src/extensions/rootRoutes.tsx', generateRootRouteRegistry(rootRouteContributions)],
     ['src/extensions/systemPageRoutes.ts', generatePageRouteRegistry(pageRouteContributions)],

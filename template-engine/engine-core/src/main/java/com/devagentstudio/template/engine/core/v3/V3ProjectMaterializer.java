@@ -56,8 +56,22 @@ public final class V3ProjectMaterializer {
         projectAnnotations(files, resolved.order());
         projectMavenDependencies(files, resolved.order());
         projectApplicationYaml(files, resolved.order());
+        composeAgents(files, "frontend/AGENTS.md", release.frontendAgents(), resolved.order());
+        composeAgents(files, "backend/AGENTS.md", release.backendAgents(), resolved.order());
         ApplicationConfigProjector.applyToProject(files, applicationConfig);
         return files;
+    }
+
+    private void composeAgents(Map<String, byte[]> files, String target, Map<String, byte[]> fragments, List<String> order) {
+        // Legacy programmatic release fixtures without AGENTS retain their previous behavior.
+        if (!files.containsKey(target) && fragments.isEmpty()) return;
+        Map<String, byte[]> selected = new LinkedHashMap<String, byte[]>();
+        Set<String> seen = new HashSet<String>();
+        for (String id : order) {
+            if (!seen.add(id)) throw sourceError("duplicate AGENTS capability: " + id);
+            if (fragments.containsKey(id)) selected.put(id, fragments.get(id));
+        }
+        files.put(target, AgentsDocument.compose(files.get(target), selected));
     }
 
     @SuppressWarnings("unchecked") private void projectApplicationYaml(Map<String, byte[]> files, List<String> order) {

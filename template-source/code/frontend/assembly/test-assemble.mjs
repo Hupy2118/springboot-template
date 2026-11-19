@@ -1,3 +1,4 @@
+import './test-agents-document.mjs';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -16,6 +17,37 @@ async function assemble(extensions) {
 }
 
 try {
+  for (const [extensions, ids] of [['', []], ['login', ['login']], ['authorization', ['login', 'authorization']], ['login,login,authorization', ['login', 'authorization']]]) {
+    await assemble(extensions);
+    const agents = await readFile(path.join(output, 'AGENTS.md'), 'utf8');
+    assert.deepEqual([...agents.matchAll(/DEVAGENTSTUDIO:CAPABILITY:([a-z]+):BEGIN/g)].map((match) => match[1]), ids);
+    assert.doesNotMatch(agents, /codebase-manifest\.json|docs\/project-structure\.md|docs\/capabilities\/|vite\.config\.ts|\buseRequest\b|ProTable/);
+    assert.match(agents, /本表说明工程所有权，不授予任何文件读写权限/);
+    assert.match(agents, /不构成对代码生成 Agent 的 Shell 执行授权/);
+    assert.match(agents, /returnCode === 'SUC0000'/);
+    assert.match(agents, /body，不要二次拆包/);
+    if (ids.length === 0) {
+      assert.doesNotMatch(agents, /LoginProvider|LoginContext|Permission\.tsx|usePermission|authorization\.ts|AUTHORIZATION_MANAGEMENT/);
+      for (const title of ['1. 工程概览与技术栈', '2. 工程目录与文件职责', '3. 基础能力及接入入口', '4. 工程文件所有权与受管边界']) assert.ok(agents.includes(title));
+    }
+    if (ids.includes('login')) {
+      assert.match(agents, /src\/context\/LoginContext\.tsx/);
+      assert.match(agents, /encodeURIComponent/);
+    }
+    if (ids.includes('authorization')) {
+      assert.match(agents, /getMyResources/);
+      assert.match(agents, /RESOURCES\.SYSTEM\.AUTHORIZATION_MANAGEMENT/);
+      assert.match(agents, /不是通用业务按钮资源键/);
+    }
+    // Every concrete inline source path must locate an existing generated entry.
+    for (const [, relative] of agents.matchAll(/`((?:src|devtools)\/[A-Za-z0-9_./-]+)`/g)) {
+      await readFile(path.join(output, relative)).catch(async (error) => {
+        if (error.code !== 'EISDIR') throw error;
+      });
+    }
+    await assert.rejects(readFile(path.join(output, 'AGENTS.fragment.md')));
+    await assert.rejects(readFile(path.join(output, 'README.md')));
+  }
   await assemble('');
   assert.equal(await readFile(path.join(output, 'package.json'), 'utf8').then(() => true), true);
   assert.equal(await readFile(path.join(output, 'index.html'), 'utf8').then(() => true), true);

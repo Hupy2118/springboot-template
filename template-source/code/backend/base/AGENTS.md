@@ -1,28 +1,28 @@
-# Backend Development Guide
+# 后端工程开发说明
 
-## Project Context
+## 技术栈与命令
 
-修改代码前必须参考：
+保持 Java 8 编译兼容，沿用 Maven、Spring Boot 2.7、MyBatis-Plus、Lombok 及 Bee/TDSQL 基线；版本和插件以 `pom.xml` 为准，不单独升级运行依赖。在 backend 目录执行 `mvn test`、`mvn package`、`mvn spring-boot:run -Dspring-boot.run.profiles=dev`。服务端口与 Profile 以 `src/main/resources/application*.yml` 为准；正式工程构建需要 Bee 私有 Maven 依赖及 TDSQL 驱动。
 
-- `docs/project-structure.md`：工程结构、分层职责和依赖方向。
-- `.devagentstudio/context/codebase-manifest.json`：当前工程有效架构视图；仅当该文件存在时必须参考。
+## 目录与依赖方向
 
-## Code Change Rules
+在 `com.cmbchina.backend.<business>/` 按职责放置代码，按需要创建层次，不要求空目录：
 
-- 保持 Java 8 兼容，并使用现有 Maven、Spring Boot 2.7、MyBatis-Plus 和 Lombok 基线；不要单独升级其中任一运行时依赖。
-- HTTP 接口只负责参数绑定、校验和调用应用服务；统一使用 Bee 的 `BeeResponseEntity` 与 `WebGlobalExceptionHandler` 返回错误，不要在 Controller 中复制异常处理或响应包装逻辑。
-- 新增业务能力按 `adapter`、`application`、`domain`、`infrastructure` 分层；下层不得反向依赖 Web、Spring MVC Controller 或应用启动入口。
-- 数据访问通过领域 Repository 抽象及其 Infrastructure 实现接入。实体、Mapper、PO 和 XML Mapper 均属于同一个基础设施边界，避免让 Controller 或 Application Service 直接依赖它们。
-- 配置使用 Bee/TDSQL 的 `bee.persistence.ds1.datasource` 与目标 Profile 的 `datasource.ds1.*`。不得提交密码、Token、连接串中的真实凭据或其他密钥；不要使用旧 `.env.example` 的 DB_* 模型覆盖 1016 基线。
+- `adapter/web/`：Controller、参数校验和 HTTP 映射，只调用应用服务。
+- `application/`：用例编排、Application Service、DTO、Assembler，依赖领域抽象，不直接依赖 Controller、Servlet、Mapper 或 PO。
+- `domain/`：实体、值对象、领域服务、错误码和 Repository 接口，不依赖 Spring MVC、MyBatis 或数据库。
+- `infrastructure/`：实现领域 Repository，承载 Mapper、PO、外部接口适配；MyBatis XML 位于 `src/main/resources/mapper/<business>/`。
 
-## Capability-managed Surfaces
+依赖为 Web Adapter → Application → Domain，Infrastructure 实现 Domain 抽象。`common/` 只放跨业务稳定能力；现有 `common/config`、`common/exception`、`common/entity/page` 分别负责公共配置、统一异常与错误码、分页对象。
 
-Authorization 自有 `com.cmbchina.backend.common.config.WebMvcConfiguration` 注册资源权限拦截器；认证由 Login 的 Bee EnableAuthClient 接入。不得复制旧 MVC 类、恢复中央 Anchor 或把 Extension 逻辑写入 Base。
+## 响应、事务与配置
 
-Base 不拥有登录、认证、授权、角色、成员、资源或权限 API。启用的 Capability 才拥有其 `auth` 代码和相关数据库资产；普通业务代码不得改写这些 Capability 所拥有的文件。
+- HTTP 统一使用 Bee 的 `BeeResponseEntity`；业务错误使用 `BizException` 与错误码，由 `common/exception/WebGlobalExceptionHandler` 映射。不要创建旧说明中的 BaseExceptionHandler 或另一套响应包装。
+- 事务边界放在应用用例，避免 Controller 管理事务；Repository 隔离存储细节。外部接口由基础设施适配，显式处理超时、失败和异常转换，不把数据库事务当作跨系统原子事务。
+- 数据源使用 `bee.persistence.ds1.datasource` 和目标 Profile 的 `datasource.ds1.*`；不要用旧 DB_* 或 `.env.example` 模型覆盖。不得提交真实凭据、Token 或密钥，不记录完整敏感请求或配置。
 
-启用 Capability 后，阅读 `docs/<capability>.md`。这些文件由引擎与该 Capability 的代码一同生成；不要在未启用相应 Capability 的工程中预先创建或引用它们。
+## 受管边界与维护
 
-## Structure Maintenance
+保留 `Application.java` 启动入口、公共异常/分页/MyBatis 配置。启用能力拥有其代码、配置 Contribution 和资源；普通业务不得覆盖，不能在 Base 写入某个能力的实现或复制旧中央 Anchor。
 
-当修改改变目录职责、层级依赖、统一响应/异常处理约定，或 Capability 接入方式时，同步更新 `docs/project-structure.md`。普通业务类、接口实现、DTO 或测试的新增和修改不需要更新该文档。
+本文件是后端唯一 Agent 工程开发说明。若工作区根目录存在 `.devagentstudio/context/codebase-manifest.json`，可用它核对实际架构事实。目录职责、依赖方向或公共约定变化时更新本说明；普通业务类和 DTO 修改不要求改写规范。模板维护时修改 Base 或能力片段，不将组合后的能力章节回写 Base。

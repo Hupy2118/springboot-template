@@ -31,9 +31,11 @@ class WorkspaceSyncContributionTest {
     private static Path fixture() throws Exception {
         Path root = Files.createTempDirectory("backend-template");
         write(root.resolve("assembly/profiles.yaml"), "login:\n  extensions: [login]\n  editTarget: login\n");
+        write(root.resolve("base/AGENTS.md"), "# Fixture\n");
         write(root.resolve("base/pom.xml"), "<project><modelVersion>4.0.0</modelVersion><dependencies/></project>");
         write(root.resolve("base/src/main/java/com/cmbchina/backend/Application.java"), "package com.cmbchina.backend;\nimport org.springframework.boot.autoconfigure.SpringBootApplication;\n@SpringBootApplication\npublic class Application {}\n");
         write(root.resolve("extensions/login/extension.yaml"), "id: login\nrequires: []\ncontributes:\n  applicationAnnotations:\n    - annotationClass: com.example.EnableLogin\n  mavenDependencies:\n    - groupId: example\n      artifactId: login-auth\n");
+        write(root.resolve("extensions/login/AGENTS.fragment.md"), "<!-- DEVAGENTSTUDIO:CAPABILITY:login:BEGIN -->\n## Fixture\n<!-- DEVAGENTSTUDIO:CAPABILITY:login:END -->\n");
         return root;
     }
     private static void write(Path file, String value) throws Exception { Files.createDirectories(file.getParent()); Files.write(file, value.getBytes(StandardCharsets.UTF_8)); }

@@ -1,4 +1,5 @@
 export const ASSEMBLY_MANAGED_FILES = new Set([
+  'AGENTS.md',
   'src/extensions/providers.ts',
   'src/extensions/rootRoutes.tsx',
   'src/extensions/systemPageRoutes.ts',

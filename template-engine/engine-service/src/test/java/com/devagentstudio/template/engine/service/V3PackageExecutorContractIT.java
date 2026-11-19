@@ -47,6 +47,7 @@ import java.util.zip.ZipInputStream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -83,6 +84,13 @@ class V3PackageExecutorContractIT {
         ReferenceExecutor executor = new ReferenceExecutor();
         AppliedPackage applied = executor.apply(updateZip, baseWorkspace, currentState);
         Map<String, byte[]> expected = projectFiles(authZip);
+        // Capability-only updates intentionally leave existing Agent documents untouched.
+        // Generate composes enabled chapters; V4 has no safe chapter merge operation.
+        for (String target : Arrays.asList("frontend/AGENTS.md", "backend/AGENTS.md")) {
+            org.junit.jupiter.api.Assertions.assertArrayEquals(baseWorkspace.get(target), applied.workspace.get(target), target);
+            assertFalse(Arrays.equals(expected.get(target), applied.workspace.get(target)), target);
+            expected.put(target, baseWorkspace.get(target));
+        }
         assertByteMapsEqual(expected, applied.workspace);
         assertEquals(JSON.convertValue(zipJson(authZip, ".devagentstudio/template-state.json"), Map.class), applied.nextState);
 

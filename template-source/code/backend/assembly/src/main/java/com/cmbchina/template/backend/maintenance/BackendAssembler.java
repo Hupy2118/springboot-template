@@ -12,9 +12,11 @@ public final class BackendAssembler {
         Path workspace = root.resolve("workspace");
         if (Files.exists(WorkspaceState.file(workspace)) && !reset && WorkspaceStatus.hasChanges(root, WorkspaceState.read(workspace)))
             throw new TemplateException("UNSYNCED_WORKSPACE", "run status and sync before assembling, or use reset");
-        deleteContents(workspace); create(workspace);
+
         ProfileResolver.Profile profile = new ProfileResolver(root.resolve("assembly/profiles.yaml")).get(profileName);
         List<ExtensionManifestLoader.Manifest> manifests = new ExtensionManifestLoader(root.resolve("extensions")).resolve(profile.requested);
+        byte[] agents = assembleAgents(root, manifests);
+        deleteContents(workspace); create(workspace);
         WorkspaceState state = new WorkspaceState(); state.profile = profile.name; state.editTarget = profile.editTarget;
         copyTree(root.resolve("base"), workspace, "base", state);
         List<String> annotations = new ArrayList<String>(); List<MavenDependency> dependencies = new ArrayList<MavenDependency>(); List<Map<String,Object>> yamlContributions = new ArrayList<Map<String,Object>>(); Map<String,List<Map<String,Object>>> profileYamlContributions = new TreeMap<String,List<Map<String,Object>>>();
@@ -30,7 +32,36 @@ public final class BackendAssembler {
         PomDependencyCompiler.apply(workspace.resolve("pom.xml"), state.mavenDependencies);
         ApplicationYamlCompiler.apply(workspace.resolve("src/main/resources/application.yml"), yamlContributions);
         for (Map.Entry<String,List<Map<String,Object>>> item : profileYamlContributions.entrySet()) ApplicationYamlCompiler.apply(workspace.resolve("src/main/resources/application-" + item.getKey() + ".yml"), item.getValue());
+        if (agents != null) {
+            try { Files.write(workspace.resolve("AGENTS.md"), agents); }
+            catch (IOException e) { throw new TemplateException("ASSEMBLY_COPY_FAILED", e.getMessage()); }
+            state.owners.put("AGENTS.md", "generator");
+        }
         state.write(workspace); AssemblyContract.verify(workspace); return state;
+    }
+    static byte[] assembleAgents(Path root, List<ExtensionManifestLoader.Manifest> manifests) {
+        Map<String, byte[]> fragments = new LinkedHashMap<String, byte[]>();
+        Set<String> seen = new HashSet<String>();
+        for (ExtensionManifestLoader.Manifest manifest : manifests) {
+            if (!seen.add(manifest.id)) throw new TemplateException("TEMPLATE_SOURCE_INVALID", "duplicate AGENTS capability");
+            if (!manifest.id.matches("[a-z0-9][a-z0-9_-]*")) throw new TemplateException("TEMPLATE_SOURCE_INVALID", "invalid AGENTS capability");
+            Path relative = Paths.get("extensions", manifest.id, "AGENTS.fragment.md");
+            if (Files.exists(root.resolve(relative), LinkOption.NOFOLLOW_LINKS) || "login".equals(manifest.id) || "authorization".equals(manifest.id))
+                fragments.put(manifest.id, readAgents(root, relative));
+        }
+        return AgentsDocument.compose(readAgents(root, Paths.get("base/AGENTS.md")), fragments);
+    }
+    private static byte[] readAgents(Path root, Path relative) {
+        Path cursor = root.toAbsolutePath().normalize();
+        try {
+            if (Files.isSymbolicLink(cursor) || !Files.isDirectory(cursor)) throw new IOException("unsafe AGENTS root");
+            for (Path segment : relative) {
+                cursor = cursor.resolve(segment);
+                if (Files.isSymbolicLink(cursor)) throw new IOException("symlink AGENTS source");
+            }
+            if (!Files.isRegularFile(cursor, LinkOption.NOFOLLOW_LINKS)) throw new IOException("missing AGENTS source: " + relative);
+            return Files.readAllBytes(cursor);
+        } catch (IOException e) { throw new TemplateException("TEMPLATE_SOURCE_INVALID", e.getMessage()); }
     }
     private static void addYamlContribution(WorkspaceState state, String target, String owner, Map<String,Object> value) {
         if (value.isEmpty()) return;

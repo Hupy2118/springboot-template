@@ -133,9 +133,9 @@
     },
     {
       "type": "replace",
-      "target": "backend/extensions/login/docs/login.md",
-      "source": "overlays/backend/extensions/login/docs/login.md",
-      "expectedSourceSha256": "0b7e9ebbecd9c281be2aae27b3430d79124e3ce8450a1178d2df4d84b8386e99",
+      "target": "backend/extensions/login/AGENTS.fragment.md",
+      "source": "overlays/backend/extensions/login/AGENTS.fragment.md",
+      "expectedSourceSha256": "673cfbcd093c47931f3e286d6b8e57fee19355ac8e66dc3cab56dd301bec73f2",
       "reason": "Document the local /api/sso/login response and cookie contract without retaining enterprise-only login guidance"
     }
   ]

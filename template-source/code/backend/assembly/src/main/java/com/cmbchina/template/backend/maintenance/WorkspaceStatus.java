@@ -18,6 +18,7 @@ public final class WorkspaceStatus {
         try { Files.walkFileTree(workspace, new SimpleFileVisitor<Path>() {
             @Override public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                 String key=workspace.relativize(file).toString().replace('\\','/'); if(key.startsWith(".xcodeagent/")) return FileVisitResult.CONTINUE; seen.add(key);
+                if ("AGENTS.md".equals(key)) { report.generated.add(key); return FileVisitResult.CONTINUE; }
                 if (state.yamlContributions.containsKey(key)) {
                     try {
                         Map<String,Object> stripped=YamlContributionCompiler.strip(YamlContributionCompiler.read(file), state.yamlContributions.get(key).values());
@@ -33,7 +34,7 @@ public final class WorkspaceStatus {
                 else if(!read(file).equals(read(source))) report.modified.add(key); return FileVisitResult.CONTINUE;
             }
         }); } catch(IOException e) { throw new TemplateException("WORKSPACE_STATUS_FAILED", e.getMessage()); }
-        for(String key:state.owners.keySet()) if(!seen.contains(key)) report.deleted.add(key); Collections.sort(report.modified); Collections.sort(report.created); Collections.sort(report.deleted); return report;
+        for(String key:state.owners.keySet()) if(!"AGENTS.md".equals(key) && !seen.contains(key)) report.deleted.add(key); Collections.sort(report.modified); Collections.sort(report.created); Collections.sort(report.deleted); return report;
     }
     public static Path source(Path root, String owner, String key) { return root.resolve("base".equals(owner) ? "base" : "extensions/" + owner).resolve(key); }
     public static String normalizedApplication(Path workspaceFile, WorkspaceState state) {
