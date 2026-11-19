@@ -7,8 +7,8 @@ public final class AuthConstants {
 
     public static final String SYSTEM_MANAGEMENT_RESOURCE = "system_authorization_management";
 
-    // XCODEAGENT_AUTH_CONSTANTS_START
-    // XCODEAGENT_AUTH_CONSTANTS_END
+    // DEVAGENTSTUDIO_AUTH_CONSTANTS_START
+    // DEVAGENTSTUDIO_AUTH_CONSTANTS_END
 
     private AuthConstants() {
     }
