@@ -2,8 +2,6 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "module": "CommonJS",
-    "moduleResolution": "Node",
     "types": [
       "jest",
       "node",
@@ -11,6 +9,7 @@
     ]
   },
   "include": [
-    "tests"
+    "tests",
+    "src/**/*.d.ts"
   ]
 }
