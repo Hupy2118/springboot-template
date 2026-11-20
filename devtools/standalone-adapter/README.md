@@ -14,7 +14,7 @@ export TEMPLATE_ENGINE_STANDALONE_ENABLED=true
 
 引擎默认监听 `127.0.0.1:18080`，可以设置 `TEMPLATE_ENGINE_PORT`。无需设置第二个 Revision 变量；以 `release.yaml` 为准。`TEMPLATE_ENGINE_SOURCE_ROOT` 若已设置，必须与选择模式的绝对路径完全一致，否则拒绝启动。不要在 Source Root 末尾加 `/code`。
 
-当前 Standalone Revision 为 `2026.10.30.1001`（正式来源 `2026.10.30.1`）。更新 Adapter 或引擎后，先构建并停止已有 Standalone 引擎，再通过上述脚本重启，才会 prepare 并加载新模板源；已下载的生成工程不会自动改写。自 1007 起，含 Login 的生成后端默认可使用模拟登录，无需额外 Mock 环境变量，数据库仍需配置，详见下文。1008 适配前端 logoutApi 与本地登出页面；1009 恢复正式 Login 配置贡献，Mock 配置仅由 Standalone Base 提供。
+当前版本见 [release.yaml](release.yaml)。遇到 `sourceRevision mismatch` 时，核对 `sourceRevision` 与正式模板的 [template-revision.txt](../../template-source/code/template-revision.txt)，按下文规则审核并发布新的 Standalone Revision。更新 Adapter 或引擎后，先构建并停止已有 Standalone 引擎，再通过上述脚本重启，才会 prepare 并加载新模板源；已下载的生成工程不会自动改写。自 1007 起，含 Login 的生成后端默认可使用模拟登录，无需额外 Mock 环境变量，数据库仍需配置，详见下文。1008 适配前端 logoutApi 与本地登出页面；1009 恢复正式 Login 配置贡献，Mock 配置仅由 Standalone Base 提供。
 
 默认关闭：
 
