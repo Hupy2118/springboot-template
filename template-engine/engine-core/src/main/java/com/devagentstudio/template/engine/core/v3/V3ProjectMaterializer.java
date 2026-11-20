@@ -71,7 +71,12 @@ public final class V3ProjectMaterializer {
             if (!seen.add(id)) throw sourceError("duplicate AGENTS capability: " + id);
             if (fragments.containsKey(id)) selected.put(id, fragments.get(id));
         }
-        files.put(target, AgentsDocument.compose(files.get(target), selected));
+        if ("frontend/AGENTS.md".equals(target)) {
+            List<String> frontendFiles = new ArrayList<String>();
+            for (String path : files.keySet())
+                if (path.startsWith("frontend/")) frontendFiles.add(path.substring("frontend/".length()));
+            files.put(target, AgentsDocument.composeFrontend(files.get(target), selected, frontendFiles));
+        } else files.put(target, AgentsDocument.compose(files.get(target), selected));
     }
 
     @SuppressWarnings("unchecked") private void projectApplicationYaml(Map<String, byte[]> files, List<String> order) {

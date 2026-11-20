@@ -463,6 +463,8 @@ Standalone 使用自己的 release.yaml 与 fingerprint 台账；正式 Revision
 
 生成工程规范维护于两端 `base/AGENTS.md` 及 `extensions/<id>/AGENTS.fragment.md`。正式 Loader 将片段独立于代码资产保存，Materializer 与现有前后端 Assembly 复用有效依赖顺序组合文档，生成器拥有输出 AGENTS.md；sync 不回写该路径。片段使用唯一 `<!-- DEVAGENTSTUDIO:CAPABILITY:<id>:BEGIN -->` / `END` 边界，内容以二级标题开始，严格 UTF-8、LF、一个末尾换行；Base 不得含能力边界。Login/Authorization 必须提供片段；其他历史扩展无片段时保持原行为，有片段则遵循同一规则。
 
+前端最终文档按当前工程视角输出：Base 中唯一的 `<!-- DEVAGENTSTUDIO:FRONTEND_PROJECT_TREE -->` 由实际文件路径集合替换为一棵目录树，只展示核心根文件、入口及指定源码目录中的非测试 TypeScript 文件，按固定字典序排列。Node Assembly 复用所有权集合和五个 Registry 路径，Java Materializer 复用已物化的前端文件集合；渲染器不自行扫描磁盘。两端先保留片段严格校验，再去除能力边界，仅追加选中功能的正文；后端仍保留原有组合格式。缺失或重复目录占位符、非法路径与非法源文本均拒绝生成。`scripts/ci/fixtures/agents-document/frontend-*` 为前端共享金标，原金标继续保护后端组合行为；正式 Generate 与维护组装通过 `V3AssemblyParityIT` 比较包括 AGENTS.md 在内的完整文件字节。
+
 已将两端 Base README、后端 project-structure 和 Login/Authorization 指引的有效内容迁入上述输入，停止交付这五份重复文档；授权存量表迁移指引保留在 Authorization 片段中。SQL、scripts、migrations、OpenAPI、Schema、Manifest 仍按原路径交付。片段是 Runtime Release Inputs，但不是独立产物或 installedArtifacts。新增能力片段不改变五个前端 Registry 或其他文件的所有权。
 
 V4 APPLY/RECONCILE 及其操作白名单保持不变：首次安装能力不会向旧 Workspace 的 AGENTS.md 增补章节，同集合 APPLY 仍返回 204。后续如需章节安装，须另行设计模板协议与 XCodeAgent Executor 的最小协同，具备锁、前像校验、事务回滚并同步操作契约与测试；本次未实现。

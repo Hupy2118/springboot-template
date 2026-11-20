@@ -3,6 +3,8 @@ package com.devagentstudio.template.engine.core.v3;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.Collection;
+import java.util.TreeMap;
 
 /** Minimal UTF-8/LF document composition; callers supply resolver dependency order. */
 public final class AgentsDocument {
@@ -39,6 +41,52 @@ public final class AgentsDocument {
         for (Map.Entry<String, byte[]> item : orderedFragments.entrySet())
             out.append('\n').append(fragment(item.getKey(), item.getValue()));
         return out.toString().getBytes(StandardCharsets.UTF_8);
+    }
+    private static final String TREE = "<!-- DEVAGENTSTUDIO:FRONTEND_PROJECT_TREE -->";
+    public static byte[] composeFrontend(byte[] base, Map<String, byte[]> orderedFragments, Collection<String> files) {
+        compose(base, orderedFragments); // Retain the same strict source validation as backend.
+        String value = normalize(base);
+        if (count(value, TREE) != 1) throw invalid("expected one frontend tree placeholder");
+        StringBuilder out = new StringBuilder(value.replace(TREE, frontendProjectTree(files)));
+        for (Map.Entry<String, byte[]> item : orderedFragments.entrySet()) {
+            String text = fragment(item.getKey(), item.getValue());
+            String begin = "<!-- " + MARKER + item.getKey() + ":BEGIN -->\n";
+            String end = "<!-- " + MARKER + item.getKey() + ":END -->\n";
+            out.append('\n').append(normalize(text.substring(begin.length(), text.length() - end.length()).getBytes(StandardCharsets.UTF_8)));
+        }
+        if (out.indexOf("DEVAGENTSTUDIO:FRONTEND_PROJECT_TREE") >= 0) throw invalid("unexpected frontend tree placeholder");
+        return out.toString().getBytes(StandardCharsets.UTF_8);
+    }
+    private static final class TreeNode {
+        final Map<String, TreeNode> children = new TreeMap<String, TreeNode>();
+    }
+    static String frontendProjectTree(Collection<String> files) {
+        TreeNode root = new TreeNode();
+        for (String file : files) {
+            if (file == null || file.matches(".*[\\\\\\x00-\\x1f\\x7f].*")) throw invalid("unsafe project path");
+            for (String part : file.split("/", -1))
+                if (part.isEmpty() || part.equals(".") || part.equals("..")) throw invalid("unsafe project path");
+            if (!file.matches("(AGENTS\\.md|package\\.json|pnpm-lock\\.yaml|rsbuild\\.config\\.ts)")
+                    && !file.matches("src/(App\\.tsx|index\\.tsx|(?:apis|pages|components|hooks|constants|typings|context|config|routes|platform|providers|layout|bootstrap|observability|utils|extensions)/.+\\.tsx?)")) continue;
+            if (file.matches(".*(?:^|/)(?:__tests__|tests|assets|public)/.*") || file.matches(".*\\.(test|spec)\\.tsx?")) continue;
+            TreeNode node = root;
+            for (String part : file.split("/")) {
+                if (!node.children.containsKey(part)) node.children.put(part, new TreeNode());
+                node = node.children.get(part);
+            }
+        }
+        StringBuilder out = new StringBuilder("```text\nfrontend/\n");
+        appendTree(out, root, "");
+        return out.append("```").toString();
+    }
+    private static void appendTree(StringBuilder out, TreeNode node, String prefix) {
+        int index = 0;
+        for (Map.Entry<String, TreeNode> entry : node.children.entrySet()) {
+            boolean last = ++index == node.children.size();
+            boolean directory = !entry.getValue().children.isEmpty();
+            out.append(prefix).append(last ? "└── " : "├── ").append(entry.getKey()).append(directory ? "/" : "").append('\n');
+            appendTree(out, entry.getValue(), prefix + (last ? "    " : "│   "));
+        }
     }
     private static int count(String value, String token) {
         int count = 0, index = 0;

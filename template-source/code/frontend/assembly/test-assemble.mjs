@@ -1,7 +1,7 @@
 import './test-agents-document.mjs';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
@@ -20,7 +20,28 @@ try {
   for (const [extensions, ids] of [['', []], ['login', ['login']], ['authorization', ['login', 'authorization']], ['login,login,authorization', ['login', 'authorization']]]) {
     await assemble(extensions);
     const agents = await readFile(path.join(output, 'AGENTS.md'), 'utf8');
-    assert.deepEqual([...agents.matchAll(/DEVAGENTSTUDIO:CAPABILITY:([a-z]+):BEGIN/g)].map((match) => match[1]), ids);
+    assert.doesNotMatch(agents, /DEVAGENTSTUDIO:CAPABILITY|FRONTEND_PROJECT_TREE|AGENTS.fragment.md|extension.yaml|Base|Capability|Manifest|Assembly/);
+    assert.equal(agents.includes('## 认证与登录'), ids.includes('login'));
+    assert.equal(agents.includes('## 权限与访问控制'), ids.includes('authorization'));
+    const trees = [...agents.matchAll(/```text\nfrontend\/\n([\s\S]*?)```/g)];
+    assert.equal(trees.length, 1);
+    const parents = [], shown = new Set();
+    for (const line of trees[0][1].trimEnd().split('\n')) {
+      const match = line.match(/^((?:│   |    )*)(?:├── |└── )(.+)$/);
+      assert.ok(match, line);
+      const depth = match[1].length / 4;
+      parents.length = depth;
+      const name = match[2].replace(/\/$/, '');
+      const relative = [...parents, name].join('/');
+      assert.ok(!shown.has(relative), relative);
+      shown.add(relative);
+      const info = await stat(path.join(output, relative));
+      assert.equal(info.isDirectory(), match[2].endsWith('/'), relative);
+      parents.push(name);
+    }
+    for (const registry of ['providers.ts', 'rootRoutes.tsx', 'systemPageRoutes.ts', 'initializers.ts', 'errorReporters.ts']) assert.ok(shown.has(`src/extensions/${registry}`));
+    await assemble(extensions);
+    assert.equal(agents, await readFile(path.join(output, 'AGENTS.md'), 'utf8'));
     assert.doesNotMatch(agents, /codebase-manifest\.json|docs\/project-structure\.md|docs\/capabilities\/|vite\.config\.ts|\buseRequest\b|ProTable/);
     assert.match(agents, /本表说明工程所有权，不授予任何文件读写权限/);
     assert.match(agents, /不构成对代码生成 Agent 的 Shell 执行授权/);
@@ -28,8 +49,9 @@ try {
     assert.match(agents, /body，不要二次拆包/);
     if (ids.length === 0) {
       assert.doesNotMatch(agents, /LoginProvider|LoginContext|Permission\.tsx|usePermission|authorization\.ts|AUTHORIZATION_MANAGEMENT/);
-      for (const title of ['1. 工程概览与技术栈', '2. 工程目录与文件职责', '3. 基础能力及接入入口', '4. 工程文件所有权与受管边界']) assert.ok(agents.includes(title));
+      for (const title of ['工程概览与技术栈', '工程目录与文件职责', '核心架构与使用入口', '文件职责与受管边界']) assert.ok(agents.includes(title));
     }
+    if (!ids.includes('authorization')) assert.doesNotMatch(agents, /AuthorizationProvider|Permission\.tsx|usePermission|resources\.ts|权限与访问控制/);
     if (ids.includes('login')) {
       assert.match(agents, /src\/context\/LoginContext\.tsx/);
       assert.match(agents, /encodeURIComponent/);

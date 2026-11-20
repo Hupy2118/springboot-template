@@ -1,0 +1,27 @@
+# 当前工程
+
+```text
+frontend/
+├── AGENTS.md
+├── package.json
+├── pnpm-lock.yaml
+├── rsbuild.config.ts
+└── src/
+    ├── App.tsx
+    ├── apis/
+    │   └── service.ts
+    ├── extensions/
+    │   └── providers.ts
+    ├── index.tsx
+    ├── pages/
+    │   ├── Home/
+    │   │   └── index.tsx
+    │   └── Login/
+    │       └── index.tsx
+    └── providers/
+        └── LoginProvider.tsx
+```
+
+## Login
+
+login rules.

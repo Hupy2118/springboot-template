@@ -28,6 +28,51 @@ export function composeAgents(base, fragments) {
   }
   return value;
 }
+const treePlaceholder = '<!-- DEVAGENTSTUDIO:FRONTEND_PROJECT_TREE -->';
+// Paths are relative to frontend; both renderers use UTF-16 lexical ordering.
+export function frontendProjectTree(files) {
+  const root = new Map();
+  for (const file of files) {
+    if (typeof file !== 'string' || /[\\\x00-\x1f\x7f]/u.test(file) || file.split('/').some((part) => !part || part === '.' || part === '..')) {
+      throw new Error('INVALID_AGENTS_SOURCE: unsafe project path');
+    }
+    if (!/^(AGENTS\.md|package\.json|pnpm-lock\.yaml|rsbuild\.config\.ts)$/.test(file)
+      && !/^src\/(App\.tsx|index\.tsx|(?:apis|pages|components|hooks|constants|typings|context|config|routes|platform|providers|layout|bootstrap|observability|utils|extensions)\/.+\.tsx?)$/.test(file)) continue;
+    if (file.split('/').some((part) => ['__tests__', 'tests', 'assets', 'public'].includes(part)) || /\.(test|spec)\.tsx?$/.test(file)) continue;
+    let node = root;
+    for (const part of file.split('/')) {
+      if (!node.has(part)) node.set(part, new Map());
+      node = node.get(part);
+    }
+  }
+  let out = '```text\nfrontend/\n';
+  const walk = (node, prefix) => {
+    const entries = [...node.keys()].sort();
+    entries.forEach((name, index) => {
+      const children = node.get(name);
+      const last = index === entries.length - 1;
+      out += `${prefix}${last ? '└── ' : '├── '}${name}${children.size ? '/' : ''}\n`;
+      walk(children, prefix + (last ? '    ' : '│   '));
+    });
+  };
+  walk(root, '');
+  return out + '```';
+}
+export function composeFrontend(base, fragments, files) {
+  // Preserve all source validation before consuming the internal controls.
+  composeAgents(base, fragments);
+  let value = normalizeAgents(base);
+  if (value.split(treePlaceholder).length !== 2) throw new Error('INVALID_AGENTS_SOURCE: expected one frontend tree placeholder');
+  value = value.replace(treePlaceholder, () => frontendProjectTree(files));
+  for (const { id, content } of fragments) {
+    const fragment = agentsFragment(id, content);
+    const begin = `<!-- ${marker}${id}:BEGIN -->\n`;
+    const end = `<!-- ${marker}${id}:END -->\n`;
+    value += `\n${normalizeAgents(new TextEncoder().encode(fragment.slice(begin.length, -end.length)))}`;
+  }
+  if (value.includes('DEVAGENTSTUDIO:FRONTEND_PROJECT_TREE')) throw new Error('INVALID_AGENTS_SOURCE: unexpected frontend tree placeholder');
+  return value;
+}
 async function readSource(root, relative, optional = false) {
   const target = path.resolve(root, relative);
   if (!target.startsWith(`${path.resolve(root)}${path.sep}`)) throw new Error('INVALID_AGENTS_SOURCE: unsafe path');
@@ -43,7 +88,7 @@ async function readSource(root, relative, optional = false) {
   }
   return readFile(target);
 }
-export async function assembleAgents(root, selected) {
+export async function assembleAgents(root, selected, files) {
   const base = await readSource(root, 'base/AGENTS.md');
   const fragments = [];
   for (const { id } of selected) {
@@ -51,5 +96,5 @@ export async function assembleAgents(root, selected) {
     const content = await readSource(root, `extensions/${id}/AGENTS.fragment.md`, !['login', 'authorization'].includes(id));
     if (content !== undefined) fragments.push({ id, content });
   }
-  return composeAgents(base, fragments);
+  return composeFrontend(base, fragments, files);
 }

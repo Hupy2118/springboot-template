@@ -222,7 +222,28 @@ async function assemble() {
   }
   const selected = selectExtensions(await manifests(), requested, disabled);
   await verifyContributionSources(selected);
-  const agents = await assembleAgents(frontendRoot, selected);
+  const owners = new Map((await filesRecursively(sourceRoot)).map((file) => [file, 'base']));
+  for (const extension of selected) {
+    const extensionSource = path.join(extension.directory, 'src');
+    for (const file of await filesRecursively(extensionSource)) {
+      const target = path.posix.join('src', file.replaceAll('\\', '/'));
+      if (ASSEMBLY_MANAGED_FILES.has(target) || owners.has(target)) throw new AssemblyError('FILE_COLLISION', `${owners.get(target) || 'assembly'} and ${extension.id}: src/${file}`);
+      owners.set(target, extension.id);
+    }
+  }
+  const providers = contributionList(selected, 'providers');
+  const rootRouteContributions = contributionList(selected, 'rootRoutes');
+  const pageRouteContributions = contributionList(selected, 'pageRoutes');
+  const initializerContributions = contributionList(selected, 'initializers');
+  const reporterContributions = contributionList(selected, 'errorReporters');
+  const generated = new Map([
+    ['src/extensions/providers.ts', generateProviderRegistry(providers)],
+    ['src/extensions/rootRoutes.tsx', generateRootRouteRegistry(rootRouteContributions)],
+    ['src/extensions/systemPageRoutes.ts', generatePageRouteRegistry(pageRouteContributions)],
+    ['src/extensions/initializers.ts', generateInitializerRegistry(initializerContributions)],
+    ['src/extensions/errorReporters.ts', generateErrorReporterRegistry(reporterContributions)],
+  ]);
+  generated.set('AGENTS.md', await assembleAgents(frontendRoot, selected, [...owners.keys(), ...generated.keys()]));
   const destination = outputDirectory();
   const primaryOutput = destination === path.join(frontendRoot, 'workspace');
   if (primaryOutput && argument('--force', '') !== 'true') await assertWorkspaceClean();
@@ -235,29 +256,9 @@ async function assemble() {
   await rm(destination, { recursive: true, force: true });
   await mkdir(destination, { recursive: true });
   await cp(sourceRoot, destination, { recursive: true, filter: (candidate) => !['node_modules', 'build'].includes(path.basename(candidate)) });
-  const owners = new Map((await filesRecursively(sourceRoot)).map((file) => [file, 'base']));
   for (const extension of selected) {
-    const extensionSource = path.join(extension.directory, 'src');
-    for (const file of await filesRecursively(extensionSource)) {
-      const target = path.posix.join('src', file.replaceAll('\\', '/'));
-      if (ASSEMBLY_MANAGED_FILES.has(target) || owners.has(target)) throw new AssemblyError('FILE_COLLISION', `${owners.get(target) || 'assembly'} and ${extension.id}: src/${file}`);
-      owners.set(target, extension.id);
-    }
-    await cp(extensionSource, path.join(destination, 'src'), { recursive: true, filter: (candidate) => !['node_modules', 'build'].includes(path.basename(candidate)) });
+    await cp(path.join(extension.directory, 'src'), path.join(destination, 'src'), { recursive: true, filter: (candidate) => !['node_modules', 'build'].includes(path.basename(candidate)) });
   }
-  const providers = contributionList(selected, 'providers');
-  const rootRouteContributions = contributionList(selected, 'rootRoutes');
-  const pageRouteContributions = contributionList(selected, 'pageRoutes');
-  const initializerContributions = contributionList(selected, 'initializers');
-  const reporterContributions = contributionList(selected, 'errorReporters');
-  const generated = new Map([
-    ['AGENTS.md', agents],
-    ['src/extensions/providers.ts', generateProviderRegistry(providers)],
-    ['src/extensions/rootRoutes.tsx', generateRootRouteRegistry(rootRouteContributions)],
-    ['src/extensions/systemPageRoutes.ts', generatePageRouteRegistry(pageRouteContributions)],
-    ['src/extensions/initializers.ts', generateInitializerRegistry(initializerContributions)],
-    ['src/extensions/errorReporters.ts', generateErrorReporterRegistry(reporterContributions)],
-  ]);
   for (const [relative, content] of generated) {
     const target = path.join(destination, relative);
     await mkdir(path.dirname(target), { recursive: true });

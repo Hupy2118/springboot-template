@@ -30,10 +30,18 @@ class AgentsGenerationTest {
             for (String side : Arrays.asList("frontend", "backend")) {
                 String document = new String(project.get(side + "/AGENTS.md"), StandardCharsets.UTF_8);
                 int last = -1;
-                for (String id : resolved.order()) {
+                for (String id : "backend".equals(side) ? resolved.order() : Collections.<String>emptyList()) {
                     String token = "DEVAGENTSTUDIO:CAPABILITY:" + id + ":BEGIN";
                     int at = document.indexOf(token);
                     assertTrue(at > last); assertEquals(at, document.lastIndexOf(token)); last = at;
+                }
+                if ("frontend".equals(side)) {
+                    assertFalse(document.contains("DEVAGENTSTUDIO:CAPABILITY:"));
+                    assertFalse(document.contains("FRONTEND_PROJECT_TREE"));
+                    assertEquals(profile != null, document.contains("## 认证与登录"));
+                    assertEquals("authorization".equals(profile), document.contains("## 权限与访问控制"));
+                    assertEquals(1, document.split("```text\nfrontend/\n", -1).length - 1);
+                    assertArrayEquals(project.get("frontend/AGENTS.md"), materializer.materialize(resolved).get("frontend/AGENTS.md"));
                 }
                 if (profile == null) assertFalse(document.contains("DEVAGENTSTUDIO:CAPABILITY:"));
                 assertFalse(project.containsKey(side + "/README.md"));
