@@ -1,6 +1,7 @@
 package com.cmbchina.template.backend.maintenance;
 
 import org.w3c.dom.*;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.*;
 import javax.xml.transform.dom.DOMSource;
@@ -64,7 +65,14 @@ public final class PomDependencyCompiler {
     }
     private static void write(Path file, Document document) { try { Files.write(file, xml(document).getBytes("UTF-8")); } catch(Exception e) { throw new TemplateException("POM_DEPENDENCY_COMPILATION_FAILED", e.getMessage()); } }
     private static String xml(Document document) {
-        try { Transformer transformer=TransformerFactory.newInstance().newTransformer(); transformer.setOutputProperty(OutputKeys.INDENT,"yes"); transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount","4"); transformer.setOutputProperty(OutputKeys.ENCODING,"UTF-8"); StringWriter writer=new StringWriter(); transformer.transform(new DOMSource(document),new StreamResult(writer)); return writer.toString(); }
+        try {
+            TransformerFactory factory = TransformerFactory.newInstance();
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+            factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
+            Transformer transformer = factory.newTransformer();
+            transformer.setOutputProperty(OutputKeys.INDENT,"yes"); transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount","4"); transformer.setOutputProperty(OutputKeys.ENCODING,"UTF-8"); StringWriter writer=new StringWriter(); transformer.transform(new DOMSource(document),new StreamResult(writer)); return writer.toString();
+        }
         catch(Exception e) { throw new TemplateException("POM_DEPENDENCY_COMPILATION_FAILED", e.getMessage()); }
     }
 }
