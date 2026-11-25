@@ -407,7 +407,7 @@ TEMPLATE_ENGINE_APP_UPDATE_URL: ""
 白名单通过 MyBatis 访问同一 MySQL 实例的 `base.engine_whitelist`，连接池由 `spring.datasource` 提供。运行账号需要对白名单表执行 SELECT、INSERT 和 UPDATE。数据源或白名单表不可用时，接口返回 `503 WHITELIST_UNAVAILABLE`。 [MySQL 配置和迁移说明](../README.md#2-配置-mysql-和数据库管理) · [白名单建表脚本](../template-engine/engine-service/src/main/resources/db/manual/engine-whitelist-schema.sql)
 
 - `POST /v1/whitelist` 接收 JSON 字符串数组，例如 `["00123456", "00654321"]`，成功返回 HTTP `200` 和 `{"returnCode":"SUC0000","errorMsg":"","body":null}`。每批 1 至 500 个 ID，重复提交同一 ID 幂等。
-- `GET /v1/whitelist/check` 以调用方提供的一个 `auth` 请求头的完整值作为待查 ID，例如 `auth: 00123456`。查询成功返回 HTTP `200`，命中时 `body` 为 `true`，未命中时为 `false`。匹配区分大小写并保留前导零。接口使用 Engine Service 的回环访问边界。
+- `GET /v1/whitelist/check` 接收 `Authorization: Bearer <JWT>`，用 `WHITELIST_JWT_SECRET` 验证 HS256 签名和有效期，再按令牌中的字符串 `id` 查询白名单。密钥须与签发端一致，UTF-8 长度至少为 32 字节。查询成功返回 HTTP `200`，命中时 `body` 为 `true`，未命中时为 `false`。匹配区分大小写并保留前导零。
 - 两个接口的 JSON 响应统一使用 `BeeResponseEntity`。失败时使用相应的 HTTP 状态码，`returnCode` 和 `errorMsg` 提供错误信息，`body` 为 `null`。
 
 ## 6. 构建、验证与发布

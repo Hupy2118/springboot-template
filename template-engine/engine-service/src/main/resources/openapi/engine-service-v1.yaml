@@ -31,12 +31,9 @@ paths:
   /v1/whitelist/check:
     get:
       operationId: checkWhitelistId
-      description: Looks up the literal auth header value as an ID using exact, case-sensitive comparison.
-      parameters:
-        - in: header
-          name: auth
-          required: true
-          schema: { $ref: '#/components/schemas/WhitelistId' }
+      description: Verifies the HS256 Bearer JWT and looks up its string id claim using exact, case-sensitive comparison.
+      security:
+        - WhitelistBearer: []
       responses:
         '200':
           description: Membership result
@@ -79,6 +76,11 @@ paths:
         '409': { $ref: '#/components/responses/Error' }
         '500': { $ref: '#/components/responses/Error' }
 components:
+  securitySchemes:
+    WhitelistBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   responses:
     Error: { description: Error envelope, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     WhitelistError:

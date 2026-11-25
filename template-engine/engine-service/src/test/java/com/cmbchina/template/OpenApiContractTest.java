@@ -33,7 +33,7 @@ class OpenApiContractTest {
     }
 
     @Test
-    void whitelistContractPublishesTheStringArrayAuthHeaderAndBeeResponses() throws Exception {
+    void whitelistContractPublishesTheStringArrayBearerSecurityAndBeeResponses() throws Exception {
         JsonNode api = openApi();
         JsonNode add = api.at("/paths/~1v1~1whitelist/post");
         assertEquals("array", add.at("/requestBody/content/application~1json/schema/type").asText());
@@ -43,9 +43,10 @@ class OpenApiContractTest {
                 add.at("/responses/200/content/application~1json/schema/$ref").asText());
         assertTrue(api.at("/components/schemas/WhitelistAddResponse/properties/body/nullable").asBoolean());
         JsonNode check = api.at("/paths/~1v1~1whitelist~1check/get");
-        assertEquals("auth", check.at("/parameters/0/name").asText());
-        assertEquals("header", check.at("/parameters/0/in").asText());
-        assertTrue(check.at("/parameters/0/required").asBoolean());
+        assertTrue(check.at("/security/0/WhitelistBearer").isArray());
+        assertEquals("http", api.at("/components/securitySchemes/WhitelistBearer/type").asText());
+        assertEquals("bearer", api.at("/components/securitySchemes/WhitelistBearer/scheme").asText());
+        assertEquals("JWT", api.at("/components/securitySchemes/WhitelistBearer/bearerFormat").asText());
         assertEquals("#/components/schemas/WhitelistCheckResponse",
                 check.at("/responses/200/content/application~1json/schema/$ref").asText());
         assertEquals("boolean", api.at("/components/schemas/WhitelistCheckResponse/properties/body/type").asText());

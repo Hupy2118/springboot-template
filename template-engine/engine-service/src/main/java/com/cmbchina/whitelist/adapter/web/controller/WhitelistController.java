@@ -2,7 +2,6 @@ package com.cmbchina.whitelist.adapter.web.controller;
 
 import com.cmb.bee.web.annotations.BeeResponseBody;
 import com.cmb.bee.web.entity.BeeResponseEntity;
-import com.cmbchina.common.exception.ServiceException;
 import com.cmbchina.whitelist.application.WhitelistService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -27,10 +26,6 @@ public class WhitelistController {
 
     @GetMapping(value = "/check")
     public BeeResponseEntity<Boolean> check(@RequestHeader HttpHeaders headers) {
-        List<String> auth = headers.get("auth");
-        if (auth == null || auth.size() != 1) {
-            throw new ServiceException("BAD_REQUEST", "exactly one auth header is required", 400);
-        }
-        return BeeResponseEntity.success(whitelistService.contains(auth.get(0)));
+        return BeeResponseEntity.success(whitelistService.check(headers.get(HttpHeaders.AUTHORIZATION)));
     }
 }
