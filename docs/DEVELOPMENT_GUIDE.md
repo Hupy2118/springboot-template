@@ -18,7 +18,7 @@
 springboot-template/
 ├── template-engine/
 │   ├── engine-core/                       # V3 Release Loader / Resolver / Materializer / Update Planner
-│   └── engine-service/                    # /v1/generate、/v1/update、ZIP 打包与 OpenAPI
+│   └── engine-service/                    # 模板、桌面更新、白名单和 Managed Database HTTP 服务
 ├── template-source/code/
 │   ├── template-revision.txt               # 唯一 V3 Release Revision
 │   ├── contracts/                          # Route Projector 对接契约
@@ -265,11 +265,14 @@ mvn -f template-engine/pom.xml verify
 
 ### 5.1 服务边界与权威契约
 
+`engine-service` 是唯一的 Spring Boot 服务模块。模板、版本检测、白名单和数据库管理分别位于 `com.cmbchina.template`、`com.cmbchina.update`、`com.cmbchina.whitelist`、`com.cmbchina.managedb`，由 `com.cmbchina.EngineServiceApplication` 一起启动。各功能的 Controller 位于 `adapter.web.controller`，请求和响应 DTO 位于 `adapter.web.dto`，Java 配置和配置属性类位于 `infrastructure.config`。默认构建使用公开依赖并包含全部接口。纯 Java 模板计算保留在 `engine-core`。
+
 | 项目 | 实现 / 权威位置 |
 | --- | --- |
 | 生成 | `POST /v1/generate`；返回 `application/zip` |
 | 更新 | `POST /v1/update`；返回更新包 ZIP 或 `204` 无变化 |
 | 桌面应用版本检测 | `POST /v1/app-updates/check` 返回 JSON 更新信息与目标版本的 CDN 目录地址 |
+| 白名单 | `POST /v1/whitelist` 批量添加 ID，`GET /v1/whitelist/check` 查询 |
 | HTTP 契约 | `template-engine/engine-service/src/main/resources/openapi/engine-service-v1.yaml` |
 | ZIP 内部 Schema | `template-engine/engine-service/src/main/resources/contracts/v3/*.schema.json`（旧协议）与 `contracts/v4/*.schema.json`（增量安装） |
 | Release 输入 | `template-source/code/` 的 Base、Extension、Contracts、Revision |
@@ -373,13 +376,11 @@ export TEMPLATE_ENGINE_STANDALONE_ENABLED=true
 此接口为无状态发布信息查询，与模板版本、Capability 和 TemplateState 无关。配置位于 `template-engine/engine-service/src/main/resources/application-dev.yml`：
 
 ```yaml
-devagentstudio:
-  app-update:
-    latest-app-version: "${TEMPLATE_ENGINE_APP_UPDATE_VERSION:1.0.1}"
-    app-download-url: "${TEMPLATE_ENGINE_APP_UPDATE_URL:http://127.0.0.1:18081/}"
+TEMPLATE_ENGINE_APP_UPDATE_VERSION: ""
+TEMPLATE_ENGINE_APP_UPDATE_URL: ""
 ```
 
-`latest-app-version` 是客户端应切换到的目标版本。`app-download-url` 配置为固定的 CDN 根地址。本地联调时，在该地址下提供 `1.0.1/` 及其清单和安装包。两项配置同时省略时，模板服务可正常启动，版本检测返回 `503 APP_UPDATE_UNAVAILABLE`。只提供一项、版本不符合 SemVer 2.0.0，或下载地址不是包含 host 的绝对 HTTP/HTTPS URL 时，服务启动失败。配置修改后需重启服务。
+`TEMPLATE_ENGINE_APP_UPDATE_VERSION` 填写目标版本，`TEMPLATE_ENGINE_APP_UPDATE_URL` 填写 CDN 根地址。本地联调时，在该地址下提供 `1.0.1/` 及其清单和安装包。两项配置同时省略时，模板服务可正常启动，版本检测返回 `503 APP_UPDATE_UNAVAILABLE`。只提供一项、版本不符合 SemVer 2.0.0，或下载地址不是包含 host 的绝对 HTTP/HTTPS URL 时，服务启动失败。配置修改后需重启服务。
 
 请求 `POST /v1/app-updates/check`，Content-Type 为 `application/json`，请求对象只允许一个必填字符串字段：
 
@@ -400,6 +401,14 @@ devagentstudio:
 有更新时，服务将目标版本追加到 CDN 根地址的路径，保留已有查询参数。客户端使用 electron-updater 读取目标目录下的 Windows `latest.yml` 或 Mac `latest-mac.yml`，核对清单版本后下载、校验并安装。回退到较低版本需要客户端启用 `allowDowngrade`。请求响应 Fixture 位于 `engine-service/src/test/resources/fixtures/app-update-check.json`。
 
 共享部署时，XCodeAgent 使用统一远端服务地址。本地配置保持回环监听，远端接入入口及认证应独立配置。部署时将 `appDownloadUrl` 指向 CDN 根地址。之后先上传并验证目标版本目录中的清单及各平台安装包，再修改 `latestAppVersion` 并重启服务。回退时将 `latestAppVersion` 指回已归档的版本。
+
+### 5.5 Engine Service 白名单
+
+白名单通过 MyBatis 访问同一 MySQL 实例的 `base.engine_whitelist`，连接池由 `spring.datasource` 提供。运行账号需要对白名单表执行 SELECT、INSERT 和 UPDATE。数据源或白名单表不可用时，接口返回 `503 WHITELIST_UNAVAILABLE`。 [MySQL 配置和迁移说明](../README.md#2-配置-mysql-和数据库管理) · [白名单建表脚本](../template-engine/engine-service/src/main/resources/db/manual/engine-whitelist-schema.sql)
+
+- `POST /v1/whitelist` 接收 JSON 字符串数组，例如 `["00123456", "00654321"]`，成功返回 HTTP `200` 和 `{"returnCode":"SUC0000","errorMsg":"","body":null}`。每批 1 至 500 个 ID，重复提交同一 ID 幂等。
+- `GET /v1/whitelist/check` 以调用方提供的一个 `auth` 请求头的完整值作为待查 ID，例如 `auth: 00123456`。查询成功返回 HTTP `200`，命中时 `body` 为 `true`，未命中时为 `false`。匹配区分大小写并保留前导零。接口使用 Engine Service 的回环访问边界。
+- 两个接口的 JSON 响应统一使用 `BeeResponseEntity`。失败时使用相应的 HTTP 状态码，`returnCode` 和 `errorMsg` 提供错误信息，`body` 为 `null`。
 
 ## 6. 构建、验证与发布
 

@@ -15,6 +15,10 @@ public final class BeeResponseEntity<T> {
         this.body = body;
     }
 
+    public static <T> BeeResponseEntity<T> success() {
+        return new BeeResponseEntity<>("SUC0000", "", null);
+    }
+
     public static <T> BeeResponseEntity<T> success(T body) {
         return new BeeResponseEntity<>("SUC0000", "", body);
     }

@@ -1,5 +1,7 @@
 # Template Engine / Managed Database：独立 Bee Mock 与普通 JSON 三字段响应契约实施方案
 
+本文记录合并前的实施方案。当前 Maven 模块结构及启动方式见 [开发指南](DEVELOPMENT_GUIDE.md#51-服务边界与权威契约)。
+
 > 适用仓库：`Hupy2118/springboot-template`；分支：`dev_manage`；分析基线：`39ce1a402804e34e37f93d4cf25c1c8dccf02939`（2026-11-13）。
 >
 > 目标：SSE 保持原 AG-UI 协议；所有**已定义的 Managed Database 普通 JSON API** 成功统一 `{returnCode:"SUC0000",errorMsg:"",body:...}`、HTTP 200；错误统一三字段并保留 4xx/5xx；本地 Mock 独立目录、原 `com.cmb.bee.*` import 不变，正式服务不带 Mock 类。

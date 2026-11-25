@@ -1,0 +1,13 @@
+{
+  "add": {
+    "request": ["00123456", "MemberA", "00123456"],
+    "status": 200,
+    "response": {"returnCode": "SUC0000", "errorMsg": "", "body": null}
+  },
+  "checks": [
+    {"auth": "00123456", "response": {"returnCode": "SUC0000", "errorMsg": "", "body": true}},
+    {"auth": "MemberA", "response": {"returnCode": "SUC0000", "errorMsg": "", "body": true}},
+    {"auth": "membera", "response": {"returnCode": "SUC0000", "errorMsg": "", "body": false}},
+    {"auth": "missing", "response": {"returnCode": "SUC0000", "errorMsg": "", "body": false}}
+  ]
+}

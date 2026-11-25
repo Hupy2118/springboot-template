@@ -1,0 +1,34 @@
+package com.cmbchina.common.web;
+
+import com.cmbchina.template.core.v3.V3Exception;
+import com.cmbchina.common.exception.ServiceException;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
+
+@RestControllerAdvice(basePackages = {"com.cmbchina.template", "com.cmbchina.update"})
+public class ApiExceptionHandler {
+    @ExceptionHandler(ServiceException.class)
+    ResponseEntity<Map<String, Object>> service(ServiceException exception) { return response(exception.code(), exception.getMessage(), exception.status()); }
+
+    @ExceptionHandler(V3Exception.class)
+    ResponseEntity<Map<String, Object>> v3(V3Exception exception) { return response(exception.code(), exception.getMessage(), exception.status()); }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    ResponseEntity<Map<String, Object>> malformed(HttpMessageNotReadableException exception) { return response("BAD_REQUEST", "request body must be valid JSON", 400); }
+
+    @ExceptionHandler(Exception.class)
+    ResponseEntity<Map<String, Object>> unknown(Exception exception) { return response("INTERNAL_ERROR", "unexpected service failure", 500); }
+
+    private ResponseEntity<Map<String, Object>> response(String code, String message, int status) {
+        Map<String, Object> body = new LinkedHashMap<String, Object>();
+        body.put("code", code); body.put("message", message); body.put("details", Collections.emptyMap()); body.put("traceId", UUID.randomUUID().toString());
+        return ResponseEntity.status(status).body(body);
+    }
+}

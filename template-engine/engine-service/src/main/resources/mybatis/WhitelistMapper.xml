@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cmbchina.whitelist.infrastructure.persistence.mapper.WhitelistMapper">
+
+    <resultMap id="WhitelistResult" type="com.cmbchina.whitelist.infrastructure.persistence.po.WhitelistPo">
+        <id column="id" property="id"/>
+        <result column="member_id" property="memberId"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <insert id="insertAll">
+        INSERT INTO `base`.`engine_whitelist` (member_id)
+        VALUES
+        <foreach collection="rows" item="row" separator=",">
+            (CAST(CONVERT(#{row.memberId,jdbcType=VARCHAR} USING utf8mb4) AS BINARY))
+        </foreach>
+        ON DUPLICATE KEY UPDATE member_id = member_id
+    </insert>
+
+    <select id="selectByMemberId" resultMap="WhitelistResult">
+        SELECT id, CONVERT(member_id USING utf8mb4) AS member_id, created_at
+        FROM `base`.`engine_whitelist`
+        WHERE member_id = CAST(CONVERT(#{memberId,jdbcType=VARCHAR} USING utf8mb4) AS BINARY)
+    </select>
+</mapper>

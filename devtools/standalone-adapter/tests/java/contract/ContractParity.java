@@ -1,6 +1,6 @@
-import com.devagentstudio.template.engine.core.v3.CodeTemplateRelease;
-import com.devagentstudio.template.engine.core.v3.ExtensionRelease;
-import com.devagentstudio.template.engine.source.v3.CodeTemplateReleaseLoader;
+import com.cmbchina.template.core.v3.CodeTemplateRelease;
+import com.cmbchina.template.core.v3.ExtensionRelease;
+import com.cmbchina.template.source.v3.CodeTemplateReleaseLoader;
 import java.nio.file.Paths;
 import java.util.Arrays;
 

@@ -3,6 +3,53 @@ info:
   title: DevAgentStudio Template Engine Service
   version: v3
 paths:
+  /v1/whitelist:
+    post:
+      operationId: addWhitelistIds
+      description: Adds IDs to the MySQL whitelist atomically. Repeating an ID leaves one entry.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              minItems: 1
+              maxItems: 500
+              items: { $ref: '#/components/schemas/WhitelistId' }
+            example: ['00123456', '00654321']
+      responses:
+        '200':
+          description: All submitted IDs are in the whitelist
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WhitelistAddResponse' }
+        '400': { $ref: '#/components/responses/WhitelistError' }
+        '406': { $ref: '#/components/responses/WhitelistError' }
+        '415': { $ref: '#/components/responses/WhitelistError' }
+        '500': { $ref: '#/components/responses/WhitelistError' }
+        '503': { $ref: '#/components/responses/WhitelistError' }
+  /v1/whitelist/check:
+    get:
+      operationId: checkWhitelistId
+      description: Looks up the literal auth header value as an ID using exact, case-sensitive comparison.
+      parameters:
+        - in: header
+          name: auth
+          required: true
+          schema: { $ref: '#/components/schemas/WhitelistId' }
+      responses:
+        '200':
+          description: Membership result
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WhitelistCheckResponse' }
+        '400': { $ref: '#/components/responses/WhitelistError' }
+        '406': { $ref: '#/components/responses/WhitelistError' }
+        '500': { $ref: '#/components/responses/WhitelistError' }
+        '503': { $ref: '#/components/responses/WhitelistError' }
   /v1/app-updates/check:
     post:
       operationId: checkAppUpdate
@@ -34,7 +81,41 @@ paths:
 components:
   responses:
     Error: { description: Error envelope, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    WhitelistError:
+      description: Whitelist request failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/WhitelistErrorResponse' }
   schemas:
+    WhitelistId:
+      type: string
+      minLength: 1
+      maxLength: 128
+      description: Case-sensitive ID with no control characters or surrounding spaces. Leading zeros are preserved.
+    WhitelistAddResponse:
+      type: object
+      required: [returnCode, errorMsg, body]
+      additionalProperties: false
+      properties:
+        returnCode: { type: string, enum: [SUC0000] }
+        errorMsg: { type: string, enum: [''] }
+        body: { type: object, nullable: true, enum: [null] }
+    WhitelistCheckResponse:
+      type: object
+      required: [returnCode, errorMsg, body]
+      additionalProperties: false
+      properties:
+        returnCode: { type: string, enum: [SUC0000] }
+        errorMsg: { type: string, enum: [''] }
+        body: { type: boolean, description: Whether the ID is in the whitelist }
+    WhitelistErrorResponse:
+      type: object
+      required: [returnCode, errorMsg, body]
+      additionalProperties: false
+      properties:
+        returnCode: { type: string, enum: [BAD_REQUEST, WHITELIST_UNAVAILABLE, INTERNAL_ERROR] }
+        errorMsg: { type: string }
+        body: { type: object, nullable: true, enum: [null] }
     SemanticVersion:
       type: string
       description: Strict SemVer 2.0.0. Build metadata is ignored for precedence.

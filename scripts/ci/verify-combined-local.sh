@@ -6,14 +6,12 @@ umask 077
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 jar=${ENGINE_SERVICE_JAR:-"$root/template-engine/engine-service/target/engine-service-1.0.0-SNAPSHOT.jar"}
-mode=${1:-combined}
 port=${TEMPLATE_ENGINE_PORT:-18080}
 base="http://127.0.0.1:$port"
 export TEMPLATE_ENGINE_PORT="$port"
 export TEMPLATE_ENGINE_SOURCE_ROOT="${TEMPLATE_ENGINE_SOURCE_ROOT:-$root/template-source}"
 
 die() { echo "FAIL: $*" >&2; exit 1; }
-[[ $mode == combined || $mode == default ]] || die "usage: $0 [combined|default]"
 for tool in java curl jq unzip; do
     command -v "$tool" >/dev/null || die "missing tool: $tool"
 done
@@ -36,34 +34,36 @@ finish() {
 }
 trap finish EXIT
 
-[[ -f $jar ]] || die "build the $mode JAR first"
-unzip -p "$jar" META-INF/MANIFEST.MF | tr -d '\r' > "$tmp/manifest"
-grep -qx 'Start-Class: com.devagentstudio.template.engine.EngineServiceApplication' "$tmp/manifest" ||
+[[ -f $jar ]] || die "build the engine-service JAR first"
+unzip -p "$jar" META-INF/MANIFEST.MF | tr -d '\r' | awk '
+    /^ / { line = line substr($0, 2); next }
+    NR > 1 { print line }
+    { line = $0 }
+    END { print line }
+' > "$tmp/manifest"
+grep -qx 'Start-Class: com.cmbchina.EngineServiceApplication' "$tmp/manifest" ||
     die "unexpected Start-Class"
 unzip -Z1 "$jar" > "$tmp/entries"
-! grep -Eq 'engine/service/EngineServiceApplication.class|BOOT-INF/lib/(bee-starter|tdsql)' "$tmp/entries" ||
-    die "unexpected boot entry point or enterprise dependency"
-profiles=dev
-if [[ $mode == combined ]]; then
-    for lib in bee-compat managed-database-core mysql-connector-j; do
-        grep -q "^BOOT-INF/lib/$lib-" "$tmp/entries" || die "missing $lib"
-    done
-    : "${MANAGED_DATABASE_SERVICE_KEY:?set the local service key}"
-    [[ $MANAGED_DATABASE_SERVICE_KEY != *$'\r'* && $MANAGED_DATABASE_SERVICE_KEY != *$'\n'* ]] ||
-        die "service key contains a newline"
-    printf 'Authorization: Bearer %s\n' "$MANAGED_DATABASE_SERVICE_KEY" > "$tmp/auth"
-    profiles=dev,managed-db
-else
-    ! grep -Eq '^BOOT-INF/lib/(bee-compat|managed-database-core|mysql-connector-j|spring-jdbc|HikariCP)-' "$tmp/entries" ||
-        die "database dependency in default JAR"
-fi
-echo "PASS $mode JAR entry point and dependencies"
+! grep -Eq 'engine/service/EngineServiceApplication.class|BOOT-INF/lib/(bee-starter|tdsql|managed-database-core-)' "$tmp/entries" ||
+    die "unexpected boot entry point or separate database or enterprise dependency"
+for lib in bee-compat mysql-connector-j; do
+    grep -q "^BOOT-INF/lib/$lib-" "$tmp/entries" || die "missing $lib"
+done
+grep -qx 'BOOT-INF/classes/com/cmbchina/managedb/adapter/web/controller/HealthController.class' "$tmp/entries" ||
+    die "missing Managed Database controller in service classes"
+grep -qx 'BOOT-INF/classes/mybatis/DatasourceRegistrationMapper.xml' "$tmp/entries" ||
+    die "missing Managed Database mapper in service resources"
+: "${MANAGED_DATABASE_SERVICE_KEY:?set the local service key}"
+[[ $MANAGED_DATABASE_SERVICE_KEY != *$'\r'* && $MANAGED_DATABASE_SERVICE_KEY != *$'\n'* ]] ||
+    die "service key contains a newline"
+printf 'Authorization: Bearer %s\n' "$MANAGED_DATABASE_SERVICE_KEY" > "$tmp/auth"
+echo "PASS engine-service JAR entry point and dependencies"
 
 start() {
     if curl -s --max-time 1 "$base/" -o /dev/null; then
         die "port $port already serves HTTP"
     fi
-    MANAGED_DATABASE_SERVICE_KEY="$1" java -jar "$jar" --spring.profiles.active="$profiles" > "$tmp/server.log" 2>&1 &
+    MANAGED_DATABASE_SERVICE_KEY="$1" java -jar "$jar" > "$tmp/server.log" 2>&1 &
     pid=$!
     for ((attempt=0; attempt<60; attempt++)); do
         kill -0 "$pid" 2>/dev/null || die "JAR exited during startup; check local configuration and port $port"
@@ -104,11 +104,6 @@ request 200 POST /v1/generate -H 'Content-Type: application/json' \
     --data '{"requestedConfig":{"capabilities":{}}}'
 grep -qi '^Content-Type: application/zip' "$tmp/headers" || die "generate did not return a ZIP"
 unzip -tq "$tmp/body"
-if [[ $mode == default ]]; then
-    request 404 GET /managed-database/health
-    exit
-fi
-
 unzip -p "$tmp/body" .devagentstudio/template-state.json | jq -c \
     '{protocolVersion:"4",currentTemplateState:.,requestedConfig:{capabilities:{}},mode:"APPLY"}' > "$tmp/update"
 request 204 POST /v1/update -H 'Accept: application/zip, application/json' -H 'Content-Type: application/json' --data-binary "@$tmp/update"

@@ -9,6 +9,7 @@
 
     <modules>
         <module>engine-core</module>
+        <module>devtools/mock-internal-deps/bee-compat</module>
         <module>engine-service</module>
     </modules>
 
@@ -20,7 +21,6 @@
         <jackson.version>2.13.4</jackson.version>
         <junit.version>5.10.2</junit.version>
         <spring-boot.version>2.7.2</spring-boot.version>
-        <managed.enterprise.active>false</managed.enterprise.active>
     </properties>
 
     <dependencyManagement>
@@ -59,46 +59,29 @@
         </dependencies>
     </dependencyManagement>
 
-    <profiles>
-        <profile>
-            <id>local-mock</id>
-            <modules>
-                <module>devtools/mock-internal-deps/bee-compat</module>
-                <module>managed-database-core</module>
-            </modules>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-enforcer-plugin</artifactId>
-                        <version>3.5.0</version>
-                        <executions>
-                            <execution>
-                                <id>require-exclusive-managed-database-profile</id>
-                                <goals><goal>enforce</goal></goals>
-                                <configuration>
-                                    <rules>
-                                        <requireProperty>
-                                            <property>managed.enterprise.active</property>
-                                            <regex>false</regex>
-                                            <regexMessage>local-mock and managed-enterprise are mutually exclusive.</regexMessage>
-                                        </requireProperty>
-                                        <bannedDependencies>
-                                            <excludes><exclude>ZA21:*</exclude><exclude>LT99.09:*</exclude></excludes>
-                                        </bannedDependencies>
-                                    </rules>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <id>managed-enterprise</id>
-            <properties><managed.enterprise.active>true</managed.enterprise.active></properties>
-            <modules><module>managed-database-core</module></modules>
-        </profile>
-    </profiles>
-
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>require-public-engine-dependencies</id>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <excludes>
+                                        <exclude>ZA21:*</exclude>
+                                        <exclude>LT99.09:*</exclude>
+                                    </excludes>
+                                </bannedDependencies>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

@@ -72,15 +72,15 @@ PROTECTED_SURFACES = (
     ("template-source/code/backend/extensions/authorization/sql/authorization/schema.sql", (
         'CREATE TABLE', 'role_resource', 'role_member',
     )),
-    ("template-engine/engine-core/src/main/java/com/devagentstudio/template/engine/core/v3/V3ProjectMaterializer.java", (
+    ("template-engine/engine-core/src/main/java/com/cmbchina/template/core/v3/V3ProjectMaterializer.java", (
         'REGISTRY_TARGETS', 'public Map<String, Object> templateState',
         'extensionInitializers', 'managedContributions',
     )),
-    ("template-engine/engine-core/src/main/java/com/devagentstudio/template/engine/source/v3/CodeTemplateReleaseLoader.java", (
+    ("template-engine/engine-core/src/main/java/com/cmbchina/template/source/v3/CodeTemplateReleaseLoader.java", (
         'src/extensions/initializers.ts', 'Base may not own generated registry',
         'extension may not own generated registry',
     )),
-    ("template-engine/engine-service/src/main/java/com/devagentstudio/template/engine/service/EngineMapper.java", (
+    ("template-engine/engine-service/src/main/java/com/cmbchina/template/adapter/web/EngineMapper.java", (
         'static Map<String, Object> templateState', 'TEMPLATE_STATE_SCHEMA_UNSUPPORTED',
         'TEMPLATE_STATE_INVALID',
     )),
