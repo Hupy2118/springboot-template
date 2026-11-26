@@ -70,6 +70,28 @@ def ignored_runtime_entry(path, root):
     return path.name == ".DS_Store" or any(part in ("node_modules", "build") for part in path.relative_to(root).parts)
 
 
+def runtime_entry_exists(path):
+    # Include dangling symlinks so the Runtime Source validators reject them.
+    return path.exists() or path.is_symlink()
+
+
+def add_extension_inputs(root, extensions, result, *, required_trees=(), optional_trees=()):
+    for extension in extension_directories(root, extensions):
+        relative = extension.relative_to(root)
+        add_file(root, relative / "extension.yaml", result)
+
+        fragment = relative / "AGENTS.fragment.md"
+        if runtime_entry_exists(root / fragment):
+            add_file(root, fragment, result)
+
+        for directory in required_trees:
+            add_tree(root, relative / directory, result)
+        for directory in optional_trees:
+            candidate = relative / directory
+            if runtime_entry_exists(root / candidate):
+                add_tree(root, candidate, result)
+
+
 def collect_inputs(template_source):
     """枚举双端源码与路由契约，供当前发布输入和 Revision 校验使用。"""
     root = pathlib.Path(template_source).resolve()
@@ -78,34 +100,24 @@ def collect_inputs(template_source):
 
     result = set()
     code = pathlib.Path("code")
-    # 将恢复的根目录路由契约纳入发布输入与 Revision 检查。
-    if (root / code / "contracts").exists() or (root / code / "contracts").is_symlink():
-        add_tree(root, code / "contracts", result)
-    add_tree(root, code / "frontend" / "base", result)
-    add_tree(root, code / "backend" / "base", result)
+    contracts = code / "contracts"
+    if runtime_entry_exists(root / contracts):
+        add_tree(root, contracts, result)
 
-    for extension in extension_directories(root, code / "frontend" / "extensions"):
-        add_file(root, extension.relative_to(root) / "extension.yaml", result)
-        fragment = extension / "AGENTS.fragment.md"
-        if fragment.exists() or fragment.is_symlink():
-            add_file(root, fragment.relative_to(root), result)
-        add_tree(root, extension.relative_to(root) / "src", result)
-
-    for extension in extension_directories(root, code / "backend" / "extensions"):
-        add_file(root, extension.relative_to(root) / "extension.yaml", result)
-        fragment = extension / "AGENTS.fragment.md"
-        if fragment.exists() or fragment.is_symlink():
-            add_file(root, fragment.relative_to(root), result)
-        for directory in ("src", "docs", "migrations", "scripts", "sql"):
-            candidate = extension / directory
-            if candidate.exists() or candidate.is_symlink():
-                add_tree(root, candidate.relative_to(root), result)
+    frontend = code / "frontend"
+    backend = code / "backend"
+    add_tree(root, frontend / "base", result)
+    add_tree(root, backend / "base", result)
+    add_extension_inputs(root, frontend / "extensions", result, required_trees=("src",))
+    add_extension_inputs(
+        root, backend / "extensions", result,
+        optional_trees=("src", "docs", "migrations", "scripts", "sql"),
+    )
 
     revision = code / "template-revision.txt"
-    if (root / revision).exists() or (root / revision).is_symlink():
+    if runtime_entry_exists(root / revision):
         add_file(root, revision, result)
-    prefix = "template-source/"
-    return sorted(prefix + (path[len(prefix):] if path.startswith(prefix) else path) for path in result)
+    return sorted(result)
 
 
 def main():
